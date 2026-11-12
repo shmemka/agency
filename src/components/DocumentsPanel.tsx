@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Download, ExternalLink, FileUp, Link2, Trash2 } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { Download, ExternalLink, EyeOff, Link2, Trash2, Upload, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { DOC_KINDS, docKindLabel } from '../lib/constants'
-import { dateTime, fileSize } from '../lib/format'
-import type { Doc, DocKind } from '../lib/types'
 import { useAuth } from '../auth/AuthProvider'
+import { useData } from '../lib/data'
+import { DOC_KINDS, docKindLabel } from '../lib/constants'
+import { date, fileSize } from '../lib/format'
+import type { Doc, DocKind, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Empty, Input, Select, Spinner, cx } from './ui'
+import { Button, Chip, IconButton, Input, Select, Spinner, cx } from './ui'
 
 const BUCKET = 'documents'
+const isImage = (d: Doc) => Boolean(d.storage_path && (d.mime?.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(d.name)))
 
 function safeName(name: string) {
   const dot = name.lastIndexOf('.')
@@ -16,58 +19,105 @@ function safeName(name: string) {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`
 }
 
-export async function openDoc(d: Doc) {
-  if (d.external_url) {
-    window.open(d.external_url, '_blank', 'noopener')
-    return
+export async function signedUrl(path: string, download?: string) {
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600, download ? { download } : undefined)
+  if (error || !data) {
+    toast(`Файл не открылся: ${error?.message ?? 'нет доступа'}`)
+    return null
   }
-  if (!d.storage_path) return
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(d.storage_path, 120, { download: d.name })
-  if (error || !data) toast(`Не удалось открыть файл: ${error?.message}`)
-  else window.open(data.signedUrl, '_blank', 'noopener')
+  return data.signedUrl
 }
 
-export async function deleteDoc(d: Doc) {
-  if (d.storage_path) await supabase.storage.from(BUCKET).remove([d.storage_path])
-  const { error } = await supabase.from('documents').delete().eq('id', d.id)
-  return error?.message ?? null
+/** Просмотр картинки поверх страницы, без скачивания */
+export function ImageViewer({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [onClose])
+  return createPortal(
+    <div className="fade fixed inset-0 z-[90] flex items-center justify-center bg-ink/80 p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={name}>
+      <img src={url} alt={name} className="max-h-full max-w-full rounded-2xl" onClick={(e) => e.stopPropagation()} />
+      <IconButton label="Закрыть" onClick={onClose} className="absolute top-4 right-4 bg-surface">
+        <X className="size-[18px]" strokeWidth={1.5} />
+      </IconButton>
+    </div>,
+    document.body,
+  )
 }
 
-export function DocRow({ d, onDelete, extra }: { d: Doc; onDelete: () => void; extra?: ReactNode }) {
-  const { personName } = useAuth()
+export function DocRow({ d, extra, onChanged }: { d: Doc; extra?: ReactNode; onChanged: () => void }) {
+  const { isAdmin, personName } = useAuth()
+  const [view, setView] = useState<string | null>(null)
+
+  async function open() {
+    if (d.external_url) return void window.open(d.external_url, '_blank', 'noopener')
+    if (!d.storage_path) return
+    if (isImage(d)) {
+      const u = await signedUrl(d.storage_path)
+      if (u) setView(u)
+    } else {
+      const u = await signedUrl(d.storage_path, d.name)
+      if (u) window.open(u, '_blank', 'noopener')
+    }
+  }
+
+  async function remove() {
+    if (!window.confirm(`Удалить «${d.name}»?`)) return
+    if (d.storage_path) await supabase.storage.from(BUCKET).remove([d.storage_path])
+    const { error } = await supabase.from('documents').delete().eq('id', d.id)
+    if (error) return toast(error.message)
+    toast('Документ удалён')
+    onChanged()
+  }
+
   return (
-    <li className="flex items-center gap-3 px-3 py-2.5">
-      <span className="inline-flex h-6 min-w-[86px] items-center justify-center rounded-md bg-base px-2 text-[11px] font-medium text-muted ring-1 ring-line">{docKindLabel(d.kind)}</span>
+    <li className="flex min-h-12 items-center gap-3 border-t border-line py-2 first:border-0">
+      <Chip className="w-24 shrink-0 justify-center">{docKindLabel(d.kind)}</Chip>
       <div className="min-w-0 flex-1">
-        <button className="block max-w-full truncate text-left text-[13px] font-medium hover:text-accent" onClick={() => openDoc(d)}>
+        <button className="block max-w-full truncate text-left hover:underline" onClick={open}>
           {d.name}
         </button>
         <div className="truncate text-xs text-muted">
           {extra}
           {extra ? ', ' : ''}
-          {d.external_url ? 'ссылка' : fileSize(d.size)}
-          {d.uploaded_by ? `, ${personName(d.uploaded_by)}` : ''}, {dateTime(d.created_at)}
+          {[d.external_url ? 'ссылка' : fileSize(d.size), d.uploaded_by ? personName(d.uploaded_by).split(' ')[0] : '', date(d.created_at)].filter(Boolean).join(', ')}
         </div>
       </div>
-      <button className="rounded-md p-1.5 text-faint hover:bg-base hover:text-ink" onClick={() => openDoc(d)} aria-label={d.external_url ? 'Открыть ссылку' : 'Скачать'}>
-        {d.external_url ? <ExternalLink className="size-4" /> : <Download className="size-4" />}
-      </button>
-      <button
-        className="rounded-md p-1.5 text-faint hover:bg-rose-50 hover:text-rose-700"
-        onClick={() => {
-          if (confirm(`Удалить «${d.name}»?`)) onDelete()
-        }}
-        aria-label="Удалить"
-      >
-        <Trash2 className="size-4" />
-      </button>
+      {d.kind === 'stats' && (
+        <IconButton
+          label={d.hide_from_client ? 'Скрыт от клиента. Показать в отчёте' : 'Виден клиенту в отчёте. Скрыть'}
+          className={cx('size-9', d.hide_from_client && 'bg-ink text-white hover:bg-ink/85 hover:text-white')}
+          onClick={async () => {
+            await supabase.from('documents').update({ hide_from_client: !d.hide_from_client }).eq('id', d.id)
+            onChanged()
+          }}
+        >
+          <EyeOff className="size-4" strokeWidth={1.5} />
+        </IconButton>
+      )}
+      <IconButton label={d.external_url ? 'Открыть ссылку' : 'Открыть файл'} className="size-9" onClick={open}>
+        {d.external_url ? <ExternalLink className="size-4" strokeWidth={1.5} /> : <Download className="size-4" strokeWidth={1.5} />}
+      </IconButton>
+      {isAdmin && (
+        <IconButton label="Удалить" className="size-9 hover:text-bad" onClick={remove}>
+          <Trash2 className="size-4" strokeWidth={1.5} />
+        </IconButton>
+      )}
+      {view && <ImageViewer url={view} name={d.name} onClose={() => setView(null)} />}
     </li>
   )
 }
 
-export function DocumentsPanel({ bloggerId, integrationId, campaignId, onCount }: { bloggerId?: string; integrationId?: string; campaignId?: string; onCount?: (n: number) => void }) {
+/**
+ * Документы блогера, интеграции или кампании.
+ * В карточке блогера `choices` — его интеграции: при загрузке выбираем, к какой относится файл.
+ */
+export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }: { bloggerId?: string; integrationId?: string; campaignId?: string; choices?: Integration[] }) {
+  const { reload, campaign } = useData()
   const [docs, setDocs] = useState<Doc[] | null>(null)
-  const [kind, setKind] = useState<DocKind>('contract')
+  const [kind, setKind] = useState<DocKind>(campaignId ? 'invoice' : 'contract')
+  const [target, setTarget] = useState(integrationId ?? '')
   const [busy, setBusy] = useState(false)
   const [hover, setHover] = useState(false)
   const [linkMode, setLinkMode] = useState(false)
@@ -76,17 +126,22 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, onCount }
 
   const load = useCallback(async () => {
     let q = supabase.from('documents').select('*').order('created_at', { ascending: false })
-    if (bloggerId) q = q.eq('blogger_id', bloggerId)
     if (integrationId) q = q.eq('integration_id', integrationId)
-    if (campaignId) q = q.eq('campaign_id', campaignId)
+    else if (bloggerId) q = q.eq('blogger_id', bloggerId)
+    else if (campaignId) q = q.eq('campaign_id', campaignId).is('integration_id', null)
     const { data } = await q
     setDocs((data as Doc[]) ?? [])
-    onCount?.(data?.length ?? 0)
-  }, [bloggerId, integrationId, campaignId, onCount])
+  }, [bloggerId, integrationId, campaignId])
 
   useEffect(() => {
     load()
   }, [load])
+
+  const changed = () => {
+    load()
+    reload('documents')
+  }
+  const base = () => ({ blogger_id: bloggerId ?? null, integration_id: target || null, campaign_id: bloggerId ? null : (campaignId ?? null), kind })
 
   async function upload(files: FileList | File[]) {
     const list = Array.from(files)
@@ -94,48 +149,33 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, onCount }
     setBusy(true)
     let ok = 0
     for (const f of list) {
-      const folder = bloggerId ? `bloggers/${bloggerId}` : campaignId ? `campaigns/${campaignId}` : 'misc'
-      const path = `${folder}/${safeName(f.name)}`
+      const path = `${bloggerId ? `bloggers/${bloggerId}` : `campaigns/${campaignId}`}/${safeName(f.name)}`
       const up = await supabase.storage.from(BUCKET).upload(path, f, { contentType: f.type || undefined })
       if (up.error) {
         toast(`«${f.name}» не загрузился: ${up.error.message}`)
         continue
       }
-      const { error } = await supabase.from('documents').insert({
-        blogger_id: bloggerId ?? null,
-        integration_id: integrationId ?? null,
-        campaign_id: campaignId ?? null,
-        kind,
-        name: f.name,
-        storage_path: path,
-        size: f.size,
-        mime: f.type,
-      })
+      const { error } = await supabase.from('documents').insert({ ...base(), name: f.name, storage_path: path, size: f.size, mime: f.type })
       if (error) toast(`«${f.name}»: ${error.message}`)
       else ok++
     }
     setBusy(false)
     if (ok) toast(ok === 1 ? 'Файл загружен' : `Загружено файлов: ${ok}`)
     if (input.current) input.current.value = ''
-    load()
+    changed()
   }
 
   async function addLink() {
     if (!link.url.trim()) return
-    const { error } = await supabase.from('documents').insert({
-      blogger_id: bloggerId ?? null,
-      integration_id: integrationId ?? null,
-      campaign_id: campaignId ?? null,
-      kind,
-      name: link.name.trim() || link.url.trim(),
-      external_url: link.url.trim(),
-    })
+    const { error } = await supabase.from('documents').insert({ ...base(), name: link.name.trim() || link.url.trim(), external_url: link.url.trim() })
     if (error) return toast(error.message)
     setLink({ name: '', url: '' })
     setLinkMode(false)
     toast('Ссылка добавлена')
-    load()
+    changed()
   }
+
+  const targetLabel = (i: Integration) => `${date(i.publish_date) === '—' ? 'без даты' : date(i.publish_date)}, ${campaign(i.campaign_id)?.name ?? 'без кампании'}`
 
   return (
     <div>
@@ -150,62 +190,58 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, onCount }
           setHover(false)
           upload(e.dataTransfer.files)
         }}
-        className={cx('rounded-xl border border-dashed p-4 transition-colors', hover ? 'border-accent bg-accent-soft' : 'border-line bg-base/50')}
+        className={cx('rounded-inner p-3 transition-colors duration-150', hover ? 'bg-lime/40' : 'hatch')}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={kind} onChange={(e) => setKind(e.target.value as DocKind)} aria-label="Тип документа" className="w-40">
+          <Select value={kind} onChange={(e) => setKind(e.target.value as DocKind)} aria-label="Тип документа" className="w-36 [&_select]:bg-surface">
             {DOC_KINDS.map((k) => (
               <option key={k.id} value={k.id}>
                 {k.label}
               </option>
             ))}
           </Select>
-          <input ref={input} type="file" multiple className="hidden" onChange={(e) => e.target.files && upload(e.target.files)} />
+          {choices && choices.length > 0 && (
+            <Select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="К чему относится" className="w-56 [&_select]:bg-surface">
+              <option value="">К блогеру в целом</option>
+              {choices.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {targetLabel(i)}
+                </option>
+              ))}
+            </Select>
+          )}
+          <input ref={input} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip" className="hidden" onChange={(e) => e.target.files && upload(e.target.files)} />
           <Button variant="primary" loading={busy} onClick={() => input.current?.click()}>
-            <FileUp className="size-4" />
-            Загрузить файл
+            <Upload className="size-4" strokeWidth={1.5} />
+            Загрузить
           </Button>
-          <Button variant="ghost" onClick={() => setLinkMode((v) => !v)}>
-            <Link2 className="size-4" />
-            Добавить ссылку
+          <Button onClick={() => setLinkMode((v) => !v)}>
+            <Link2 className="size-4" strokeWidth={1.5} />
+            Ссылка
           </Button>
-          <span className="text-xs text-muted">или перетащите файлы сюда</span>
         </div>
         {linkMode && (
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Input placeholder="Название, например «Договор подписанный»" value={link.name} onChange={(e) => setLink({ ...link, name: e.target.value })} className="min-w-[200px] flex-1" />
-            <Input placeholder="https://disk.yandex.ru/…" value={link.url} onChange={(e) => setLink({ ...link, url: e.target.value })} className="min-w-[200px] flex-1" />
-            <Button onClick={addLink}>Сохранить ссылку</Button>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Input placeholder="Название" value={link.name} onChange={(e) => setLink({ ...link, name: e.target.value })} className="min-w-40 flex-1 bg-surface" />
+            <Input placeholder="https://disk.yandex.ru/…" value={link.url} onChange={(e) => setLink({ ...link, url: e.target.value })} className="min-w-40 flex-1 bg-surface" />
+            <Button variant="primary" onClick={addLink}>
+              Сохранить
+            </Button>
           </div>
         )}
       </div>
-
-      <div className="mt-4">
-        {docs === null ? (
-          <div className="flex justify-center py-8">
-            <Spinner />
-          </div>
-        ) : docs.length === 0 ? (
-          <Empty title="Документов пока нет">Загрузите договор, акт, чек или скрин статистики.</Empty>
-        ) : (
-          <ul className="divide-y divide-line rounded-xl ring-1 ring-line">
-            {docs.map((d) => (
-              <DocRow
-                key={d.id}
-                d={d}
-                onDelete={async () => {
-                  const err = await deleteDoc(d)
-                  if (err) toast(err)
-                  else {
-                    toast('Документ удалён')
-                    load()
-                  }
-                }}
-              />
-            ))}
-          </ul>
-        )}
-      </div>
+      {docs === null ? (
+        <Spinner className="mt-4" />
+      ) : docs.length === 0 ? (
+        <p className="mt-4 text-muted">Документов пока нет. Перетащите сюда договор, чек или скрин статистики</p>
+      ) : (
+        <ul className="mt-2">
+          {docs.map((d) => {
+            const i = !integrationId && d.integration_id ? choices?.find((x) => x.id === d.integration_id) : undefined
+            return <DocRow key={d.id} d={d} extra={i ? targetLabel(i) : undefined} onChanged={changed} />
+          })}
+        </ul>
+      )}
     </div>
   )
 }

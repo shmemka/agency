@@ -1,25 +1,26 @@
 @import '@fontsource/onest/400.css';
 @import '@fontsource/onest/500.css';
 @import '@fontsource/onest/600.css';
-@import '@fontsource/unbounded/500.css';
-@import '@fontsource/unbounded/600.css';
 @import 'tailwindcss';
 
 @theme {
   --font-sans: 'Onest', system-ui, sans-serif;
-  --font-display: 'Unbounded', 'Onest', sans-serif;
 
-  --color-base: #f3f4f8;
+  --color-canvas: #eef0f4;
   --color-surface: #ffffff;
-  --color-ink: #171a2b;
-  --color-muted: #676d82;
-  --color-faint: #9aa0b2;
-  --color-line: #e1e4ec;
-  --color-night: #232a5c;
-  --color-night-2: #2f3770;
-  --color-accent: #e4387b;
-  --color-accent-dark: #c42263;
-  --color-accent-soft: #fde8f0;
+  --color-soft: #f4f5f8;
+  --color-ink: #15171c;
+  --color-muted: #5b616e;
+  --color-faint: #8a909c;
+  --color-line: rgb(21 23 28 / 0.08);
+  --color-lime: #c5e84e;
+  --color-leaf: #6fd96b;
+  --color-warn: #b45309;
+  --color-bad: #c2410c;
+
+  --radius-card: 28px;
+  --radius-inner: 20px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 html,
@@ -29,12 +30,13 @@ body,
 }
 
 body {
-  background: var(--color-base);
+  background: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-size: 14px;
-  line-height: 1.45;
+  line-height: 20px;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .num {
@@ -42,37 +44,83 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-ink);
   outline-offset: 2px;
 }
 
 input,
 select,
-textarea {
+textarea,
+button {
   font: inherit;
 }
 
-@keyframes drawer-in {
+/* фирменная деталь: штриховка = «ещё не сделано» */
+.hatch {
+  background-image: repeating-linear-gradient(-45deg, rgb(21 23 28 / 0.14) 0 3px, transparent 3px 8px);
+}
+.bar-lime {
+  background-image: linear-gradient(90deg, var(--color-lime), var(--color-leaf));
+}
+
+@keyframes rise {
   from {
-    transform: translateX(24px);
+    transform: translateY(8px);
     opacity: 0;
   }
 }
-@keyframes fade-in {
+@keyframes slide {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+}
+@keyframes sheet {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+@keyframes fade {
   from {
     opacity: 0;
   }
 }
-.drawer-in {
-  animation: drawer-in 0.18s ease-out;
+.rise {
+  animation: rise 0.3s var(--ease-out);
 }
-.fade-in {
-  animation: fade-in 0.15s ease-out;
+.slide {
+  animation: slide 0.3s var(--ease-out);
+}
+.sheet {
+  animation: sheet 0.3s var(--ease-out);
+}
+.fade {
+  animation: fade 0.18s var(--ease-out);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .drawer-in,
-  .fade-in {
+  .rise,
+  .slide,
+  .sheet,
+  .fade {
     animation: none;
+  }
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-card {
+    box-shadow: none !important;
+    break-inside: avoid;
   }
 }

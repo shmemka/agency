@@ -1,4 +1,4 @@
-import type { Status } from './constants'
+import type { BloggerStatus, Status } from './constants'
 
 export interface Profile {
   id: string
@@ -11,6 +11,7 @@ export interface Profile {
 
 export type Platform = 'tiktok' | 'youtube' | 'telegram' | 'vk' | 'instagram' | 'other'
 export type LegalStatus = 'self_employed' | 'ip' | 'ooo' | 'individual' | 'unknown'
+export type AgeSplit = Partial<Record<'u18' | 'a18' | 'a25' | 'a35', number>>
 
 export interface Blogger {
   id: string
@@ -24,15 +25,19 @@ export interface Blogger {
   city: string | null
   followers: number | null
   avg_reach: number | null
+  clip_views: number | null
+  audience_female_pct: number | null
+  audience_age: AgeSplit | null
+  stats_updated_at: string | null
   price: number | null
   contact: string | null
   email: string | null
   phone: string | null
   legal_status: LegalStatus
   rkn_registered: boolean | null
-  status: Status
+  status: BloggerStatus
+  blacklist_reason: string | null
   owner_id: string | null
-  next_action_at: string | null
   tags: string[]
   notes: string | null
   source: string | null
@@ -58,8 +63,7 @@ export interface Campaign {
   client_id: string | null
   name: string
   status: CampaignStatus
-  budget: number | null
-  commission_pct: number | null
+  markup_pct: number
   prepaid: boolean
   start_date: string | null
   end_date: string | null
@@ -68,6 +72,8 @@ export interface Campaign {
   created_at: string
 }
 
+export type Decision = 'none' | 'pending' | 'approved' | 'rejected'
+
 export interface Integration {
   id: string
   blogger_id: string
@@ -75,6 +81,10 @@ export interface Integration {
   publish_date: string | null
   format: string | null
   price: number | null
+  price_client: number | null
+  price_client_manual: boolean
+  client_decision: Decision
+  client_comment: string | null
   guaranteed_reach: number | null
   fact_reach: number | null
   status: Status
@@ -83,7 +93,10 @@ export interface Integration {
   ad_url: string | null
   promo_code: string | null
   erid: string | null
-  ord_registered: boolean
+  first_shown_at: string | null
+  ord_reported_at: string | null
+  ord_reported_by: string | null
+  marked_by: 'us' | 'client' | 'blogger'
   payments_count: number | null
   revenue: number | null
   owner_id: string | null
@@ -105,6 +118,7 @@ export interface Doc {
   external_url: string | null
   size: number | null
   mime: string | null
+  hide_from_client: boolean
   uploaded_by: string | null
   created_at: string
 }
@@ -116,7 +130,71 @@ export interface Activity {
   actor_id: string | null
   kind: 'comment' | 'status' | 'document' | 'created'
   body: string | null
-  from_status: Status | null
-  to_status: Status | null
+  from_status: string | null
+  to_status: string | null
   created_at: string
+}
+
+export interface Task {
+  id: string
+  title: string
+  assignee_id: string
+  due_date: string | null
+  due_time: string | null
+  blogger_id: string | null
+  integration_id: string | null
+  campaign_id: string | null
+  done_at: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface Notice {
+  id: number
+  profile_id: string
+  kind: string
+  title: string
+  link: string | null
+  read_at: string | null
+  created_at: string
+}
+
+export interface ShareLink {
+  id: string
+  token: string
+  kind: 'shortlist' | 'report'
+  campaign_id: string
+  revoked: boolean
+  created_at: string
+}
+
+export interface Income {
+  id: string
+  paid_on: string
+  amount: number
+  client_id: string | null
+  campaign_id: string | null
+  receiver_id: string | null
+  payer_type: 'org' | 'person'
+  has_receipt: boolean
+  receipt_url: string | null
+  note: string | null
+}
+
+export interface Expense {
+  id: string
+  paid_on: string
+  amount: number
+  category: string | null
+  paid_by: string | null
+  note: string | null
+}
+
+export interface Settings {
+  agency_name: string
+  default_markup_pct: number
+  tax_org_pct: number
+  tax_person_pct: number
+  income_limit: number
+  ord_deadline_days: number
 }

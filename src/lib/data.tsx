@@ -1,102 +1,187 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { fetchAll, supabase } from './supabase'
-import type { Blogger, Campaign, Client } from './types'
+import { useAuth } from '../auth/AuthProvider'
+import { statusInfo, type Status } from './constants'
+import { transitionWarnings, type DocLite } from './rules'
+import { toast } from './toast'
+import type { Blogger, Campaign, Client, Integration, Notice, Settings, ShareLink, Task } from './types'
+
+type TableName = 'bloggers' | 'integrations' | 'campaigns' | 'clients' | 'tasks' | 'notifications' | 'documents' | 'campaign_members' | 'share_links' | 'campaign_money' | 'settings'
 
 interface DataState {
   bloggers: Blogger[]
+  integrations: Integration[]
   campaigns: Campaign[]
   clients: Client[]
+  tasks: Task[]
+  notices: Notice[]
+  docs: DocLite[]
+  members: { campaign_id: string; profile_id: string }[]
+  links: ShareLink[]
+  budgets: Record<string, number | null>
+  settings: Settings | null
   loading: boolean
   error: string | null
-  /** Счётчик — меняется при любых изменениях интеграций/ленты у коллег */
+  /** меняется при любом событии в ленте — карточки перечитывают историю */
   pulse: number
-  reloadBloggers: () => Promise<void>
-  reloadCampaigns: () => Promise<void>
+  reload: (...t: TableName[]) => Promise<void>
   patchBlogger: (id: string, patch: Partial<Blogger>) => Promise<string | null>
-  bloggerById: (id: string | null | undefined) => Blogger | undefined
+  patchIntegration: (id: string, patch: Partial<Integration>) => Promise<string | null>
+  /** смена этапа с проверкой правил; false — пользователь передумал */
+  moveIntegration: (i: Integration, to: Status) => Promise<boolean>
+  blogger: (id: string | null | undefined) => Blogger | undefined
+  campaign: (id: string | null | undefined) => Campaign | undefined
 }
 
 const Ctx = createContext<DataState | null>(null)
+const q = <T,>(table: string, order: string, asc = false, cols = '*') =>
+  fetchAll<T>((f, t) => supabase.from(table).select(cols).order(order, { ascending: asc }).range(f, t) as unknown as PromiseLike<{ data: T[] | null; error: { message: string } | null }>)
 
 export function DataProvider({ children }: { children: ReactNode }) {
-  const [bloggers, setBloggers] = useState<Blogger[]>([])
-  const [campaigns, setCampaigns] = useState<Campaign[]>([])
-  const [clients, setClients] = useState<Client[]>([])
+  const { isAdmin } = useAuth()
+  const [s, setS] = useState({
+    bloggers: [] as Blogger[],
+    integrations: [] as Integration[],
+    campaigns: [] as Campaign[],
+    clients: [] as Client[],
+    tasks: [] as Task[],
+    notices: [] as Notice[],
+    docs: [] as DocLite[],
+    members: [] as { campaign_id: string; profile_id: string }[],
+    links: [] as ShareLink[],
+    budgets: {} as Record<string, number | null>,
+    settings: null as Settings | null,
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pulse, setPulse] = useState(0)
-  const timer = useRef<number | undefined>(undefined)
+  const timers = useRef<Record<string, number>>({})
 
-  const reloadBloggers = useCallback(async () => {
-    try {
-      const rows = await fetchAll<Blogger>((from, to) =>
-        supabase.from('bloggers').select('*').order('updated_at', { ascending: false }).range(from, to),
-      )
-      setBloggers(rows)
-      setError(null)
-    } catch (e) {
-      setError((e as Error).message)
+  const loadOne = useCallback(
+    async (t: TableName) => {
+      switch (t) {
+        case 'bloggers':
+          return { bloggers: await q<Blogger>('bloggers', 'updated_at') }
+        case 'integrations':
+          return { integrations: await q<Integration>('integrations', 'updated_at') }
+        case 'campaigns':
+          return { campaigns: await q<Campaign>('campaigns', 'created_at') }
+        case 'clients':
+          return { clients: await q<Client>('clients', 'name', true) }
+        case 'tasks':
+          return { tasks: await q<Task>('tasks', 'created_at') }
+        case 'notifications':
+          return { notices: ((await supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(40)).data ?? []) as Notice[] }
+        case 'documents':
+          return { docs: await q<DocLite>('documents', 'created_at', false, 'id,integration_id,blogger_id,campaign_id,kind') }
+        case 'campaign_members':
+          return { members: ((await supabase.from('campaign_members').select('campaign_id,profile_id')).data ?? []) as { campaign_id: string; profile_id: string }[] }
+        case 'share_links':
+          return { links: ((await supabase.from('share_links').select('*').order('created_at', { ascending: false })).data ?? []) as ShareLink[] }
+        case 'campaign_money': {
+          if (!isAdmin) return {}
+          const rows = ((await supabase.from('campaign_money').select('*')).data ?? []) as { campaign_id: string; budget: number | null }[]
+          return { budgets: Object.fromEntries(rows.map((r) => [r.campaign_id, r.budget])) }
+        }
+        case 'settings':
+          return { settings: ((await supabase.from('settings').select('*').maybeSingle()).data ?? null) as Settings | null }
+      }
+    },
+    [isAdmin],
+  )
+
+  const reload = useCallback(
+    async (...tables: TableName[]) => {
+      try {
+        const parts = await Promise.all(tables.map(loadOne))
+        setS((prev) => Object.assign({}, prev, ...parts))
+        setError(null)
+      } catch (e) {
+        setError((e as Error).message)
+      }
+    },
+    [loadOne],
+  )
+
+  useEffect(() => {
+    reload('bloggers', 'integrations', 'campaigns', 'clients', 'tasks', 'notifications', 'documents', 'campaign_members', 'share_links', 'campaign_money', 'settings').then(() => setLoading(false))
+  }, [reload])
+
+  // живые обновления: изменения коллег и клиента приходят сами
+  useEffect(() => {
+    const later = (t: TableName) => () => {
+      window.clearTimeout(timers.current[t])
+      timers.current[t] = window.setTimeout(() => reload(t), 500)
     }
-  }, [])
-
-  const reloadCampaigns = useCallback(async () => {
-    const [c, cl] = await Promise.all([
-      supabase.from('campaigns').select('*').order('created_at', { ascending: false }),
-      supabase.from('clients').select('*').order('name'),
-    ])
-    setCampaigns((c.data as Campaign[]) ?? [])
-    setClients((cl.data as Client[]) ?? [])
-  }, [])
-
-  useEffect(() => {
-    ;(async () => {
-      await Promise.all([reloadBloggers(), reloadCampaigns()])
-      setLoading(false)
-    })()
-  }, [reloadBloggers, reloadCampaigns])
-
-  // Живые обновления: если коллега поменял статус — список обновится сам
-  useEffect(() => {
-    const ch = supabase
-      .channel('crm-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bloggers' }, () => {
-        window.clearTimeout(timer.current)
-        timer.current = window.setTimeout(() => reloadBloggers(), 400)
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'integrations' }, () => setPulse((p) => p + 1))
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity' }, () => setPulse((p) => p + 1))
-      .subscribe()
+    let ch = supabase.channel('crm-live')
+    for (const t of ['bloggers', 'integrations', 'campaigns', 'tasks', 'notifications', 'documents'] as TableName[]) {
+      ch = ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, later(t))
+    }
+    ch = ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity' }, () => setPulse((p) => p + 1))
+    ch.subscribe()
     return () => {
       supabase.removeChannel(ch)
     }
-  }, [reloadBloggers])
+  }, [reload])
 
-  const patchBlogger = useCallback(async (id: string, patch: Partial<Blogger>) => {
-    setBloggers((list) => list.map((b) => (b.id === id ? { ...b, ...patch } : b)))
-    const { data, error } = await supabase.from('bloggers').update(patch).eq('id', id).select().single()
-    if (error) {
-      await reloadBloggers()
-      return error.message
-    }
-    setBloggers((list) => list.map((b) => (b.id === id ? (data as Blogger) : b)))
-    setPulse((p) => p + 1)
-    return null
-  }, [reloadBloggers])
+  const patchBlogger = useCallback(
+    async (id: string, patch: Partial<Blogger>) => {
+      setS((p) => ({ ...p, bloggers: p.bloggers.map((b) => (b.id === id ? { ...b, ...patch } : b)) }))
+      const { data, error } = await supabase.from('bloggers').update(patch).eq('id', id).select().single()
+      if (error) {
+        await reload('bloggers')
+        return error.message
+      }
+      setS((p) => ({ ...p, bloggers: p.bloggers.map((b) => (b.id === id ? (data as Blogger) : b)) }))
+      setPulse((p) => p + 1)
+      return null
+    },
+    [reload],
+  )
+
+  const patchIntegration = useCallback(
+    async (id: string, patch: Partial<Integration>) => {
+      setS((p) => ({ ...p, integrations: p.integrations.map((i) => (i.id === id ? { ...i, ...patch } : i)) }))
+      const { data, error } = await supabase.from('integrations').update(patch).eq('id', id).select().single()
+      if (error) {
+        await reload('integrations')
+        return error.message
+      }
+      setS((p) => ({ ...p, integrations: p.integrations.map((i) => (i.id === id ? (data as Integration) : i)) }))
+      setPulse((p) => p + 1)
+      if (patch.status === 'published' || patch.status === 'done') reload('bloggers')
+      return null
+    },
+    [reload],
+  )
+
+  const moveIntegration = useCallback(
+    async (i: Integration, to: Status) => {
+      if (i.status === to) return false
+      const b = s.bloggers.find((x) => x.id === i.blogger_id)
+      const warns = transitionWarnings(i, b, s.docs, to)
+      if (warns.length && !window.confirm(`${warns.map((w) => `• ${w}`).join('\n')}\n\nВсё равно перевести в «${statusInfo(to).label}»?`)) return false
+      const err = await patchIntegration(i.id, { status: to })
+      toast(err ? `Не удалось сменить этап: ${err}` : `${b?.nick ?? 'Интеграция'}: ${statusInfo(to).label}`)
+      return !err
+    },
+    [s.bloggers, s.docs, patchIntegration],
+  )
 
   const value = useMemo<DataState>(
     () => ({
-      bloggers,
-      campaigns,
-      clients,
+      ...s,
       loading,
       error,
       pulse,
-      reloadBloggers,
-      reloadCampaigns,
+      reload,
       patchBlogger,
-      bloggerById: (id) => (id ? bloggers.find((b) => b.id === id) : undefined),
+      patchIntegration,
+      moveIntegration,
+      blogger: (id) => (id ? s.bloggers.find((b) => b.id === id) : undefined),
+      campaign: (id) => (id ? s.campaigns.find((c) => c.id === id) : undefined),
     }),
-    [bloggers, campaigns, clients, loading, error, pulse, reloadBloggers, reloadCampaigns, patchBlogger],
+    [s, loading, error, pulse, reload, patchBlogger, patchIntegration, moveIntegration],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

@@ -38,7 +38,7 @@ export function nickFromUrl(url: string | null | undefined) {
   if (!url) return null
   const m = url.match(/@([A-Za-z0-9_.-]+)/)
   if (m) return m[1].replace(/\.$/, '')
-  const t = url.match(/t\.me\/([A-Za-z0-9_]+)/)
+  const t = url.match(/(?:t\.me|vk\.com|vk\.ru)\/([A-Za-z0-9_.]+)/)
   if (t) return t[1]
   return null
 }
@@ -48,7 +48,7 @@ export function platformFromUrl(url: string | null | undefined) {
   if (u.includes('tiktok')) return 'tiktok' as const
   if (u.includes('youtu')) return 'youtube' as const
   if (u.includes('t.me')) return 'telegram' as const
-  if (u.includes('vk.com')) return 'vk' as const
+  if (u.includes('vk.com') || u.includes('vk.ru')) return 'vk' as const
   if (u.includes('instagram')) return 'instagram' as const
   return 'other' as const
 }
@@ -79,4 +79,39 @@ export function initials(name: string | null | undefined) {
     .slice(0, 2)
     .map((p) => p[0]?.toUpperCase())
     .join('')
+}
+
+export const todayISO = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+export function addDays(iso: string, n: number) {
+  const d = new Date(`${iso}T12:00:00`)
+  d.setDate(d.getDate() + n)
+  return d.toISOString().slice(0, 10)
+}
+
+export function daysBetween(a: string, b: string) {
+  return Math.round((new Date(`${b.slice(0, 10)}T12:00:00`).getTime() - new Date(`${a.slice(0, 10)}T12:00:00`).getTime()) / 86_400_000)
+}
+
+export function pct(v: number | null | undefined) {
+  return v === null || v === undefined ? '—' : `${Math.round(v)}%`
+}
+
+export function plural(n: number, one: string, few: string, many: string) {
+  const a = Math.abs(n) % 100
+  const b = a % 10
+  if (a > 10 && a < 20) return many
+  if (b > 1 && b < 5) return few
+  if (b === 1) return one
+  return many
+}
+
+export async function downloadXlsx(name: string, rows: Record<string, unknown>[]) {
+  const XLSX = await import('xlsx')
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Лист1')
+  XLSX.writeFile(wb, `${name}.xlsx`)
 }

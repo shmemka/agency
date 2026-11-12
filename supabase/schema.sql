@@ -319,6 +319,8 @@ create policy profiles_update on public.profiles for update
 do $$
 declare t text;
 begin
+  -- после перехода на версию 2 (migrations/002) эти общие правила не возвращаем
+  if exists (select 1 from pg_policies where schemaname = 'public' and policyname like 'v2_%') then return; end if;
   foreach t in array array['clients', 'campaigns', 'bloggers', 'integrations', 'documents'] loop
     execute format('drop policy if exists %I_member_all on public.%I', t, t);
     execute format(

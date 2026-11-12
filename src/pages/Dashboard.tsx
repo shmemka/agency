@@ -1,184 +1,188 @@
-import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useData } from '../lib/data'
+import { ArrowUpRight } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
-import { fetchAll, supabase } from '../lib/supabase'
-import { PHASES, legalInfo, statusInfo } from '../lib/constants'
-import { date, money } from '../lib/format'
-import type { Blogger, Integration } from '../lib/types'
-import { PageHeader, StatusBadge, cx } from '../components/ui'
-import { PlatformTag } from './Bloggers'
-
-const DAY = 86_400_000
+import { useData } from '../lib/data'
+import { PHASES, statusInfo } from '../lib/constants'
+import { isActive, isLive, ordDeadline } from '../lib/rules'
+import { count, date, money, plural, todayISO } from '../lib/format'
+import { Card, PageHeader, StatusBadge, cx } from '../components/ui'
+import { BloggerName, TaskList, useIntegrationPanel } from '../components/bits'
+import { useAttention } from '../components/Layout'
 
 export function Dashboard() {
-  const { bloggers, campaigns, pulse, bloggerById } = useData()
-  const { profile } = useAuth()
-  const [ints, setInts] = useState<Integration[]>([])
+  const { integrations, campaigns, tasks, settings, blogger, campaign, bloggers, loading } = useData()
+  const { profile, isAdmin } = useAuth()
+  const { open } = useIntegrationPanel()
+  const items = useAttention().filter((a) => !a.key.startsWith('t'))
+  const today = todayISO()
+  const month = today.slice(0, 7)
 
-  useEffect(() => {
-    fetchAll<Integration>((f, t) => supabase.from('integrations').select('*').range(f, t)).then(setInts).catch(() => setInts([]))
-  }, [pulse])
-
-  const today = new Date().toISOString().slice(0, 10)
-  const monthStart = today.slice(0, 8) + '01'
-
-  const phaseCounts = useMemo(() => {
-    const c: Record<string, number> = {}
-    for (const b of bloggers) c[statusInfo(b.status).phase] = (c[statusInfo(b.status).phase] ?? 0) + 1
-    return c
-  }, [bloggers])
+  const active = integrations.filter(isActive)
   const flow = PHASES.filter((p) => p.id !== 'stop')
-  const flowTotal = flow.reduce((a, p) => a + (phaseCounts[p.id] ?? 0), 0) || 1
+  const byPhase = (id: string) => active.filter((i) => statusInfo(i.status).phase === id)
+  const total = active.length || 1
+  const livePhase = flow.findIndex((p) => p.id === 'live')
 
-  const stale = bloggers
-    .filter((b) => (b.status === 'waiting_reply' || b.status === 'contacted') && Date.now() - new Date(b.updated_at).getTime() > 3 * DAY)
-    .sort((a, b) => a.updated_at.localeCompare(b.updated_at))
-  const due = bloggers.filter((b) => b.next_action_at && b.next_action_at <= today && !['done', 'declined', 'blacklist'].includes(b.status)).sort((a, b) => a.next_action_at!.localeCompare(b.next_action_at!))
-  const legalGap = bloggers.filter((b) => ['agreed', 'waiting_details', 'waiting_contract', 'waiting_signature', 'waiting_payment'].includes(b.status) && !legalInfo(b.legal_status).ok)
-  const noErid = ints.filter((i) => ['agreed', 'waiting_payment', 'paid', 'published'].includes(i.status) && !i.erid && (!i.publish_date || i.publish_date >= monthStart))
-  const thisMonth = ints.filter((i) => i.publish_date && i.publish_date >= monthStart && i.status !== 'declined')
-  const upcoming = ints.filter((i) => i.publish_date && i.publish_date >= today && !['declined', 'blacklist'].includes(i.status)).sort((a, b) => a.publish_date!.localeCompare(b.publish_date!)).slice(0, 8)
-  const active = campaigns.filter((c) => c.status === 'active' || c.status === 'planning')
-  const commission = active.reduce((a, c) => a + ((c.budget ?? 0) * (c.commission_pct ?? 0)) / 100, 0)
-  const mine = bloggers.filter((b) => b.owner_id === profile?.id && !['done', 'declined', 'blacklist'].includes(b.status)).length
-
-  const firstName = (profile?.full_name || '').split(' ')[0]
+  const myTasks = tasks.filter((t) => t.assignee_id === profile?.id && !t.done_at && (!t.due_date || t.due_date <= today)).sort((a, b) => (a.due_date ?? '9').localeCompare(b.due_date ?? '9'))
+  const thisMonth = integrations.filter((i) => i.publish_date?.startsWith(month) && i.status !== 'declined' && (!i.campaign_id || i.client_decision === 'approved'))
+  const out = thisMonth.filter(isLive)
+  const upcoming = active.filter((i) => i.publish_date && i.publish_date >= today && !isLive(i)).sort((a, b) => a.publish_date!.localeCompare(b.publish_date!)).slice(0, 6)
+  const ord = integrations
+    .filter((i) => isLive(i) && !i.ord_reported_at)
+    .map((i) => ({ i, dl: ordDeadline(i, settings) }))
+    .filter((x) => x.dl)
+    .sort((a, b) => a.dl!.localeCompare(b.dl!))
+  const running = campaigns.filter((c) => c.status === 'active' || c.status === 'planning')
+  const commission = integrations.filter((i) => i.campaign_id && running.some((c) => c.id === i.campaign_id) && i.client_decision === 'approved' && i.status !== 'declined').reduce((a, i) => a + Math.max(0, (i.price_client ?? i.price ?? 0) - (i.price ?? 0)), 0)
 
   return (
     <>
-      <PageHeader title={firstName ? `${firstName}, вот что сейчас в работе` : 'Что сейчас в работе'} sub={new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })} />
+      <PageHeader title={new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, (c) => c.toUpperCase())} sub={isAdmin ? 'Все блогеры и кампании агентства' : 'Ваши блогеры и кампании'} />
 
-      <section className="rounded-2xl bg-surface p-5 ring-1 ring-line">
-        <div className="mb-4 flex items-baseline justify-between">
-          <h2 className="font-medium">Воронка блогеров</h2>
-          <Link to="/bloggers?view=board" className="text-sm text-muted hover:text-accent">
-            Открыть доску
-          </Link>
-        </div>
-        <div className="flex h-3 overflow-hidden rounded-full bg-base" aria-hidden>
-          {flow.map((p) => (
-            <div key={p.id} className={p.dot} style={{ width: `${((phaseCounts[p.id] ?? 0) / flowTotal) * 100}%` }} />
-          ))}
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-6">
-          {PHASES.map((p) => (
-            <Link key={p.id} to={`/bloggers?phase=${p.id}`} className="group">
-              <div className="flex items-center gap-1.5 text-[13px] text-muted group-hover:text-ink">
-                <span className={cx('size-2 rounded-full', p.dot)} />
-                {p.label}
-              </div>
-              <div className="num font-display mt-1 text-2xl font-semibold">{phaseCounts[p.id] ?? 0}</div>
+      <div className="grid gap-3 lg:grid-cols-3">
+        <Card className="rise lg:col-span-2">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="text-base">В работе сейчас</h2>
+            <Link to="/integrations?tab=active" className="text-[13px] text-muted hover:text-ink">
+              Все интеграции
             </Link>
-          ))}
-        </div>
-      </section>
-
-      <div className="mt-4 grid gap-4 sm:grid-cols-3">
-        <Stat label="Выходов в этом месяце" value={String(thisMonth.length)} note={`на ${money(thisMonth.reduce((a, i) => a + (i.price ?? 0), 0))}`} to="/integrations?period=month" />
-        <Stat label="Комиссия по текущим кампаниям" value={money(commission)} note={`${active.length} кампаний в работе`} to="/campaigns" />
-        <Stat label="Мои блогеры в работе" value={String(mine)} note="вы ответственный" to="/bloggers?owner=me" />
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Todo title="Пора напомнить о себе" hint="Написали или ждём ответ дольше трёх дней" items={stale} render={(b) => `без движения с ${date(b.updated_at)}`} />
-        <Todo title="Следующий шаг на сегодня" hint="Срок в карточке наступил" items={due} render={(b) => `до ${date(b.next_action_at)}`} />
-        <Todo title="Нет статуса самозанятого или ИП" hint="Без него договор не заключаем" items={legalGap} render={(b) => legalInfo(b.legal_status).label} />
-        <section className="rounded-2xl bg-surface p-5 ring-1 ring-line">
-          <h2 className="font-medium">Интеграции без erid</h2>
-          <p className="text-[13px] text-muted">Каждый выход маркируем через ОРД</p>
-          {noErid.length === 0 ? (
-            <p className="mt-4 text-sm text-muted">Все согласованные выходы промаркированы.</p>
-          ) : (
-            <ul className="mt-3 divide-y divide-line">
-              {noErid.slice(0, 6).map((i) => {
-                const b = bloggerById(i.blogger_id)
-                return (
-                  <li key={i.id} className="flex items-center gap-2 py-2 text-[13px]">
-                    {b && <PlatformTag p={b.platform} />}
-                    <Link to={`/bloggers/${i.blogger_id}`} className="font-medium hover:text-accent">
-                      {b?.nick ?? '—'}
-                    </Link>
-                    <span className="text-muted">{date(i.publish_date)}</span>
-                    <StatusBadge status={i.status} className="ml-auto" />
-                  </li>
-                )
-              })}
-              {noErid.length > 6 && (
-                <li className="pt-2 text-[13px]">
-                  <Link to="/integrations?filter=no_erid" className="text-muted hover:text-accent">
-                    Ещё {noErid.length - 6}
-                  </Link>
-                </li>
-              )}
-            </ul>
-          )}
-        </section>
-      </div>
-
-      <section className="mt-4 rounded-2xl bg-surface p-5 ring-1 ring-line">
-        <h2 className="font-medium">Ближайшие выходы</h2>
-        {upcoming.length === 0 ? (
-          <p className="mt-3 text-sm text-muted">Запланированных выходов нет. Поставьте дату выхода в интеграции — она появится здесь.</p>
-        ) : (
-          <ul className="mt-3 divide-y divide-line">
-            {upcoming.map((i) => {
-              const b = bloggerById(i.blogger_id)
+          </div>
+          <div className="num mt-2 text-[44px] leading-[48px] tracking-tight">
+            {active.length} <span className="text-base tracking-normal text-muted">{plural(active.length, 'интеграция', 'интеграции', 'интеграций')}</span>
+          </div>
+          {/* яркий момент экрана: путь интеграций от поиска до выхода */}
+          <div className="mt-6 flex gap-1" role="img" aria-label="Интеграции по этапам">
+            {flow.map((p, idx) => {
+              const n = byPhase(p.id).length
               return (
-                <li key={i.id} className="flex items-center gap-3 py-2.5 text-[13px]">
-                  <span className="num w-20 font-medium">{date(i.publish_date)}</span>
-                  {b && <PlatformTag p={b.platform} />}
-                  <Link to={`/bloggers/${i.blogger_id}`} className="font-medium hover:text-accent">
-                    {b?.nick}
-                  </Link>
-                  <span className="hidden truncate text-muted sm:inline">{campaigns.find((c) => c.id === i.campaign_id)?.name}</span>
-                  <span className="num ml-auto">{money(i.price)}</span>
-                  <StatusBadge status={i.status} />
-                </li>
+                <Link key={p.id} to={`/integrations?tab=active&phase=${p.id}`} className="group min-w-0 sm:min-w-24" style={{ flex: `${Math.max(n / total, 0.08)} 1 0` }}>
+                  <div className={cx('h-10 rounded-full transition-opacity duration-150 group-hover:opacity-80', n === 0 ? 'hatch' : idx >= livePhase - 1 ? 'bar-lime' : 'bg-ink')} style={n > 0 && idx < livePhase - 1 ? { opacity: 0.25 + idx * 0.25 } : undefined} />
+                  <div className="mt-2 truncate text-[11px] text-muted sm:text-xs">{p.label}</div>
+                  <div className="num text-base">{n}</div>
+                </Link>
               )
             })}
-          </ul>
-        )}
-      </section>
-    </>
-  )
-}
+          </div>
+        </Card>
 
-function Stat({ label, value, note, to }: { label: string; value: string; note: string; to: string }) {
-  return (
-    <Link to={to} className="rounded-2xl bg-surface p-5 ring-1 ring-line hover:ring-night/30">
-      <div className="text-[13px] text-muted">{label}</div>
-      <div className="num font-display mt-2 text-[26px] leading-none font-semibold">{value}</div>
-      <div className="mt-2 text-xs text-muted">{note}</div>
-    </Link>
-  )
-}
-
-function Todo({ title, hint, items, render }: { title: string; hint: string; items: Blogger[]; render: (b: Blogger) => string }) {
-  return (
-    <section className="rounded-2xl bg-surface p-5 ring-1 ring-line">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="font-medium">{title}</h2>
-        {items.length > 0 && <span className="num rounded-full bg-accent-soft px-2 text-xs font-semibold text-accent-dark">{items.length}</span>}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+          <Card>
+            <div className="text-[13px] text-muted">Выходы в {new Date().toLocaleDateString('ru-RU', { month: 'long' }).replace(/[ьй]$/, 'е').replace(/т$/, 'те')}</div>
+            <div className="num mt-1 text-[28px] leading-8">
+              {out.length} <span className="text-base text-muted">из {thisMonth.length}</span>
+            </div>
+            <div className="num mt-1 text-xs text-muted">охват {count(out.reduce((a, i) => a + (i.fact_reach ?? 0), 0))}</div>
+          </Card>
+          {isAdmin ? (
+            <Card>
+              <div className="text-[13px] text-muted">Комиссия по текущим кампаниям</div>
+              <div className="num mt-1 text-[28px] leading-8">{money(commission)}</div>
+              <div className="mt-1 text-xs text-muted">
+                {running.length} {plural(running.length, 'кампания', 'кампании', 'кампаний')}, по одобренным интеграциям
+              </div>
+            </Card>
+          ) : (
+            <Card>
+              <div className="text-[13px] text-muted">Ваши блогеры</div>
+              <div className="num mt-1 text-[28px] leading-8">{bloggers.length}</div>
+              <div className="mt-1 text-xs text-muted">в работе {new Set(active.map((i) => i.blogger_id)).size}</div>
+            </Card>
+          )}
+        </div>
       </div>
-      <p className="text-[13px] text-muted">{hint}</p>
-      {items.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">Здесь пусто — всё в порядке.</p>
-      ) : (
-        <ul className="mt-3 divide-y divide-line">
-          {items.slice(0, 6).map((b) => (
-            <li key={b.id} className="flex items-center gap-2 py-2 text-[13px]">
-              <PlatformTag p={b.platform} />
-              <Link to={`/bloggers/${b.id}`} className="font-medium hover:text-accent">
-                {b.nick}
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <Card>
+          <div className="mb-3 flex items-baseline justify-between">
+            <h2 className="text-base">Мои задачи на сегодня</h2>
+            <Link to="/tasks" className="text-[13px] text-muted hover:text-ink">
+              Все задачи
+            </Link>
+          </div>
+          <TaskList tasks={myTasks} empty="На сегодня задач нет" />
+        </Card>
+
+        <Card>
+          <h2 className="mb-2 text-base">Требует внимания</h2>
+          {items.length === 0 ? (
+            <p className="text-muted">{loading ? 'Загружаем' : 'Никто не молчит, сроки не горят'}</p>
+          ) : (
+            <ul>
+              {items.slice(0, 7).map((a) => (
+                <li key={a.key}>
+                  {a.link.startsWith('?i=') ? (
+                    <button onClick={() => open(a.link.slice(3))} className="flex min-h-11 w-full items-center gap-3 border-t border-line py-2 text-left hover:bg-soft">
+                      <span className={cx('size-2 shrink-0 rounded-full', a.tone === 'bad' ? 'bg-bad' : 'bg-amber-400')} />
+                      {a.text}
+                    </button>
+                  ) : (
+                    <Link to={a.link} className="flex min-h-11 items-center gap-3 border-t border-line py-2 hover:bg-soft">
+                      <span className={cx('size-2 shrink-0 rounded-full', a.tone === 'bad' ? 'bg-bad' : 'bg-amber-400')} />
+                      {a.text}
+                    </Link>
+                  )}
+                </li>
+              ))}
+              {items.length > 7 && <li className="border-t border-line pt-2 text-[13px] text-muted">И ещё {items.length - 7}, все в колокольчике</li>}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="text-base">Ближайшие выходы</h2>
+            <Link to="/calendar" className="text-[13px] text-muted hover:text-ink">
+              Календарь
+            </Link>
+          </div>
+          {upcoming.length === 0 ? (
+            <p className="text-muted">Дат выхода пока нет. Поставьте дату в интеграции, и она появится здесь</p>
+          ) : (
+            <ul>
+              {upcoming.map((i) => (
+                <li key={i.id}>
+                  <button onClick={() => open(i.id)} className="flex min-h-12 w-full items-center gap-3 border-t border-line py-2 text-left hover:bg-soft">
+                    <span className="num w-16 shrink-0">{date(i.publish_date)}</span>
+                    <span className="min-w-0 flex-1">
+                      <BloggerName b={blogger(i.blogger_id)} />
+                    </span>
+                    <span className="hidden max-w-32 truncate text-xs text-muted sm:inline">{campaign(i.campaign_id)?.name}</span>
+                    <StatusBadge status={i.status} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="text-base">Сдать статистику в ОРД</h2>
+            {ord.length > 0 && (
+              <Link to="/integrations?tab=ord" className="inline-flex items-center gap-1 text-[13px] text-muted hover:text-ink">
+                Отметить сданные <ArrowUpRight className="size-3.5" strokeWidth={1.5} />
               </Link>
-              <span className="truncate text-muted">{render(b)}</span>
-              <StatusBadge status={b.status} className="ml-auto" />
-            </li>
-          ))}
-          {items.length > 6 && <li className="pt-2 text-[13px] text-muted">и ещё {items.length - 6}</li>}
-        </ul>
-      )}
-    </section>
+            )}
+          </div>
+          {ord.length === 0 ? (
+            <p className="text-muted">По всем вышедшим интеграциям статистика передана</p>
+          ) : (
+            <ul>
+              {ord.slice(0, 6).map(({ i, dl }) => (
+                <li key={i.id}>
+                  <button onClick={() => open(i.id)} className="flex min-h-12 w-full items-center gap-3 border-t border-line py-2 text-left hover:bg-soft">
+                    <span className="min-w-0 flex-1">
+                      <BloggerName b={blogger(i.blogger_id)} />
+                    </span>
+                    <span className={cx('num shrink-0 text-[13px]', dl! < today ? 'text-bad' : 'text-muted')}>{dl! < today ? `срок прошёл ${date(dl)}` : `до ${date(dl)}`}</span>
+                  </button>
+                </li>
+              ))}
+              {ord.length > 6 && <li className="border-t border-line pt-2 text-[13px] text-muted">И ещё {ord.length - 6}</li>}
+            </ul>
+          )}
+        </Card>
+      </div>
+    </>
   )
 }

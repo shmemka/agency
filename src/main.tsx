@@ -5,19 +5,23 @@ import './index.css'
 import { isConfigured } from './lib/supabase'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { DataProvider } from './lib/data'
-import { ToastHost } from './lib/toast'
 import { Layout } from './components/Layout'
-import { Spinner } from './components/ui'
+import { Spinner, ToastHost } from './components/ui'
 import { Login, NotConfigured, Pending } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { Bloggers } from './pages/Bloggers'
 import { Integrations } from './pages/Integrations'
 import { Campaigns } from './pages/Campaigns'
+import { CampaignPage } from './pages/Campaign'
+import { Tasks } from './pages/Tasks'
+import { Calendar } from './pages/Calendar'
 import { Documents } from './pages/Documents'
+import { Finance } from './pages/Finance'
 import { Team } from './pages/Team'
+import { Share } from './pages/Share'
 
 function Gate() {
-  const { session, profile, loading } = useAuth()
+  const { session, profile, loading, isAdmin } = useAuth()
   if (loading)
     return (
       <div className="flex h-full items-center justify-center">
@@ -35,7 +39,11 @@ function Gate() {
           <Route path="bloggers/:id" element={<Bloggers />} />
           <Route path="integrations" element={<Integrations />} />
           <Route path="campaigns" element={<Campaigns />} />
+          <Route path="campaigns/:id" element={<CampaignPage />} />
+          <Route path="tasks" element={<Tasks />} />
+          <Route path="calendar" element={<Calendar />} />
           <Route path="documents" element={<Documents />} />
+          {isAdmin && <Route path="finance" element={<Finance />} />}
           <Route path="team" element={<Team />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
@@ -48,10 +56,19 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {isConfigured ? (
       <BrowserRouter>
-        <AuthProvider>
-          <Gate />
-          <ToastHost />
-        </AuthProvider>
+        <Routes>
+          {/* страницы для клиента: без входа, по ссылке */}
+          <Route path="/s/:token" element={<Share />} />
+          <Route
+            path="*"
+            element={
+              <AuthProvider>
+                <Gate />
+              </AuthProvider>
+            }
+          />
+        </Routes>
+        <ToastHost />
       </BrowserRouter>
     ) : (
       <NotConfigured />

@@ -1,11 +1,14 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import { useEffect, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, Loader2, X } from 'lucide-react'
-import { PHASES, STATUSES, phaseInfo, statusInfo, type Status } from '../lib/constants'
+import { Check, ChevronDown, ChevronLeft, Loader2, X } from 'lucide-react'
+import { BLOGGER_STATUSES, PHASES, STATUSES, STATUS_ORDER, bloggerStatusInfo, nextStatus, phaseInfo, statusInfo, type BloggerStatus, type Status } from '../lib/constants'
+import { onToast } from '../lib/toast'
 
 export function cx(...a: (string | false | null | undefined)[]) {
   return a.filter(Boolean).join(' ')
 }
+
+export const isPhone = () => window.matchMedia('(max-width: 767px)').matches
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 export function Button({
@@ -18,15 +21,16 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md'; loading?: boolean }) {
   return (
     <button
+      type="button"
       {...rest}
       disabled={rest.disabled || loading}
       className={cx(
-        'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50',
-        size === 'sm' ? 'h-8 px-2.5 text-[13px]' : 'h-9 px-3.5 text-sm',
-        variant === 'primary' && 'bg-accent text-white hover:bg-accent-dark',
-        variant === 'secondary' && 'bg-surface text-ink ring-1 ring-line hover:bg-base',
-        variant === 'ghost' && 'text-muted hover:bg-base hover:text-ink',
-        variant === 'danger' && 'text-rose-700 hover:bg-rose-50',
+        'inline-flex shrink-0 items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40',
+        size === 'sm' ? 'h-8 px-3 text-[13px]' : 'h-10 px-4 text-sm',
+        variant === 'primary' && 'bg-ink text-white hover:bg-ink/85',
+        variant === 'secondary' && 'bg-surface text-ink ring-1 ring-line hover:bg-soft',
+        variant === 'ghost' && 'text-muted hover:bg-ink/5 hover:text-ink',
+        variant === 'danger' && 'text-bad hover:bg-bad/10',
         className,
       )}
     >
@@ -36,22 +40,36 @@ export function Button({
   )
 }
 
-const fieldBase =
-  'w-full rounded-lg border border-line bg-surface px-3 text-sm text-ink placeholder:text-faint focus:border-night focus:outline-none focus:ring-2 focus:ring-night/10'
+/** Круглая кнопка с иконкой */
+export function IconButton({ label, className, children, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { label: string }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      {...rest}
+      className={cx('inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted transition-colors duration-150 hover:bg-ink/5 hover:text-ink', className)}
+    >
+      {children}
+    </button>
+  )
+}
+
+const fieldBase = 'w-full rounded-2xl bg-soft px-4 text-sm text-ink placeholder:text-faint ring-1 ring-transparent transition-shadow duration-150 focus:bg-surface focus:outline-none focus:ring-ink/25'
 
 export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cx(fieldBase, 'h-9', props.className)} />
+  return <input {...props} className={cx(fieldBase, 'h-10', props.className)} />
 }
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cx(fieldBase, 'py-2 leading-relaxed', props.className)} />
+  return <textarea {...props} className={cx(fieldBase, 'py-3 leading-5', props.className)} />
 }
-export function Select({ children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({ children, className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <div className="relative">
-      <select {...props} className={cx(fieldBase, 'h-9 appearance-none pr-8', props.className)}>
+    <div className={cx('relative', className)}>
+      <select {...props} className={cx(fieldBase, 'h-10 appearance-none pr-9')}>
         {children}
       </select>
-      <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-faint" />
+      <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-faint" strokeWidth={1.5} />
     </div>
   )
 }
@@ -59,7 +77,7 @@ export function Select({ children, ...props }: SelectHTMLAttributes<HTMLSelectEl
 export function Field({ label, hint, children, className }: { label: string; hint?: string; children: ReactNode; className?: string }) {
   return (
     <label className={cx('block', className)}>
-      <span className="mb-1 block text-[13px] font-medium text-muted">{label}</span>
+      <span className="mb-1 block text-[13px] text-muted">{label}</span>
       {children}
       {hint && <span className="mt-1 block text-xs text-faint">{hint}</span>}
     </label>
@@ -70,12 +88,20 @@ export function Spinner({ className }: { className?: string }) {
   return <Loader2 className={cx('size-5 animate-spin text-faint', className)} />
 }
 
+export function Card({ className, children, ...rest }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div {...rest} className={cx('rounded-card bg-surface p-5 sm:p-6', className)}>
+      {children}
+    </div>
+  )
+}
+
 export function PageHeader({ title, sub, actions }: { title: string; sub?: ReactNode; actions?: ReactNode }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="font-display text-[22px] leading-tight font-semibold tracking-tight">{title}</h1>
-        {sub && <p className="mt-1 text-sm text-muted">{sub}</p>}
+      <div className="min-w-0">
+        <h1 className="text-[28px] leading-8 tracking-tight sm:text-[32px] sm:leading-9">{title}</h1>
+        {sub && <p className="mt-1 text-muted">{sub}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -84,125 +110,194 @@ export function PageHeader({ title, sub, actions }: { title: string; sub?: React
 
 export function Empty({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-line bg-surface px-6 py-12 text-center">
-      <p className="font-medium">{title}</p>
-      {children && <p className="mx-auto mt-1 max-w-md text-sm text-muted">{children}</p>}
-      {action && <div className="mt-4">{action}</div>}
+    <div className="rounded-card bg-surface px-6 py-12 text-center">
+      <p className="text-base">{title}</p>
+      {children && <p className="mx-auto mt-1 max-w-md text-muted">{children}</p>}
+      {action && <div className="mt-5 flex justify-center gap-2">{action}</div>}
     </div>
+  )
+}
+
+/** Тихая плашка: нейтральная, смысл несёт точка */
+export function Chip({ dot, children, className, tone }: { dot?: string; children: ReactNode; className?: string; tone?: 'warn' | 'bad' | 'dark' }) {
+  return (
+    <span
+      className={cx(
+        'inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[13px] whitespace-nowrap',
+        tone === 'dark' ? 'bg-ink text-white' : tone === 'warn' ? 'bg-amber-100 text-warn' : tone === 'bad' ? 'bg-orange-100 text-bad' : 'bg-soft text-ink',
+        className,
+      )}
+    >
+      {dot && <span className={cx('size-2 rounded-full', dot)} />}
+      {children}
+    </span>
   )
 }
 
 export function StatusBadge({ status, className }: { status: Status; className?: string }) {
   const s = statusInfo(status)
-  const p = phaseInfo(s.phase)
   return (
-    <span className={cx('inline-flex h-6 items-center gap-1.5 rounded-md px-2 text-xs font-medium whitespace-nowrap ring-1 ring-inset', p.chip, className)}>
-      <span className={cx('size-1.5 rounded-full', p.dot)} />
+    <Chip dot={phaseInfo(s.phase).dot} className={className}>
       {s.label}
-    </span>
+    </Chip>
   )
 }
 
-/** Компактный выпадающий выбор статуса — для строк таблицы */
-export function StatusSelect({ value, onChange, className }: { value: Status; onChange: (s: Status) => void; className?: string }) {
+export function BloggerStatusBadge({ status, className }: { status: BloggerStatus; className?: string }) {
+  const s = bloggerStatusInfo(status)
+  return (
+    <Chip dot={s.id === 'blacklist' ? undefined : s.dot} tone={s.id === 'blacklist' ? 'dark' : undefined} className={className}>
+      {s.label}
+    </Chip>
+  )
+}
+
+/** Выпадающее меню; на телефоне — панель снизу с крупными строками */
+export function Menu<T extends string>({
+  value,
+  options,
+  onChange,
+  trigger,
+  title,
+}: {
+  value: T
+  options: { id: T; label: string; dot?: string; group?: string }[]
+  onChange: (v: T) => void
+  trigger: ReactNode
+  title: string
+}) {
   const [open, setOpen] = useState(false)
   const btn = useRef<HTMLButtonElement>(null)
   const [pos, setPos] = useState({ top: 0, left: 0 })
+  const phone = isPhone()
 
   useEffect(() => {
     if (!open) return
-    const close = (e: MouseEvent | KeyboardEvent) => {
-      if (e instanceof KeyboardEvent && e.key !== 'Escape') return
-      setOpen(false)
-    }
+    const close = () => setOpen(false)
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && close()
     window.addEventListener('mousedown', close)
-    window.addEventListener('keydown', close)
-    window.addEventListener('scroll', () => setOpen(false), { once: true, capture: true })
+    window.addEventListener('keydown', key)
+    if (!phone) window.addEventListener('scroll', close, { once: true, capture: true })
     return () => {
       window.removeEventListener('mousedown', close)
-      window.removeEventListener('keydown', close)
+      window.removeEventListener('keydown', key)
     }
-  }, [open])
+  }, [open, phone])
+
+  const list = options.map((o, i) => (
+    <div key={o.id}>
+      {i > 0 && o.group !== options[i - 1].group && <div className="mx-3 my-1 h-px bg-line" />}
+      <button
+        role="option"
+        aria-selected={o.id === value}
+        className={cx('flex w-full items-center gap-2.5 rounded-xl px-3 text-left hover:bg-soft', phone ? 'h-11 text-[15px]' : 'h-8 text-[13px]')}
+        onClick={() => {
+          setOpen(false)
+          if (o.id !== value) onChange(o.id)
+        }}
+      >
+        {o.dot && <span className={cx('size-2 rounded-full', o.dot)} />}
+        <span className="flex-1">{o.label}</span>
+        {o.id === value && <Check className="size-4" strokeWidth={1.5} />}
+      </button>
+    </div>
+  ))
 
   return (
     <>
       <button
         ref={btn}
         type="button"
-        className={cx('group inline-flex items-center gap-0.5 rounded-md', className)}
+        className="group inline-flex items-center gap-0.5 rounded-full"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={title}
+        onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation()
           const r = btn.current!.getBoundingClientRect()
-          const top = Math.min(r.bottom + 4, window.innerHeight - 440)
-          setPos({ top: Math.max(8, top), left: Math.min(r.left, window.innerWidth - 220) })
+          const h = options.length * 32 + 40
+          setPos({ top: Math.max(8, Math.min(r.bottom + 4, window.innerHeight - h)), left: Math.min(r.left, window.innerWidth - 232) })
           setOpen((o) => !o)
         }}
-        aria-haspopup="listbox"
-        aria-expanded={open}
       >
-        <StatusBadge status={value} />
-        <ChevronDown className="size-3.5 text-faint opacity-0 transition-opacity group-hover:opacity-100" />
+        {trigger}
+        <ChevronDown className="size-3.5 text-faint opacity-60 group-hover:opacity-100" strokeWidth={1.5} />
       </button>
       {open &&
         createPortal(
-          <div
-            role="listbox"
-            className="fade-in fixed z-50 w-52 rounded-xl bg-surface p-1.5 shadow-xl ring-1 ring-line"
-            style={pos}
-            onMouseDown={(e) => e.stopPropagation()}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {PHASES.map((ph) => (
-              <div key={ph.id} className="py-0.5">
-                {STATUSES.filter((s) => s.phase === ph.id).map((s) => (
-                  <button
-                    key={s.id}
-                    role="option"
-                    aria-selected={s.id === value}
-                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-[13px] hover:bg-base"
-                    onClick={() => {
-                      setOpen(false)
-                      if (s.id !== value) onChange(s.id)
-                    }}
-                  >
-                    <span className={cx('size-2 rounded-full', ph.dot)} />
-                    <span className="flex-1">{s.label}</span>
-                    {s.id === value && <Check className="size-3.5 text-accent" />}
-                  </button>
-                ))}
+          phone ? (
+            <div className="fade fixed inset-0 z-[70] flex items-end bg-ink/30" onMouseDown={() => setOpen(false)}>
+              <div role="listbox" className="sheet safe-bottom max-h-[80vh] w-full overflow-y-auto rounded-t-[28px] bg-surface p-3" onMouseDown={(e) => e.stopPropagation()}>
+                <div className="px-3 pt-1 pb-2 text-[13px] text-muted">{title}</div>
+                {list}
               </div>
-            ))}
-          </div>,
+            </div>
+          ) : (
+            <div role="listbox" className="fade fixed z-[70] w-56 rounded-2xl bg-surface p-1.5 shadow-[0_8px_24px_rgba(21,23,28,0.1)] ring-1 ring-line" style={pos} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+              {list}
+            </div>
+          ),
           document.body,
         )}
     </>
   )
 }
 
-/** Дорожка этапов — главный элемент карточки блогера */
+export function StatusSelect({ value, onChange }: { value: Status; onChange: (s: Status) => void }) {
+  return (
+    <Menu
+      title="Этап"
+      value={value}
+      onChange={onChange}
+      options={STATUSES.map((s) => ({ id: s.id, label: s.label, dot: phaseInfo(s.phase).dot, group: s.phase }))}
+      trigger={<StatusBadge status={value} />}
+    />
+  )
+}
+
+export function BloggerStatusSelect({ value, onChange }: { value: BloggerStatus; onChange: (s: BloggerStatus) => void }) {
+  return (
+    <Menu
+      title="Статус блогера"
+      value={value}
+      onChange={onChange}
+      options={BLOGGER_STATUSES.map((s) => ({ id: s.id, label: s.label, dot: s.dot }))}
+      trigger={<BloggerStatusBadge status={value} />}
+    />
+  )
+}
+
+/** Дорожка этапов интеграции. На телефоне — текущий этап и кнопка следующего */
 export function StatusRail({ value, onChange }: { value: Status; onChange: (s: Status) => void }) {
-  const current = statusInfo(value)
+  const cur = STATUS_ORDER[value]
+  const stopped = value === 'declined'
+  const next = nextStatus(value)
   const flow = PHASES.filter((p) => p.id !== 'stop')
-  const flowStatuses = STATUSES.filter((s) => s.phase !== 'stop')
-  const curIdx = flowStatuses.findIndex((s) => s.id === value)
-  const stopped = current.phase === 'stop'
 
   return (
     <div>
-      <div className="grid grid-cols-2 gap-x-1.5 gap-y-3 sm:grid-cols-5 sm:gap-y-1.5">
-        {flow.map((ph) => {
-          const items = STATUSES.filter((s) => s.phase === ph.id)
-          return (
+      <div className="flex flex-wrap items-center gap-2 md:hidden">
+        <StatusSelect value={value} onChange={onChange} />
+        {next && !stopped && (
+          <Button size="sm" variant="primary" className="ml-auto" onClick={() => onChange(next)}>
+            Дальше: {statusInfo(next).label}
+          </Button>
+        )}
+      </div>
+      <div className="hidden md:block">
+        <div className="grid grid-cols-5 gap-2">
+          {flow.map((ph) => (
             <div key={ph.id} className="min-w-0">
-              <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-medium text-muted">
-                <span className={cx('size-1.5 rounded-full', ph.dot)} />
+              <div className="mb-2 flex items-center gap-1.5 text-xs text-muted">
+                <span className={cx('size-2 rounded-full', ph.dot)} />
                 {ph.label}
               </div>
               <div className="flex flex-col gap-1">
-                {items.map((s) => {
-                  const idx = flowStatuses.findIndex((x) => x.id === s.id)
+                {STATUSES.filter((s) => s.phase === ph.id).map((s) => {
+                  const idx = STATUS_ORDER[s.id]
                   const isCur = s.id === value
-                  const passed = !stopped && curIdx > -1 && idx < curIdx
+                  const passed = !stopped && idx < cur
                   return (
                     <button
                       key={s.id}
@@ -210,8 +305,8 @@ export function StatusRail({ value, onChange }: { value: Status; onChange: (s: S
                       onClick={() => onChange(s.id)}
                       aria-pressed={isCur}
                       className={cx(
-                        'truncate rounded-md px-2 py-1.5 text-left text-xs transition-colors',
-                        isCur ? cx(ph.solid, 'font-medium shadow-sm') : passed ? 'bg-night/[0.07] text-ink hover:bg-night/[0.12]' : 'bg-base text-muted hover:bg-line hover:text-ink',
+                        'h-8 truncate rounded-full px-3 text-left text-[13px] transition-colors duration-150',
+                        isCur ? 'bg-ink text-white' : passed ? 'bg-lime/45 text-ink hover:bg-lime/70' : 'hatch text-muted hover:text-ink',
                       )}
                     >
                       {s.label}
@@ -220,25 +315,46 @@ export function StatusRail({ value, onChange }: { value: Status; onChange: (s: S
                 })}
               </div>
             </div>
-          )
-        })}
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange('declined')}
+          aria-pressed={stopped}
+          className={cx('mt-2 h-8 rounded-full px-3 text-[13px] transition-colors duration-150', stopped ? 'bg-ink text-white' : 'text-muted hover:bg-ink/5 hover:text-ink')}
+        >
+          Отказ
+        </button>
       </div>
-      <div className="mt-2 flex gap-1.5">
-        {STATUSES.filter((s) => s.phase === 'stop').map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            onClick={() => onChange(s.id)}
-            aria-pressed={s.id === value}
-            className={cx(
-              'rounded-md px-2 py-1 text-xs transition-colors',
-              s.id === value ? 'bg-rose-600 font-medium text-white' : 'text-muted hover:bg-rose-50 hover:text-rose-700',
-            )}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
+    </div>
+  )
+}
+
+/** Переключатель-пилюля: активное — чёрное */
+export function Segmented<T extends string>({ value, options, onChange, className }: { value: T; options: { id: T; label: ReactNode }[]; onChange: (v: T) => void; className?: string }) {
+  return (
+    <div className={cx('inline-flex max-w-full gap-1 overflow-x-auto rounded-full bg-surface p-1', className)} role="tablist">
+      {options.map((o) => (
+        <button
+          key={o.id}
+          role="tab"
+          aria-selected={value === o.id}
+          onClick={() => onChange(o.id)}
+          className={cx('inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] whitespace-nowrap transition-colors duration-150', value === o.id ? 'bg-ink text-white' : 'text-muted hover:text-ink')}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Яркий момент: лаймовая полоса, остаток — штриховка */
+export function Progress({ value, max, over, className }: { value: number; max: number; over?: boolean; className?: string }) {
+  const p = max > 0 ? Math.min(100, (value / max) * 100) : 0
+  return (
+    <div className={cx('hatch h-4 overflow-hidden rounded-full', className)} role="progressbar" aria-valuenow={Math.round(p)} aria-valuemin={0} aria-valuemax={100}>
+      <div className={cx('h-full rounded-full', over ? 'bg-bad' : 'bar-lime')} style={{ width: `${p}%` }} />
     </div>
   )
 }
@@ -252,28 +368,29 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
   }, [open, onClose])
   if (!open) return null
   return createPortal(
-    <div className="fade-in fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-night/40 p-4 pt-[8vh]" onMouseDown={onClose}>
+    <div className="fade fixed inset-0 z-[60] flex items-end justify-center bg-ink/30 md:items-start md:overflow-y-auto md:p-6 md:pt-[8vh]" onMouseDown={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={cx('w-full rounded-2xl bg-surface shadow-2xl', wide ? 'max-w-3xl' : 'max-w-lg')}
+        className={cx('sheet safe-bottom flex max-h-[92vh] w-full flex-col rounded-t-[28px] bg-surface md:max-h-none md:rounded-card', wide ? 'md:max-w-3xl' : 'md:max-w-lg')}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <h2 className="font-semibold">{title}</h2>
-          <button className="rounded-md p-1 text-faint hover:bg-base hover:text-ink" onClick={onClose} aria-label="Закрыть">
-            <X className="size-4" />
-          </button>
+        <div className="flex items-center justify-between py-3 pr-3 pl-6">
+          <h2 className="text-lg">{title}</h2>
+          <IconButton label="Закрыть" onClick={onClose}>
+            <X className="size-[18px]" strokeWidth={1.5} />
+          </IconButton>
         </div>
-        <div className="px-5 py-4">{children}</div>
-        {footer && <div className="flex justify-end gap-2 border-t border-line px-5 py-3">{footer}</div>}
+        <div className="overflow-y-auto px-6 pb-6 md:overflow-visible">{children}</div>
+        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-line px-6 py-4">{footer}</div>}
       </div>
     </div>,
     document.body,
   )
 }
 
+/** Боковая панель; на телефоне — экран целиком с кнопкой «Назад» */
 export function Drawer({ onClose, children, label }: { onClose: () => void; children: ReactNode; label: string }) {
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -283,9 +400,13 @@ export function Drawer({ onClose, children, label }: { onClose: () => void; chil
     return () => window.removeEventListener('keydown', k)
   }, [onClose])
   return createPortal(
-    <div className="fixed inset-0 z-40">
-      <div className="fade-in absolute inset-0 bg-night/25" onClick={onClose} />
-      <aside role="complementary" aria-label={label} className="drawer-in absolute top-0 right-0 flex h-full w-full max-w-[720px] flex-col overflow-y-auto bg-surface shadow-2xl sm:overflow-hidden">
+    <div className="fixed inset-0 z-50">
+      <div className="fade absolute inset-0 hidden bg-ink/25 md:block" onClick={onClose} />
+      <aside role="complementary" aria-label={label} className="slide absolute inset-0 flex flex-col overflow-y-auto bg-canvas md:inset-y-3 md:right-3 md:left-auto md:w-[720px] md:rounded-card md:shadow-[0_8px_24px_rgba(21,23,28,0.1)]">
+        <button onClick={onClose} className="flex h-12 shrink-0 items-center gap-1 px-3 text-muted md:hidden">
+          <ChevronLeft className="size-5" strokeWidth={1.5} />
+          Назад
+        </button>
         {children}
       </aside>
     </div>,
@@ -295,9 +416,9 @@ export function Drawer({ onClose, children, label }: { onClose: () => void; chil
 
 export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 text-sm select-none">
+    <label className="inline-flex min-h-10 cursor-pointer items-center gap-3 select-none">
       <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span className="relative h-5 w-9 rounded-full bg-line transition-colors peer-checked:bg-night peer-focus-visible:ring-2 peer-focus-visible:ring-accent after:absolute after:top-0.5 after:left-0.5 after:size-4 after:rounded-full after:bg-white after:shadow after:transition-transform peer-checked:after:translate-x-4" />
+      <span className="relative h-6 w-10 shrink-0 rounded-full bg-ink/15 transition-colors duration-150 peer-checked:bg-ink peer-focus-visible:ring-2 peer-focus-visible:ring-ink/40 after:absolute after:top-1 after:left-1 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-150 peer-checked:after:translate-x-4" />
       {label}
     </label>
   )
@@ -305,13 +426,8 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
 
 export function Avatar({ name, className }: { name: string; className?: string }) {
   const n = name || '?'
-  const hue = [...n].reduce((a, c) => a + c.charCodeAt(0), 0) % 360
   return (
-    <span
-      className={cx('inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white', className)}
-      style={{ background: `oklch(0.55 0.12 ${hue})` }}
-      title={n}
-    >
+    <span className={cx('inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-ink/8 text-xs font-medium text-ink', className)} title={n}>
       {n
         .split(/\s+/)
         .slice(0, 2)
@@ -321,17 +437,44 @@ export function Avatar({ name, className }: { name: string; className?: string }
   )
 }
 
-export function Toast({ message, onDone }: { message: string | null; onDone: () => void }) {
+export function ToastHost() {
+  const [msg, setMsg] = useState<string | null>(null)
+  useEffect(() => onToast(setMsg), [])
   useEffect(() => {
-    if (!message) return
-    const t = setTimeout(onDone, 3200)
+    if (!msg) return
+    const t = setTimeout(() => setMsg(null), 3200)
     return () => clearTimeout(t)
-  }, [message, onDone])
-  if (!message) return null
+  }, [msg])
+  if (!msg) return null
   return createPortal(
-    <div role="status" className="fade-in fixed bottom-5 left-1/2 z-[60] -translate-x-1/2 rounded-lg bg-night px-4 py-2.5 text-sm text-white shadow-xl">
-      {message}
+    <div role="status" className="rise fixed bottom-24 left-1/2 z-[80] max-w-[90vw] -translate-x-1/2 rounded-full bg-ink px-5 py-3 text-sm text-white md:bottom-6">
+      {msg}
     </div>,
     document.body,
+  )
+}
+
+/** Таблица в карточке: общий вид для всех списков */
+export function Table({ head, children, min }: { head: ReactNode; children: ReactNode; min?: number }) {
+  return (
+    <div className="overflow-hidden rounded-card bg-surface">
+      <div className="overflow-x-auto">
+        <table
+          className="w-full text-left text-[13px] [&_tbody_tr]:border-t [&_tbody_tr]:border-line [&_td]:px-2.5 [&_td]:py-2.5 [&_td.num]:whitespace-nowrap [&_td:first-child]:pl-6 [&_td:last-child]:pr-6 [&_th]:px-2.5 [&_th]:py-3 [&_th]:font-normal [&_th]:whitespace-nowrap [&_th:first-child]:pl-6 [&_th:last-child]:pr-6"
+          style={{ minWidth: min }}
+        >
+          <thead className="text-faint">{head}</thead>
+          <tbody>{children}</tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+export function PlatformTag({ short, label }: { short: string; label: string }) {
+  return (
+    <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-soft text-[10px] font-medium text-muted" title={label}>
+      {short}
+    </span>
   )
 }
