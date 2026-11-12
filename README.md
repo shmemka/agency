@@ -33,17 +33,20 @@
 
 ### 2. Сайт на GitHub Pages
 
-Сайт собирается и публикуется сам при каждом пуше в `main` (файл `.github/workflows/pages.yml`).
+GitHub Actions на этом аккаунте сейчас недоступны (GitHub пишет про проблему с оплатой), поэтому сайт собирается командой и выкладывается готовыми файлами в ветку `gh-pages`.
 
-1. **Settings → Secrets and variables → Actions → New repository secret** — добавьте два секрета:
-   - `VITE_SUPABASE_URL` — Project URL из Supabase;
-   - `VITE_SUPABASE_ANON_KEY` — ключ anon public.
-2. **Settings → Pages → Build and deployment → Source:** выберите **GitHub Actions** (не «Deploy from a branch»).
-3. **Actions → «Публикация на GitHub Pages» → Run workflow** (или любой пуш в `main`). Через пару минут сайт откроется по адресу `https://shmemka.github.io/agency/`.
+1. Создайте в корне репозитория файл `.env.production` с адресом и ключом из Supabase (Project Settings → API):
+   ```
+   VITE_SUPABASE_URL=https://xxxx.supabase.co
+   VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
+   ```
+   Ключ anon public не секретный: он и так виден в браузере любому посетителю сайта, а данные защищают правила доступа в базе. Поэтому файл можно хранить в репозитории.
+2. **Settings → Pages → Build and deployment:** Source — **Deploy from a branch**, ветка **gh-pages**, папка **/ (root)**.
+3. Выложить сайт: `npm install`, затем `npm run deploy`. Повторять после каждого изменения кода. Сайт откроется по адресу `https://shmemka.github.io/agency/`.
 
-Ключ anon public не секретный, он и так виден в браузере; защищают данные правила доступа в базе. Секреты нужны, чтобы не хранить ключ в коде.
+Если GitHub Actions снова заработают, можно публиковать автоматически: в `.github/workflows/pages.yml` верните запуск на push, добавьте ключи в Settings → Secrets and variables → Actions и выберите Source: **GitHub Actions**.
 
-**Свой домен:** Settings → Pages → Custom domain, затем перезапустите публикацию. Сборка сама поймёт, что подпапки `/agency/` больше нет. После этого поменяйте Site URL в Supabase.
+**Свой домен:** Settings → Pages → Custom domain, затем опубликуйте командой `BASE_PATH=/ npm run deploy` (со своим доменом подпапки `/agency/` нет) и поменяйте Site URL в Supabase.
 
 **Приватный репозиторий:** на бесплатном аккаунте GitHub Pages работают только с публичными репозиториями. Чтобы закрыть код, нужен GitHub Pro или перенос сайта на Vercel (`vercel.json` уже лежит в репозитории, переменные те же).
 

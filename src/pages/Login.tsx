@@ -126,7 +126,7 @@ export function NotConfigured() {
   return (
     <Shell>
       <h1 className="text-2xl tracking-tight">Подключите Supabase</h1>
-      <p className="mt-2 text-muted">Сайту нужны адрес и ключ базы. Добавьте две переменные окружения и пересоберите сайт</p>
+      <p className="mt-2 text-muted">Сайту нужны адрес и ключ базы. Впишите их в файл .env.production и опубликуйте сайт заново</p>
       <pre className="mt-4 overflow-x-auto rounded-2xl bg-soft p-4 text-xs">{`VITE_SUPABASE_URL=https://xxxx.supabase.co\nVITE_SUPABASE_ANON_KEY=eyJhbGciOi...`}</pre>
       <p className="mt-3 text-muted">Они лежат в Supabase: Project Settings, раздел API. Подробности в README</p>
     </Shell>
