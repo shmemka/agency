@@ -186,7 +186,7 @@ export function Integrations() {
                         <span className="hatch flex h-1.5 w-12 overflow-hidden rounded-full">
                           <span className="bar-lime rounded-full" style={{ width: `${(r / 6) * 100}%` }} />
                         </span>
-                        <span className="num text-xs text-muted">{r} из 6</span>
+                        <span className="num text-xs whitespace-nowrap text-muted">{r} из 6</span>
                       </span>
                     </td>
                     <td className="whitespace-nowrap">{ordCell(i)}</td>
