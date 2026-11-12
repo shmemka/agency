@@ -268,21 +268,16 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
             )}
           </FieldGroup>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Теги" hint="Через запятую">
-              <Input value={(d.tags ?? []).join(', ')} onChange={(e) => set('tags', e.target.value.split(',').map((t) => t.trimStart()))} />
-            </Field>
-            <Field label="Заметки" className="sm:col-span-2">
-              <Textarea rows={3} value={d.notes ?? ''} onChange={(e) => set('notes', e.target.value)} />
-            </Field>
-          </div>
+          <Field label="Заметки">
+            <Textarea rows={3} value={d.notes ?? ''} onChange={(e) => set('notes', e.target.value)} />
+          </Field>
         </div>
       )}
     </div>
   )
 }
 
-const EDITABLE = ['nick', 'name', 'platform', 'url', 'topic', 'audience', 'content_type', 'city', 'age', 'avatar_url', 'followers', 'avg_reach', 'clip_views', 'audience_female_pct', 'audience_age', 'price', 'contact', 'email', 'phone', 'legal_status', 'rkn_registered', 'owner_id', 'tags', 'notes'] as const
+const EDITABLE = ['nick', 'name', 'platform', 'url', 'topic', 'audience', 'content_type', 'city', 'age', 'avatar_url', 'followers', 'avg_reach', 'clip_views', 'audience_female_pct', 'audience_age', 'price', 'contact', 'email', 'phone', 'legal_status', 'rkn_registered', 'owner_id', 'notes'] as const
 
 export function cleanBlogger(d: BloggerDraft): BloggerDraft {
   const out: Record<string, unknown> = {}
@@ -291,7 +286,6 @@ export function cleanBlogger(d: BloggerDraft): BloggerDraft {
     if (v === undefined) continue
     out[k] = typeof v === 'string' ? v.trim() || null : v
   }
-  if (d.tags) out.tags = d.tags.map((t) => t.trim()).filter(Boolean)
   return out as BloggerDraft
 }
 
@@ -317,7 +311,7 @@ export function BloggerFormModal({ open, onClose, onCreated }: { open: boolean; 
 
   useEffect(() => {
     if (open) {
-      setD({ platform: 'tiktok', legal_status: 'unknown', owner_id: profile?.id ?? null, tags: [] })
+      setD({ platform: 'tiktok', legal_status: 'unknown', owner_id: profile?.id ?? null })
       setDup(null)
     }
   }, [open, profile?.id])
