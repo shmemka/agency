@@ -162,6 +162,20 @@ export interface Notice {
   created_at: string
 }
 
+export interface Offer {
+  id: string
+  token: string
+  blogger_id: string
+  created_by: string | null
+  created_at: string
+  views: number
+  first_seen_at: string | null
+  last_seen_at: string | null
+  reply_contact: string | null
+  reply_text: string | null
+  replied_at: string | null
+}
+
 export interface ShareLink {
   id: string
   token: string
