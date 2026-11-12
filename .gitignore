@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.env.local
+.DS_Store
+# данные блогеров не храним в публичном репозитории
+supabase/seed*.sql
+*.xlsx
+*.tsbuildinfo

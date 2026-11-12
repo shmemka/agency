@@ -1,0 +1,78 @@
+@import '@fontsource/onest/400.css';
+@import '@fontsource/onest/500.css';
+@import '@fontsource/onest/600.css';
+@import '@fontsource/unbounded/500.css';
+@import '@fontsource/unbounded/600.css';
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Onest', system-ui, sans-serif;
+  --font-display: 'Unbounded', 'Onest', sans-serif;
+
+  --color-base: #f3f4f8;
+  --color-surface: #ffffff;
+  --color-ink: #171a2b;
+  --color-muted: #676d82;
+  --color-faint: #9aa0b2;
+  --color-line: #e1e4ec;
+  --color-night: #232a5c;
+  --color-night-2: #2f3770;
+  --color-accent: #e4387b;
+  --color-accent-dark: #c42263;
+  --color-accent-soft: #fde8f0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-base);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+@keyframes drawer-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+.drawer-in {
+  animation: drawer-in 0.18s ease-out;
+}
+.fade-in {
+  animation: fade-in 0.15s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer-in,
+  .fade-in {
+    animation: none;
+  }
+}
