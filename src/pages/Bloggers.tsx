@@ -231,7 +231,7 @@ export function Bloggers() {
                   <Th k="cpm" right>
                     CPM
                   </Th>
-                  {isAdmin && <th>Ответственный</th>}
+                  {isAdmin && <th className="text-right">Ответственный</th>}
                 </tr>
               }
             >
@@ -259,7 +259,7 @@ export function Bloggers() {
                     <td className="num text-right">{money(b.price)}</td>
                     <td className="num text-right text-muted">{c ? money(c) : '—'}</td>
                     {isAdmin && (
-                      <td>
+                      <td className="text-right">
                         {b.owner_id ? (
                           <Avatar name={personName(b.owner_id)} src={personAvatar(b.owner_id)} className="size-6 align-middle text-[10px]" />
                         ) : (
