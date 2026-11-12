@@ -3,6 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
+/** Адрес сайта с учётом подпапки (на GitHub Pages это /agency/) */
+export const siteUrl = (path = '') => new URL(path.replace(/^\//, ''), window.location.origin + import.meta.env.BASE_URL).href
+
 export const isConfigured = Boolean(url && key)
 
 export const supabase = createClient(url || 'http://localhost', key || 'missing-key', {

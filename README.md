@@ -25,23 +25,27 @@
    1. [`supabase/schema.sql`](supabase/schema.sql) — основа;
    2. `seed.sql` — блогеры из ваших таблиц (файла нет в репозитории, в нём контакты и цены; этот шаг можно пропустить);
    3. [`supabase/migrations/002_workspace.sql`](supabase/migrations/002_workspace.sql) — права по ролям, подборки, задачи, финансы. Старые статусы блогеров он сам переносит в интеграции.
-3. **Authentication → Sign In / Providers → Email**: для быстрого старта можно выключить *Confirm email*.
-4. **Project Settings → API**: скопируйте *Project URL* и *anon public key*.
+3. **Authentication → URL Configuration:** *Site URL* = `https://shmemka.github.io/agency/`, в *Redirect URLs* добавьте `https://shmemka.github.io/agency/**`.
+4. **Authentication → Sign In / Providers → Email**: для быстрого старта можно выключить *Confirm email*.
+5. **Project Settings → API**: скопируйте *Project URL* и *anon public key*.
 
 Порядок важен: `seed.sql` написан под первую схему, поэтому идёт до миграции. Если база уже работает на первой версии, достаточно выполнить `002_workspace.sql`.
 
-### 2. Сайт на Vercel
+### 2. Сайт на GitHub Pages
 
-1. [vercel.com](https://vercel.com) → **Add New → Project** → импортируйте репозиторий.
-2. В **Environment Variables**:
-   ```
-   VITE_SUPABASE_URL=https://xxxx.supabase.co
-   VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
-   ```
-3. **Deploy**. Каждый пуш в `main` обновляет сайт.
-4. В Supabase → **Authentication → URL Configuration** укажите адрес сайта в *Site URL*.
+Сайт собирается и публикуется сам при каждом пуше в `main` (файл `.github/workflows/pages.yml`).
 
-**Свой домен:** Vercel → Settings → Domains, затем поменяйте *Site URL* в Supabase. Ссылки для клиентов строятся от адреса, с которого открыт кабинет, поэтому новые ссылки сразу будут на новом домене, а старые продолжат работать на прежнем.
+1. **Settings → Secrets and variables → Actions → New repository secret** — добавьте два секрета:
+   - `VITE_SUPABASE_URL` — Project URL из Supabase;
+   - `VITE_SUPABASE_ANON_KEY` — ключ anon public.
+2. **Settings → Pages → Build and deployment → Source:** выберите **GitHub Actions** (не «Deploy from a branch»).
+3. **Actions → «Публикация на GitHub Pages» → Run workflow** (или любой пуш в `main`). Через пару минут сайт откроется по адресу `https://shmemka.github.io/agency/`.
+
+Ключ anon public не секретный, он и так виден в браузере; защищают данные правила доступа в базе. Секреты нужны, чтобы не хранить ключ в коде.
+
+**Свой домен:** Settings → Pages → Custom domain, затем перезапустите публикацию. Сборка сама поймёт, что подпапки `/agency/` больше нет. После этого поменяйте Site URL в Supabase.
+
+**Приватный репозиторий:** на бесплатном аккаунте GitHub Pages работают только с публичными репозиториями. Чтобы закрыть код, нужен GitHub Pro или перенос сайта на Vercel (`vercel.json` уже лежит в репозитории, переменные те же).
 
 ### 3. Первый вход
 

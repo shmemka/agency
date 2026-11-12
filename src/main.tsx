@@ -55,7 +55,7 @@ function Gate() {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     {isConfigured ? (
-      <BrowserRouter>
+      <BrowserRouter basename={import.meta.env.BASE_URL.replace(/\/$/, '') || '/'}>
         <Routes>
           {/* страницы для клиента: без входа, по ссылке */}
           <Route path="/s/:token" element={<Share />} />

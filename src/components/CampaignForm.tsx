@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { siteUrl, supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { CAMPAIGN_STATUSES } from '../lib/constants'
@@ -231,7 +231,7 @@ export function ShareBox({ campaignId, kind, onCreated }: { campaignId: string; 
         Создать ссылку для клиента
       </Button>
     )
-  const url = `${window.location.origin}/s/${link.token}`
+  const url = siteUrl(`s/${link.token}`)
   return (
     <div className="space-y-2">
       <CopyLink url={url} />

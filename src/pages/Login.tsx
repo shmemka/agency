@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { supabase } from '../lib/supabase'
+import { siteUrl, supabase } from '../lib/supabase'
 import { AGENCY, PHASES } from '../lib/constants'
 import { Button, Field, Input, cx } from '../components/ui'
 
@@ -56,7 +56,7 @@ export function Login() {
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) setError(ERRORS[error.message] ?? error.message)
     } else {
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name }, emailRedirectTo: window.location.origin } })
+      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name }, emailRedirectTo: siteUrl() } })
       if (error) setError(ERRORS[error.message] ?? error.message)
       else if (!data.session) setInfo('Отправили письмо для подтверждения почты. После подтверждения войдите здесь')
     }

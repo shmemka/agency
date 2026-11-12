@@ -161,13 +161,15 @@ create unique index if not exists notifications_dedupe_idx
 
 create table if not exists public.share_links (
   id           uuid primary key default gen_random_uuid(),
-  token        text not null unique default encode(gen_random_bytes(18), 'hex'),
+  token        text not null unique default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''),
   kind         text not null check (kind in ('shortlist', 'report')),
   campaign_id  uuid not null references public.campaigns(id) on delete cascade,
   revoked      boolean not null default false,
   created_by   uuid references public.profiles(id) on delete set null default auth.uid(),
   created_at   timestamptz not null default now()
 );
+
+alter table public.share_links alter column token set default replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
 
 create table if not exists public.incomes (
   id           uuid primary key default gen_random_uuid(),
