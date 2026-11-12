@@ -12,6 +12,7 @@ import { toast } from '../lib/toast'
 import { Button, Chip, Empty, Input, PageHeader, Segmented, Select, Spinner, StatusBadge, StatusSelect, Table, cx } from '../components/ui'
 import { BloggerName, useIntegrationPanel } from '../components/bits'
 import { NewIntegrationModal } from '../components/BloggerForm'
+import { confirmDialog } from '../components/dialogs'
 
 export function Integrations() {
   const { integrations, blogger, campaign, campaigns, docs, settings, loading, moveIntegration, reload } = useData()
@@ -60,7 +61,7 @@ export function Integrations() {
   const totals = rows.reduce((a, i) => ({ price: a.price + (i.price ?? 0), reach: a.reach + (i.fact_reach ?? 0) }), { price: 0, reach: 0 })
 
   async function markOrd() {
-    if (!window.confirm(`Отметить, что статистика передана в ОРД по ${rows.length} интеграциям?`)) return
+    if (!(await confirmDialog({ title: 'Отметить сдачу в ОРД?', body: `Статистика по ${rows.length} интеграциям будет отмечена как переданная`, ok: 'Отметить' }))) return
     setBusy(true)
     const { error } = await supabase.from('integrations').update({ ord_reported_at: new Date().toISOString(), ord_reported_by: profile?.id }).in('id', rows.map((r) => r.id))
     setBusy(false)

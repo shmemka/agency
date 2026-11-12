@@ -8,6 +8,7 @@ import { dateTime } from '../lib/format'
 import type { Activity } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Avatar, Button, Spinner, Textarea } from './ui'
+import { confirmDialog } from './dialogs'
 
 const label = (s: string | null) => STATUSES.find((x) => x.id === s)?.label ?? BLOGGER_STATUSES.find((x) => x.id === s)?.label ?? s ?? ''
 
@@ -75,7 +76,7 @@ export function Feed({ bloggerId, integrationId }: { bloggerId: string; integrat
                         className="ml-auto text-faint opacity-0 group-hover:opacity-100 hover:text-bad focus-visible:opacity-100"
                         aria-label="Удалить комментарий"
                         onClick={async () => {
-                          if (!window.confirm('Удалить комментарий?')) return
+                          if (!(await confirmDialog({ title: 'Удалить комментарий?', ok: 'Удалить', danger: true }))) return
                           await supabase.from('activity').delete().eq('id', a.id)
                           load()
                         }}

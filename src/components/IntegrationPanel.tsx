@@ -13,6 +13,8 @@ import { Button, Card, Drawer, Field, IconButton, Input, Segmented, Select, Spin
 import { BloggerName, TaskList } from './bits'
 import { DocumentsPanel } from './DocumentsPanel'
 import { Feed } from './Feed'
+import { confirmDialog } from './dialogs'
+import { DateInput } from './DateInput'
 
 type Tab = 'work' | 'terms' | 'docs'
 
@@ -63,7 +65,7 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
   }
 
   async function remove() {
-    if (!window.confirm('Удалить интеграцию? Её документы останутся в карточке блогера')) return
+    if (!(await confirmDialog({ title: 'Удалить интеграцию?', body: 'Её документы останутся в карточке блогера', ok: 'Удалить', danger: true }))) return
     const { error } = await supabase.from('integrations').delete().eq('id', i!.id)
     if (error) return toast(error.message)
     await reload('integrations')
@@ -207,7 +209,7 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
                 </Field>
               )}
               <Field label="Дата выхода">
-                <Input type="date" value={v.publish_date ?? ''} onChange={(e) => set('publish_date', e.target.value || null)} />
+                <DateInput value={v.publish_date} onChange={(x) => set('publish_date', x)} aria-label="Дата выхода" />
               </Field>
               <Field label="Формат">
                 <Input value={v.format ?? ''} onChange={(e) => set('format', e.target.value)} placeholder={b ? platformInfo(b.platform).format : ''} />
@@ -247,7 +249,7 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
                 </Select>
               </Field>
               <Field label="Дата первого показа" hint="От неё считается срок сдачи статистики">
-                <Input type="date" value={v.first_shown_at ?? ''} onChange={(e) => set('first_shown_at', e.target.value || null)} />
+                <DateInput value={v.first_shown_at} onChange={(x) => set('first_shown_at', x)} aria-label="Дата первого показа" />
               </Field>
             </div>
 

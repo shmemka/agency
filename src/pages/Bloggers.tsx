@@ -240,7 +240,7 @@ export function Bloggers() {
                 return (
                   <tr key={b.id} onClick={() => open(b)} onKeyDown={(e) => e.key === 'Enter' && open(b)} tabIndex={0} className={cx('cursor-pointer transition-colors duration-150 hover:bg-soft', (id === b.id || picked.has(b.id)) && 'bg-soft')}>
                     <td onClick={(e) => e.stopPropagation()}>
-                      <input type="checkbox" checked={picked.has(b.id)} onChange={() => toggle(b.id)} aria-label={`Выбрать ${b.nick}`} className="size-4 accent-[#15171c]" />
+                      <input type="checkbox" checked={picked.has(b.id)} onChange={() => toggle(b.id)} aria-label={`Выбрать ${b.nick}`} />
                     </td>
                     <td className="max-w-44">
                       <BloggerName b={b} />

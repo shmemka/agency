@@ -13,6 +13,7 @@ import { AudienceBar, BloggerName, TaskList, statsStale, useIntegrationPanel } f
 import { BloggerFields, NewIntegrationModal, cleanBlogger, type BloggerDraft } from './BloggerForm'
 import { DocumentsPanel } from './DocumentsPanel'
 import { Feed } from './Feed'
+import { confirmDialog, promptDialog } from './dialogs'
 
 type Tab = 'work' | 'data' | 'docs'
 
@@ -22,7 +23,7 @@ export function useBloggerStatus() {
     if (s === b.status) return
     let reason: string | null = null
     if (s === 'blacklist') {
-      reason = window.prompt('Почему блогер в чёрном списке? Причина обязательна')?.trim() || null
+      reason = await promptDialog({ title: `${b.nick} в чёрный список`, label: 'Причина', placeholder: 'Сорвал сроки, накрутка, грубил', ok: 'В чёрный список', required: true, multiline: true })
       if (!reason) return
     }
     const err = await patchBlogger(b.id, { status: s, blacklist_reason: reason })
@@ -69,7 +70,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
   }
 
   async function remove() {
-    if (!window.confirm(`Удалить ${b!.nick} вместе с интеграциями и историей?`)) return
+    if (!(await confirmDialog({ title: `Удалить ${b!.nick}?`, body: 'Вместе с блогером удалятся его интеграции и история', ok: 'Удалить', danger: true }))) return
     const { error } = await supabase.from('bloggers').delete().eq('id', b!.id)
     if (error) return toast(error.message)
     await reload('bloggers', 'integrations')

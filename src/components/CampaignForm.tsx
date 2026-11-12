@@ -7,6 +7,8 @@ import type { Campaign, Client, ShareLink } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Button, Field, Input, Modal, Select, Textarea, cx } from './ui'
 import { CopyLink } from './bits'
+import { confirmDialog } from './dialogs'
+import { DateInput } from './DateInput'
 
 export function CampaignModal({ value, onClose, onSaved }: { value: Partial<Campaign> | null; onClose: () => void; onSaved?: (id: string) => void }) {
   const { clients, members, settings, reload } = useData()
@@ -86,10 +88,10 @@ export function CampaignModal({ value, onClose, onSaved }: { value: Partial<Camp
           </Select>
         </Field>
         <Field label="Начало">
-          <Input type="date" value={d.start_date ?? ''} onChange={(e) => set('start_date', e.target.value || null)} />
+          <DateInput value={d.start_date} onChange={(v) => set('start_date', v)} aria-label="Начало" />
         </Field>
         <Field label="Конец">
-          <Input type="date" value={d.end_date ?? ''} onChange={(e) => set('end_date', e.target.value || null)} />
+          <DateInput value={d.end_date} onChange={(v) => set('end_date', v)} aria-label="Конец" />
         </Field>
         <Field label="Ответственный">
           <Select value={d.owner_id ?? ''} onChange={(e) => set('owner_id', e.target.value || null)}>
@@ -218,7 +220,7 @@ export function ShareBox({ campaignId, kind, onCreated }: { campaignId: string; 
   }
 
   async function revoke() {
-    if (!link || !window.confirm('Отозвать ссылку? Клиент больше не сможет её открыть')) return
+    if (!link || !(await confirmDialog({ title: 'Отозвать ссылку?', body: 'Клиент больше не сможет её открыть', ok: 'Отозвать', danger: true }))) return
     const { error } = await supabase.from('share_links').update({ revoked: true }).eq('id', link.id)
     if (error) return toast(error.message)
     await reload('share_links')

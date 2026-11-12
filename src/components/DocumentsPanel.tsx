@@ -9,6 +9,7 @@ import { date, fileSize } from '../lib/format'
 import type { Doc, DocKind, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Button, Chip, IconButton, Input, Select, Spinner, cx } from './ui'
+import { confirmDialog } from './dialogs'
 
 const BUCKET = 'documents'
 const isImage = (d: Doc) => Boolean(d.storage_path && (d.mime?.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(d.name)))
@@ -63,7 +64,7 @@ export function DocRow({ d, extra, onChanged }: { d: Doc; extra?: ReactNode; onC
   }
 
   async function remove() {
-    if (!window.confirm(`Удалить «${d.name}»?`)) return
+    if (!(await confirmDialog({ title: 'Удалить документ?', body: `«${d.name}» удалится без возможности восстановить`, ok: 'Удалить', danger: true }))) return
     if (d.storage_path) await supabase.storage.from(BUCKET).remove([d.storage_path])
     const { error } = await supabase.from('documents').delete().eq('id', d.id)
     if (error) return toast(error.message)

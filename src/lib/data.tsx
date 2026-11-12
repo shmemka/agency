@@ -5,6 +5,7 @@ import { statusInfo, type Status } from './constants'
 import { transitionWarnings, type DocLite } from './rules'
 import { toast } from './toast'
 import type { Blogger, Campaign, Client, Integration, Notice, Settings, ShareLink, Task } from './types'
+import { confirmDialog } from '../components/dialogs'
 
 type TableName = 'bloggers' | 'integrations' | 'campaigns' | 'clients' | 'tasks' | 'notifications' | 'documents' | 'campaign_members' | 'share_links' | 'campaign_money' | 'settings'
 
@@ -160,7 +161,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (i.status === to) return false
       const b = s.bloggers.find((x) => x.id === i.blogger_id)
       const warns = transitionWarnings(i, b, s.docs, to)
-      if (warns.length && !window.confirm(`${warns.map((w) => `• ${w}`).join('\n')}\n\nВсё равно перевести в «${statusInfo(to).label}»?`)) return false
+      if (warns.length && !(await confirmDialog({ title: `Перевести в «${statusInfo(to).label}»?`, body: 'Не всё готово для этого этапа', items: warns, ok: 'Всё равно перевести' }))) return false
       const err = await patchIntegration(i.id, { status: to })
       toast(err ? `Не удалось сменить этап: ${err}` : `${b?.nick ?? 'Интеграция'}: ${statusInfo(to).label}`)
       return !err

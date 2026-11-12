@@ -1,4 +1,4 @@
-import { Children, isValidElement, useEffect, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
+import { Children, isValidElement, useEffect, useRef, useState, type ButtonHTMLAttributes, type ComponentProps, type HTMLAttributes, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, ChevronLeft, Loader2, X } from 'lucide-react'
 import { BLOGGER_STATUSES, PHASES, STATUSES, STATUS_ORDER, bloggerStatusInfo, nextStatus, phaseInfo, statusInfo, type BloggerStatus, type Status } from '../lib/constants'
@@ -18,7 +18,7 @@ export function Button({
   className,
   children,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: 'sm' | 'md'; loading?: boolean }) {
+}: ComponentProps<'button'> & { variant?: Variant; size?: 'sm' | 'md'; loading?: boolean }) {
   return (
     <button
       type="button"
@@ -57,11 +57,11 @@ export function IconButton({ label, className, children, ...rest }: ButtonHTMLAt
 
 const fieldBase = 'w-full rounded-2xl bg-soft px-4 text-sm text-ink placeholder:text-faint ring-1 ring-transparent transition-shadow duration-150 focus:bg-surface focus:outline-none focus:ring-ink/25'
 
-export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
+export function Input(props: ComponentProps<'input'>) {
   return <input {...props} className={cx(fieldBase, 'h-10', props.className)} />
 }
-export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cx(fieldBase, 'py-3 leading-5', props.className)} />
+export function Textarea(props: ComponentProps<'textarea'>) {
+  return <textarea {...props} className={cx(fieldBase, 'min-h-20 resize-none py-3 leading-5 [field-sizing:content]', props.className)} />
 }
 type SelectEvent = { target: { value: string } }
 interface SelectOption {

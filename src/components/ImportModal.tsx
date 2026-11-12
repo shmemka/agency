@@ -217,7 +217,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
             const n = s.rows.filter((r) => !taken.has(key(r))).length
             return (
               <label key={s.name} className="flex cursor-pointer gap-3 rounded-inner bg-soft p-4">
-                <input type="checkbox" checked={s.include} onChange={(e) => setSheets(sheets.map((x, j) => (j === i ? { ...x, include: e.target.checked } : x)))} className="mt-1 size-4 accent-[#15171c]" />
+                <input type="checkbox" checked={s.include} onChange={(e) => setSheets(sheets.map((x, j) => (j === i ? { ...x, include: e.target.checked } : x)))} className="mt-0.5" />
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-x-3">
                     <span>{s.name}</span>

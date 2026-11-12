@@ -14,6 +14,7 @@ import { Button, Card, Chip, Empty, Field, IconButton, Input, Menu, Modal, PageH
 import { AudienceBar, BloggerName, useIntegrationPanel } from '../components/bits'
 import { CampaignModal, ShareBox } from '../components/CampaignForm'
 import { DocumentsPanel } from '../components/DocumentsPanel'
+import { confirmDialog } from '../components/dialogs'
 
 type Tab = 'shortlist' | 'work' | 'docs' | 'report' | 'money'
 const ORDER: Record<Decision, number> = { pending: 0, none: 1, approved: 2, rejected: 3 }
@@ -39,7 +40,7 @@ export function CampaignPage() {
   const canEdit = isAdmin || c.owner_id === profile?.id
 
   async function remove() {
-    if (!window.confirm(`Удалить кампанию «${c!.name}»? Интеграции останутся, но без кампании`)) return
+    if (!(await confirmDialog({ title: `Удалить кампанию «${c!.name}»?`, body: 'Интеграции останутся, но без кампании', ok: 'Удалить', danger: true }))) return
     const { error } = await supabase.from('campaigns').delete().eq('id', c!.id)
     if (error) return toast(error.message)
     await reload('campaigns', 'integrations')
@@ -154,7 +155,7 @@ function Shortlist({ c, rows }: { c: Campaign; rows: Integration[] }) {
   }
 
   async function remove(i: Integration) {
-    if (!window.confirm(`Убрать ${blogger(i.blogger_id)?.nick} из подборки?`)) return
+    if (!(await confirmDialog({ title: `Убрать ${blogger(i.blogger_id)?.nick} из подборки?`, ok: 'Убрать', danger: true }))) return
     const { error } = await supabase.from('integrations').delete().eq('id', i.id)
     if (error) return toast(error.message)
     reload('integrations')
@@ -421,7 +422,7 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
             <label className="flex min-h-12 cursor-pointer items-center gap-3 border-t border-line py-2 hover:bg-soft">
               <input
                 type="checkbox"
-                className="size-4 accent-[#15171c]"
+               
                 checked={picked.has(b.id)}
                 onChange={() =>
                   setPicked((s) => {

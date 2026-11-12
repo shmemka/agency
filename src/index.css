@@ -43,9 +43,11 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-:focus-visible {
-  outline: 2px solid var(--color-ink);
-  outline-offset: 2px;
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+  }
 }
 
 input,
@@ -53,6 +55,76 @@ select,
 textarea,
 button {
   font: inherit;
+}
+
+/* Системные элементы в фирменном стиле. В base-слое, чтобы классы Tailwind их перебивали */
+@layer base {
+input[type='checkbox']:not(.sr-only) {
+  appearance: none;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border-radius: 6px;
+  background: var(--color-surface) center / 12px no-repeat;
+  box-shadow: inset 0 0 0 1.5px rgb(21 23 28 / 0.25);
+  cursor: pointer;
+  transition:
+    background-color 120ms,
+    box-shadow 120ms;
+}
+input[type='checkbox']:not(.sr-only):hover {
+  box-shadow: inset 0 0 0 1.5px rgb(21 23 28 / 0.5);
+}
+input[type='checkbox']:not(.sr-only):checked {
+  background-color: var(--color-ink);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.2 5 8.5l4.5-5'/%3E%3C/svg%3E");
+  box-shadow: none;
+}
+input[type='checkbox']:not(.sr-only):disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+}
+
+::selection {
+  background: rgb(197 232 78 / 0.55);
+  color: var(--color-ink);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(21 23 28 / 0.18) transparent;
+}
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: rgb(21 23 28 / 0.18) padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgb(21 23 28 / 0.32);
+}
+
+/* автозаполнение браузера не красит поля в жёлтый */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--color-ink);
+  -webkit-box-shadow: 0 0 0 40px var(--color-soft) inset;
+  caret-color: var(--color-ink);
+  transition: background-color 9999s;
+}
+
+input[type='search']::-webkit-search-cancel-button,
+input[type='search']::-webkit-search-decoration {
+  appearance: none;
 }
 
 /* фирменная деталь: штриховка = «ещё не сделано» */

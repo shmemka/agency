@@ -49,14 +49,23 @@ export function Login() {
 
   async function submit(e: FormEvent) {
     e.preventDefault()
-    setBusy(true)
     setError(null)
     setInfo(null)
+    const problem =
+      mode === 'up' && !name.trim()
+        ? 'Укажите имя и фамилию'
+        : !/^\S+@\S+\.\S+$/.test(email.trim())
+          ? 'Проверьте почту: нужен адрес вида name@mail.ru'
+          : password.length < 6
+            ? 'Пароль должен быть не короче 6 символов'
+            : null
+    if (problem) return setError(problem)
+    setBusy(true)
     if (mode === 'in') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
       if (error) setError(ERRORS[error.message] ?? error.message)
     } else {
-      const { data, error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: name }, emailRedirectTo: siteUrl() } })
+      const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: { data: { full_name: name }, emailRedirectTo: siteUrl() } })
       if (error) setError(ERRORS[error.message] ?? error.message)
       else if (!data.session) setInfo('Отправили письмо для подтверждения почты. После подтверждения войдите здесь')
     }
@@ -65,21 +74,21 @@ export function Login() {
 
   return (
     <Shell>
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} noValidate className="space-y-4">
         <div>
           <h1 className="text-2xl tracking-tight">{mode === 'in' ? 'Вход' : 'Регистрация'}</h1>
           <p className="mt-1 text-muted">{mode === 'in' ? 'Кабинет команды агентства' : 'После регистрации учредитель откроет вам доступ'}</p>
         </div>
         {mode === 'up' && (
           <Field label="Имя и фамилия">
-            <Input value={name} onChange={(e) => setName(e.target.value)} required autoComplete="name" />
+            <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
           </Field>
         )}
         <Field label="Почта">
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
         </Field>
         <Field label="Пароль" hint={mode === 'up' ? 'Не короче 6 символов' : undefined}>
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} autoComplete={mode === 'in' ? 'current-password' : 'new-password'} />
+          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'in' ? 'current-password' : 'new-password'} />
         </Field>
         {error && <p className="rounded-2xl bg-orange-100 px-4 py-3 text-bad">{error}</p>}
         {info && <p className="rounded-2xl bg-soft px-4 py-3">{info}</p>}

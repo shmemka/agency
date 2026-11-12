@@ -7,6 +7,8 @@ import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { DataProvider } from './lib/data'
 import { Layout } from './components/Layout'
 import { Spinner, ToastHost } from './components/ui'
+import { DialogHost } from './components/dialogs'
+import { TooltipHost } from './components/Tooltip'
 import { Login, NotConfigured, Pending } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { Bloggers } from './pages/Bloggers'
@@ -69,6 +71,8 @@ createRoot(document.getElementById('root')!).render(
           />
         </Routes>
         <ToastHost />
+        <DialogHost />
+        <TooltipHost />
       </BrowserRouter>
     ) : (
       <NotConfigured />

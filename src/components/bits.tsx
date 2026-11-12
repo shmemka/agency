@@ -9,6 +9,8 @@ import { date, daysBetween, todayISO } from '../lib/format'
 import type { AgeSplit, Blogger, Task } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Avatar, Button, IconButton, Input, PlatformTag, Select, cx } from './ui'
+import { confirmDialog, promptDialog } from './dialogs'
+import { DateInput } from './DateInput'
 
 /** Панель интеграции открывается поверх любой страницы через ?i=<id> */
 export function useIntegrationPanel() {
@@ -86,7 +88,7 @@ export function CopyLink({ url }: { url: string }) {
             await navigator.clipboard.writeText(url)
             toast('Ссылка скопирована')
           } catch {
-            window.prompt('Скопируйте ссылку', url)
+            await promptDialog({ title: 'Скопируйте ссылку', body: 'Браузер не дал скопировать автоматически. Ссылка уже выделена', value: url, readOnly: true })
           }
         }}
       >
@@ -136,7 +138,7 @@ export function TaskList({ tasks, scope, showDone, empty, noForm }: { tasks: Tas
   }
 
   async function remove(t: Task) {
-    if (!window.confirm('Удалить задачу?')) return
+    if (!(await confirmDialog({ title: 'Удалить задачу?', body: t.title, ok: 'Удалить', danger: true }))) return
     const { error } = await supabase.from('tasks').delete().eq('id', t.id)
     if (error) toast(error.message)
     reload('tasks')
@@ -156,7 +158,7 @@ export function TaskList({ tasks, scope, showDone, empty, noForm }: { tasks: Tas
           </Select>
         )}
         <div className="w-36">
-          <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} aria-label="Срок" />
+          <DateInput compact value={due} onChange={(v) => setDue(v ?? '')} placeholder="Срок" aria-label="Срок" />
         </div>
         <IconButton label="Добавить задачу" onClick={add} disabled={!title.trim()} className="bg-ink text-white hover:bg-ink/85 hover:text-white disabled:opacity-40">
           <Plus className="size-[18px]" strokeWidth={1.5} />

@@ -9,6 +9,8 @@ import type { Expense, Income, Settings } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Button, Card, Chip, Empty, Field, IconButton, Input, Modal, PageHeader, Progress, Segmented, Select, StatusBadge, Table, Toggle, cx } from '../components/ui'
 import { BloggerName, useIntegrationPanel } from '../components/bits'
+import { confirmDialog } from '../components/dialogs'
+import { DateInput } from '../components/DateInput'
 
 type Tab = 'summary' | 'incomes' | 'payouts' | 'expenses' | 'settings'
 type Period = 'month' | 'quarter' | 'year'
@@ -63,7 +65,7 @@ export function Finance() {
   const payoutRows = payouts.filter((p) => !onlyNoReceipt || (p.i.status !== 'waiting_payment' && !p.receipt))
 
   async function del(table: 'incomes' | 'expenses', id: string) {
-    if (!window.confirm('Удалить запись?')) return
+    if (!(await confirmDialog({ title: 'Удалить запись?', ok: 'Удалить', danger: true }))) return
     const { error } = await supabase.from(table).delete().eq('id', id)
     if (error) return toast(error.message)
     load()
@@ -358,7 +360,7 @@ function IncomeModal({ value, onClose, onSaved, founders }: { value: Partial<Inc
           <Input inputMode="numeric" className="num" value={d.amount ?? ''} onChange={(e) => set('amount', parseNumber(e.target.value))} />
         </Field>
         <Field label="Дата">
-          <Input type="date" value={d.paid_on ?? ''} onChange={(e) => set('paid_on', e.target.value)} />
+          <DateInput clearable={false} value={d.paid_on} onChange={(v) => v && set('paid_on', v)} aria-label="Дата" />
         </Field>
         <Field label="Кампания">
           <Select
@@ -453,15 +455,22 @@ function ExpenseModal({ value, onClose, onSaved, founders }: { value: Partial<Ex
           <Input inputMode="numeric" className="num" value={d.amount ?? ''} onChange={(e) => setD({ ...d, amount: parseNumber(e.target.value) ?? undefined })} />
         </Field>
         <Field label="Дата">
-          <Input type="date" value={d.paid_on ?? ''} onChange={(e) => setD({ ...d, paid_on: e.target.value })} />
+          <DateInput clearable={false} value={d.paid_on} onChange={(v) => v && setD({ ...d, paid_on: v })} aria-label="Дата" />
         </Field>
         <Field label="Статья">
-          <Input value={d.category ?? ''} onChange={(e) => setD({ ...d, category: e.target.value })} placeholder="Банк, сервисы, реклама" list="expense-cats" />
-          <datalist id="expense-cats">
+          <Input value={d.category ?? ''} onChange={(e) => setD({ ...d, category: e.target.value })} placeholder="Банк, сервисы, реклама" />
+          <div className="mt-2 flex flex-wrap gap-1.5">
             {['Банк', 'Сервисы', 'Реклама', 'Домен и хостинг', 'Прочее'].map((c) => (
-              <option key={c} value={c} />
+              <button
+                key={c}
+                type="button"
+                onClick={() => setD({ ...d, category: c })}
+                className={cx('h-7 rounded-full px-3 text-xs transition-colors duration-150', d.category === c ? 'bg-ink text-white' : 'bg-soft text-muted hover:text-ink')}
+              >
+                {c}
+              </button>
             ))}
-          </datalist>
+          </div>
         </Field>
         <Field label="Кто заплатил">
           <Select value={d.paid_by ?? ''} onChange={(e) => setD({ ...d, paid_by: e.target.value || null })}>
