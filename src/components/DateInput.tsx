@@ -149,7 +149,7 @@ export function DateInput({
                 aria-label={`${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`}
                 onClick={() => pick(d)}
                 className={cx(
-                  'num inline-flex items-center justify-center rounded-full text-[13px] transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/40',
+                  'inline-flex items-center justify-center rounded-full text-[13px] transition-colors duration-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/40',
                   phone ? 'size-11 text-[15px]' : 'size-9',
                   isSel ? 'bg-ink text-white' : isToday ? 'bg-lime text-ink hover:bg-lime/80' : 'hover:bg-soft',
                   outside && !isSel && 'text-faint',

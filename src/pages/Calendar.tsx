@@ -141,7 +141,7 @@ export function Calendar() {
             const out = d.getMonth() !== cursor.getMonth()
             return (
               <div key={k} className={cx('min-h-28 border-t border-l border-line p-1.5 first:border-l-0 [&:nth-child(7n+1)]:border-l-0', out && 'bg-soft/60')}>
-                <div className={cx('num mb-1 flex size-6 items-center justify-center rounded-full text-xs', k === today ? 'bg-ink text-white' : out ? 'text-faint' : 'text-muted')}>{d.getDate()}</div>
+                <div className={cx('mb-1 flex size-6 items-center justify-center rounded-full text-xs', k === today ? 'bg-ink text-white' : out ? 'text-faint' : 'text-muted')}>{d.getDate()}</div>
                 {evs.slice(0, 3).map((e) => item(e))}
                 {evs.length > 3 && <div className="px-1.5 text-xs text-faint">ещё {evs.length - 3}</div>}
               </div>
