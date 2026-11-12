@@ -91,7 +91,7 @@ export function Profile() {
               setDrag(false)
               upload(e.dataTransfer.files[0])
             }}
-            className={`flex flex-col items-start gap-5 rounded-inner p-4 ring-1 ring-inset transition-colors duration-150 sm:flex-row sm:items-center ${drag ? 'bg-soft ring-ink/30' : 'ring-ink/10'}`}
+            className={`-m-3 flex flex-col items-start gap-5 rounded-inner p-3 transition-colors duration-150 sm:flex-row sm:items-center ${drag ? 'bg-soft' : ''}`}
           >
             <Avatar name={display} src={profile.avatar_url} className="size-24 text-2xl" />
             <div className="min-w-0 flex-1">
@@ -108,7 +108,6 @@ export function Profile() {
                   </Button>
                 )}
               </div>
-              <p className="mt-2 text-xs text-faint">JPG, PNG или WebP. Можно перетащить файл сюда</p>
             </div>
             <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => upload(e.target.files?.[0])} />
           </div>
