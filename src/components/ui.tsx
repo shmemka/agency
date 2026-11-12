@@ -708,7 +708,7 @@ export function Table({ head, children, min }: { head: ReactNode; children: Reac
   return (
     <div className="overflow-x-auto">
       <table
-        className="rows w-full text-left text-[13px] [&_td]:px-2.5 [&_td]:py-2.5 [&_td.num]:whitespace-nowrap [&_td:first-child]:pl-5 [&_td:last-child]:pr-5 [&_th]:px-2.5 [&_th]:pt-1 [&_th]:pb-2 [&_th]:font-normal [&_th]:whitespace-nowrap [&_th:first-child]:pl-5 [&_th:last-child]:pr-5"
+        className="rows w-full text-left text-[13px] [&_td]:px-2.5 [&_td]:py-2.5 [&_td.num]:whitespace-nowrap [&_td:first-child]:pl-6 [&_td:last-child]:pr-6 [&_th]:px-2.5 [&_th]:pt-1 [&_th]:pb-2 [&_th]:font-normal [&_th]:whitespace-nowrap [&_th:first-child]:pl-6 [&_th:last-child]:pr-6"
         style={{ minWidth: min }}
       >
         <thead className="text-faint">{head}</thead>

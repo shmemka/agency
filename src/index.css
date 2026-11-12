@@ -127,10 +127,7 @@ input[type='search']::-webkit-search-decoration {
   appearance: none;
 }
 
-/*
- * Таблицы: каждая строка отдельным белым блоком, между блоками 2px фона.
- * Внешние углы группы большие, внутренние маленькие, чтобы строки читались одним списком.
- */
+/* Таблицы: каждая строка отдельным скруглённым белым блоком, между блоками 2px фона */
 @layer components {
   table.rows {
     border-collapse: separate;
@@ -149,22 +146,13 @@ input[type='search']::-webkit-search-decoration {
     background: #f8f9fb;
   }
   table.rows tbody td:first-child {
-    border-radius: 6px 0 0 6px;
+    border-radius: 24px 0 0 24px;
   }
   table.rows tbody td:last-child {
-    border-radius: 0 6px 6px 0;
+    border-radius: 0 24px 24px 0;
   }
-  table.rows tbody tr:first-child > td:first-child {
-    border-top-left-radius: 20px;
-  }
-  table.rows tbody tr:first-child > td:last-child {
-    border-top-right-radius: 20px;
-  }
-  table.rows tbody tr:last-child > td:first-child {
-    border-bottom-left-radius: 20px;
-  }
-  table.rows tbody tr:last-child > td:last-child {
-    border-bottom-right-radius: 20px;
+  table.rows tbody td:only-child {
+    border-radius: 24px;
   }
 }
 
