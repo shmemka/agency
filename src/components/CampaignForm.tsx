@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { siteUrl, supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
-import { CAMPAIGN_STATUSES } from '../lib/constants'
+import { campaignStatusLabel } from '../lib/constants'
 import type { Campaign, Client, ShareLink } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Button, Field, Input, Modal, Select, Textarea, cx } from './ui'
@@ -23,6 +23,8 @@ export function CampaignModal({ value, onClose, onSaved }: { value: Partial<Camp
     setD(value.id ? value : { status: 'planning', markup_pct: settings?.default_markup_pct ?? 20, ...value })
     setCrew(new Set(members.filter((m) => m.campaign_id === value.id).map((m) => m.profile_id)))
   }, [value])
+  // «На паузе», «Завершена» и «Отменена» автоматика не меняет, остальное база считает сама по интеграциям
+  const manual = d.status === 'paused' || d.status === 'done' || d.status === 'cancelled'
   const set = <K extends keyof Campaign>(k: K, v: Campaign[K] | null) => setD((x) => ({ ...x, [k]: v }))
 
   async function save() {
@@ -78,13 +80,12 @@ export function CampaignModal({ value, onClose, onSaved }: { value: Partial<Camp
             ))}
           </Select>
         </Field>
-        <Field label="Статус">
-          <Select value={d.status ?? 'planning'} onChange={(e) => set('status', e.target.value as Campaign['status'])}>
-            {CAMPAIGN_STATUSES.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
+        <Field label="Статус" hint={manual ? undefined : 'Идёт после первого «Берём» клиента, завершается, когда все интеграции закрыты'}>
+          <Select value={manual ? d.status! : 'auto'} onChange={(e) => set('status', (e.target.value === 'auto' ? 'planning' : e.target.value) as Campaign['status'])}>
+            <option value="auto">{d.id && !manual && value?.status ? `Автоматически: ${campaignStatusLabel(value.status).toLowerCase()}` : 'Автоматически'}</option>
+            <option value="paused">На паузе</option>
+            <option value="done">Завершена</option>
+            <option value="cancelled">Отменена</option>
           </Select>
         </Field>
         <Field label="Начало">

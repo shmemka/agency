@@ -151,6 +151,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       setS((p) => ({ ...p, integrations: p.integrations.map((i) => (i.id === id ? (data as Integration) : i)) }))
       setPulse((p) => p + 1)
       if (patch.status === 'published' || patch.status === 'done') reload('bloggers')
+      // статус кампании база пересчитывает сама по решениям клиента и статусам интеграций
+      if (patch.status || patch.client_decision || 'campaign_id' in patch) reload('campaigns')
       return null
     },
     [reload],
