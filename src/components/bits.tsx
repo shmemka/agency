@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { AGE_GROUPS, platformInfo } from '../lib/constants'
-import { date, daysBetween, todayISO } from '../lib/format'
+import { date, daysBetween, plural, todayISO } from '../lib/format'
 import type { AgeSplit, Blogger, Task } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Avatar, Button, IconButton, Input, PlatformTag, Select, cx } from './ui'
@@ -47,7 +47,7 @@ export function BloggerName({ b, link }: { b: Blogger | undefined; link?: boolea
             </a>
           )}
         </span>
-        {b.name && <span className="block truncate text-xs text-muted">{b.name}</span>}
+        {(b.name || b.age) && <span className="block truncate text-xs text-muted">{[b.name, b.age && `${b.age} ${plural(b.age, 'год', 'года', 'лет')}`].filter(Boolean).join(', ')}</span>}
       </span>
     </span>
   )

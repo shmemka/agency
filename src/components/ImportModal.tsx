@@ -29,6 +29,7 @@ const FIELDS: { key: keyof Blogger; label: string; test: RegExp; not?: RegExp }[
   { key: 'content_type', label: 'Формат контента', test: /тип контента|формат контента/i },
   { key: 'contact', label: 'Контакт', test: /связь|контакт|telegram|телеграм/i },
   { key: 'city', label: 'Город', test: /город/i },
+  { key: 'age', label: 'Возраст', test: /^\s*возраст(\s+блогера)?\s*$/i },
 ]
 const AGE: { id: keyof AgeSplit; test: RegExp }[] = [
   { id: 'u18', test: /до\s?18|13\s?[-–]\s?17|<\s?18/ },
@@ -108,6 +109,10 @@ function detect(sheetName: string, data: unknown[][], fileName: string): Sheet |
       content_type: str('content_type'),
       contact: str('contact'),
       city: str('city'),
+      age: (() => {
+        const n = parseNumber(cell('age'))
+        return n !== null && n >= 5 && n <= 100 ? Math.round(n) : null
+      })(),
       source: `${fileName.replace(/\.(xlsx|xls|csv)$/i, '')}, ${sheetName}`,
     })
   }

@@ -149,13 +149,25 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
               <Field label="Имя">
                 <Input value={d.name ?? ''} onChange={(e) => set('name', e.target.value)} />
               </Field>
+              <Field label="Возраст">
+                <Input
+                  inputMode="numeric"
+                  className="num"
+                  placeholder="лет"
+                  value={d.age ?? ''}
+                  onChange={(e) => {
+                    const n = parseNumber(e.target.value)
+                    set('age', n === null ? null : Math.min(100, Math.round(n)))
+                  }}
+                />
+              </Field>
               <Field label="Город">
                 <Input value={d.city ?? ''} onChange={(e) => set('city', e.target.value)} />
               </Field>
               <Field label="Тематика">
                 <Input value={d.topic ?? ''} onChange={(e) => set('topic', e.target.value)} placeholder="учёба, лайфстайл, бьюти" />
               </Field>
-              <Field label="Формат контента">
+              <Field label="Формат контента" className="sm:col-span-2">
                 <Input value={d.content_type ?? ''} onChange={(e) => set('content_type', e.target.value)} placeholder="разговорник, скетчи, влоги" />
               </Field>
             </div>
@@ -216,7 +228,7 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
   )
 }
 
-const EDITABLE = ['nick', 'name', 'platform', 'url', 'topic', 'audience', 'content_type', 'city', 'followers', 'avg_reach', 'clip_views', 'audience_female_pct', 'audience_age', 'price', 'contact', 'email', 'phone', 'legal_status', 'rkn_registered', 'owner_id', 'tags', 'notes'] as const
+const EDITABLE = ['nick', 'name', 'platform', 'url', 'topic', 'audience', 'content_type', 'city', 'age', 'followers', 'avg_reach', 'clip_views', 'audience_female_pct', 'audience_age', 'price', 'contact', 'email', 'phone', 'legal_status', 'rkn_registered', 'owner_id', 'tags', 'notes'] as const
 
 export function cleanBlogger(d: BloggerDraft): BloggerDraft {
   const out: Record<string, unknown> = {}

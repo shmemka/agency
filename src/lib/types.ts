@@ -24,6 +24,7 @@ export interface Blogger {
   audience: string | null
   content_type: string | null
   city: string | null
+  age: number | null
   followers: number | null
   avg_reach: number | null
   clip_views: number | null
