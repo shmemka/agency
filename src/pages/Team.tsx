@@ -6,13 +6,11 @@ import { isActive } from '../lib/rules'
 import { date } from '../lib/format'
 import type { Profile } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Button, Card, Chip, Field, Input, Modal, PageHeader, Select, Table } from '../components/ui'
+import { Avatar, Button, Card, Chip, Field, Modal, PageHeader, Select, Table } from '../components/ui'
 
 export function Team() {
-  const { team, profile, isAdmin, reloadTeam, reloadProfile } = useAuth()
+  const { team, profile, isAdmin, reloadTeam } = useAuth()
   const { bloggers, integrations, reload } = useData()
-  const [name, setName] = useState(profile?.full_name ?? '')
-  const [saving, setSaving] = useState(false)
   const [closing, setClosing] = useState<Profile | null>(null)
   const [heir, setHeir] = useState('')
   const pending = team.filter((t) => !t.is_active)
@@ -48,7 +46,7 @@ export function Team() {
           <ul className="mt-2">
             {pending.map((p) => (
               <li key={p.id} className="flex flex-wrap items-center gap-3 border-t border-line py-3 first:border-0">
-                <Avatar name={p.full_name || p.email || ''} />
+                <Avatar name={p.full_name || p.email || ''} src={p.avatar_url} />
                 <div className="min-w-0 flex-1">
                   <div>{p.full_name}</div>
                   <div className="text-xs text-muted">
@@ -82,7 +80,7 @@ export function Team() {
             <tr key={p.id}>
               <td>
                 <div className="flex items-center gap-3">
-                  <Avatar name={p.full_name || p.email || ''} />
+                  <Avatar name={p.full_name || p.email || ''} src={p.avatar_url} />
                   <div>
                     <div>
                       {p.full_name}
@@ -125,30 +123,7 @@ export function Team() {
         })}
       </Table>
 
-      <Card className="mt-3 max-w-md">
-        <h2 className="mb-3 text-base">Мой профиль</h2>
-        <Field label="Имя, которое видят коллеги">
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
-        </Field>
-        <Button
-          className="mt-3"
-          variant="primary"
-          loading={saving}
-          disabled={!name.trim() || name === profile?.full_name}
-          onClick={async () => {
-            if (!profile) return
-            setSaving(true)
-            const { error } = await supabase.from('profiles').update({ full_name: name.trim() }).eq('id', profile.id)
-            setSaving(false)
-            if (error) return toast(error.message)
-            await Promise.all([reloadProfile(), reloadTeam()])
-            toast('Имя обновлено')
-          }}
-        >
-          Сохранить имя
-        </Button>
-        <p className="mt-4 text-[13px] text-muted">{isAdmin ? 'Чтобы добавить человека, отправьте ему адрес сайта. Он зарегистрируется, а вы откроете доступ здесь' : 'Новых людей подключают учредители'}</p>
-      </Card>
+      <p className="mt-4 px-1 text-[13px] text-muted">{isAdmin ? 'Чтобы добавить человека, отправьте ему адрес сайта. Он зарегистрируется, а вы откроете доступ здесь' : 'Новых людей подключают учредители'}</p>
 
       <Modal
         open={!!closing}

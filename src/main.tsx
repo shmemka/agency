@@ -21,6 +21,8 @@ import { Documents } from './pages/Documents'
 import { Finance } from './pages/Finance'
 import { Team } from './pages/Team'
 import { Share } from './pages/Share'
+import { Profile } from './pages/Profile'
+import { Settings } from './pages/Settings'
 
 function Gate() {
   const { session, profile, loading, isAdmin } = useAuth()
@@ -47,6 +49,8 @@ function Gate() {
           <Route path="documents" element={<Documents />} />
           {isAdmin && <Route path="finance" element={<Finance />} />}
           <Route path="team" element={<Team />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

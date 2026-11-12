@@ -20,7 +20,7 @@ type SortKey = 'nick' | 'followers' | 'avg_reach' | 'price' | 'cpm' | 'updated_a
 
 export function Bloggers() {
   const { bloggers, integrations, campaigns, campaign, loading, error, moveIntegration, reload } = useData()
-  const { team, personName, profile, isAdmin } = useAuth()
+  const { team, personName, personAvatar, profile, isAdmin } = useAuth()
   const { id } = useParams()
   const nav = useNavigate()
   const setStatus = useBloggerStatus()
@@ -262,7 +262,7 @@ export function Bloggers() {
                       <td>
                         {b.owner_id ? (
                           <span className="inline-flex items-center gap-2">
-                            <Avatar name={personName(b.owner_id)} className="size-6 text-[10px]" />
+                            <Avatar name={personName(b.owner_id)} src={personAvatar(b.owner_id)} className="size-6 text-[10px]" />
                             {personName(b.owner_id).split(' ')[0]}
                           </span>
                         ) : (

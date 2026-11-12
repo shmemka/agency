@@ -13,6 +13,7 @@ interface AuthState {
   reloadProfile: () => Promise<void>
   signOut: () => Promise<void>
   personName: (id: string | null | undefined) => string
+  personAvatar: (id: string | null | undefined) => string | null
 }
 
 const Ctx = createContext<AuthState | null>(null)
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const p = team.find((t) => t.id === id)
         return p?.full_name || p?.email || '—'
       },
+      personAvatar: (id) => (id ? (team.find((t) => t.id === id)?.avatar_url ?? null) : null),
     }),
     [session, profile, team, loading, reloadTeam, reloadProfile],
   )

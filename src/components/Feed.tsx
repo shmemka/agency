@@ -14,7 +14,7 @@ const label = (s: string | null) => STATUSES.find((x) => x.id === s)?.label ?? B
 
 /** Комментарии и история: по блогеру целиком или по одной интеграции */
 export function Feed({ bloggerId, integrationId }: { bloggerId: string; integrationId?: string }) {
-  const { personName, profile, isAdmin } = useAuth()
+  const { personName, personAvatar, profile, isAdmin } = useAuth()
   const { pulse, campaign, integrations } = useData()
   const [items, setItems] = useState<Activity[] | null>(null)
   const [text, setText] = useState('')
@@ -65,7 +65,7 @@ export function Feed({ bloggerId, integrationId }: { bloggerId: string; integrat
             const where = !integrationId && a.integration_id ? campaign(integrations.find((i) => i.id === a.integration_id)?.campaign_id)?.name : null
             return (
               <li key={a.id} className="group flex gap-3 border-t border-line py-3 first:border-0">
-                <Avatar name={who} className="size-7 text-[10px]" />
+                <Avatar name={who} src={personAvatar(a.actor_id)} className="size-7 text-[10px]" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-xs text-muted">
                     <span className="text-ink">{who}</span>

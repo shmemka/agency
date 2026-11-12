@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, CalendarDays, Clapperboard, Ellipsis, FileText, LayoutGrid, ListTodo, LogOut, Megaphone, Users, UsersRound, Wallet } from 'lucide-react'
+import { Bell, CalendarDays, Clapperboard, Ellipsis, FileText, LayoutGrid, ListTodo, LogOut, Megaphone, Settings, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { AGENCY } from '../lib/constants'
 import { attention, type Attention } from '../lib/rules'
 import { dateTime } from '../lib/format'
-import { Avatar, IconButton, Modal, cx } from './ui'
+import { Avatar, IconButton, ITEM, ITEM_DESKTOP, Modal, POPOVER, cx } from './ui'
 import { useIntegrationPanel } from './bits'
 import { IntegrationPanel } from './IntegrationPanel'
 
@@ -156,16 +156,7 @@ export function Layout() {
             </NavLink>
           ))}
         </nav>
-        <div className="flex items-center gap-2.5 rounded-inner bg-surface p-2">
-          <Avatar name={name} />
-          <div className="min-w-0 flex-1 leading-4">
-            <div className="truncate text-[13px]">{name}</div>
-            <div className="text-xs text-faint">{isAdmin ? 'Учредитель' : 'Специалист'}</div>
-          </div>
-          <IconButton label="Выйти" onClick={signOut} className="size-8">
-            <LogOut className="size-4" strokeWidth={1.5} />
-          </IconButton>
-        </div>
+        <UserCard name={name} avatar={profile?.avatar_url} role={isAdmin ? 'Учредитель' : 'Специалист'} onSignOut={signOut} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -205,6 +196,13 @@ export function Layout() {
                 {badge(n.to) > 0 && <span className="num text-[13px] text-faint">{badge(n.to)}</span>}
               </NavLink>
             ))}
+          <div className="mx-3 my-2 h-px bg-line" />
+          {ACCOUNT.map((n) => (
+            <NavLink key={n.to} to={n.to} onClick={() => setMore(false)} className="flex h-12 items-center gap-3 rounded-2xl px-3 text-[15px] hover:bg-soft">
+              <n.icon className="size-5 text-muted" strokeWidth={1.5} />
+              <span className="flex-1">{n.label}</span>
+            </NavLink>
+          ))}
           <button onClick={signOut} className="flex h-12 w-full items-center gap-3 rounded-2xl px-3 text-[15px] text-muted hover:bg-soft">
             <LogOut className="size-5" strokeWidth={1.5} />
             Выйти
@@ -213,6 +211,84 @@ export function Layout() {
       </Modal>
 
       {openId && <IntegrationPanel id={openId} onClose={() => open(null)} />}
+    </div>
+  )
+}
+
+const ACCOUNT = [
+  { to: '/profile', label: 'Мой профиль', icon: UserRound },
+  { to: '/settings', label: 'Настройки', icon: Settings },
+]
+
+/** Карточка пользователя внизу сайдбара: при наведении или по клику открывает меню аккаунта */
+function UserCard({ name, avatar, role, onSignOut }: { name: string; avatar?: string | null; role: string; onSignOut: () => void }) {
+  const [open, setOpen] = useState(false)
+  const timer = useRef<number | undefined>(undefined)
+  const box = useRef<HTMLDivElement>(null)
+  const loc = useLocation()
+  const here = ACCOUNT.some((a) => loc.pathname.startsWith(a.to))
+
+  const show = () => {
+    window.clearTimeout(timer.current)
+    setOpen(true)
+  }
+  const hide = (delay = 160) => {
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setOpen(false), delay)
+  }
+
+  useEffect(() => setOpen(false), [loc.pathname])
+  useEffect(() => {
+    if (!open) return
+    const out = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false)
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    window.addEventListener('mousedown', out)
+    window.addEventListener('keydown', key)
+    return () => {
+      window.removeEventListener('mousedown', out)
+      window.removeEventListener('keydown', key)
+    }
+  }, [open])
+
+  return (
+    <div
+      ref={box}
+      className="relative"
+      onMouseEnter={show}
+      onMouseLeave={() => hide()}
+      onBlur={(e) => !box.current?.contains(e.relatedTarget as Node) && hide(0)}
+    >
+      {open && (
+        // pb-1.5 — невидимый мостик: курсор доходит до меню, не покидая блок
+        <div className="absolute inset-x-0 bottom-full pb-1.5">
+          <div role="menu" aria-label="Аккаунт" className={cx('fade', POPOVER)}>
+            {ACCOUNT.map((a) => (
+              <NavLink key={a.to} to={a.to} role="menuitem" className={({ isActive }) => cx(ITEM, ITEM_DESKTOP, 'gap-2.5 transition-colors duration-150 hover:bg-soft', isActive && 'bg-soft')}>
+                <a.icon className="size-4 shrink-0 text-muted" strokeWidth={1.5} />
+                {a.label}
+              </NavLink>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className={cx('flex items-center gap-2.5 rounded-inner bg-surface p-2 transition-shadow duration-150', (open || here) && 'ring-1 ring-ink/10')}>
+        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={open}
+          onClick={() => (open ? setOpen(false) : show())}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl text-left focus-visible:outline-offset-4"
+        >
+          <Avatar name={name} src={avatar} />
+          <span className="min-w-0 flex-1 leading-4">
+            <span className="block truncate text-[13px]">{name}</span>
+            <span className="block text-xs text-faint">{role}</span>
+          </span>
+        </button>
+        <IconButton label="Выйти" onClick={onSignOut} className="size-8">
+          <LogOut className="size-4" strokeWidth={1.5} />
+        </IconButton>
+      </div>
     </div>
   )
 }

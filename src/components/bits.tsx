@@ -111,7 +111,7 @@ export function dueLabel(t: Task) {
 
 /** Список задач с добавлением. scope привязывает новые задачи к блогеру, интеграции или кампании */
 export function TaskList({ tasks, scope, showDone, empty, noForm }: { tasks: Task[]; noForm?: boolean; scope?: Partial<Pick<Task, 'blogger_id' | 'integration_id' | 'campaign_id'>>; showDone?: boolean; empty?: string }) {
-  const { profile, team, isAdmin, personName } = useAuth()
+  const { profile, team, isAdmin, personName, personAvatar } = useAuth()
   const { reload, blogger } = useData()
   const [title, setTitle] = useState('')
   const [assignee, setAssignee] = useState(profile?.id ?? '')
@@ -192,7 +192,7 @@ export function TaskList({ tasks, scope, showDone, empty, noForm }: { tasks: Tas
                     {t.created_by && t.created_by !== t.assignee_id && <span>от {personName(t.created_by).split(' ')[0]}</span>}
                   </div>
                 </div>
-                {t.assignee_id !== profile?.id && <Avatar name={personName(t.assignee_id)} className="size-6 text-[10px]" />}
+                {t.assignee_id !== profile?.id && <Avatar name={personName(t.assignee_id)} src={personAvatar(t.assignee_id)} className="size-6 text-[10px]" />}
                 {(isAdmin || t.created_by === profile?.id) && (
                   <button onClick={() => remove(t)} className="text-faint opacity-0 group-hover:opacity-100 hover:text-bad focus-visible:opacity-100" aria-label="Удалить задачу">
                     <Trash2 className="size-4" strokeWidth={1.5} />

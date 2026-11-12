@@ -73,8 +73,8 @@ type SelectEvent = { target: { value: string } }
  */
 export const POPOVER = 'rounded-[18px] bg-surface p-1.5 shadow-[0_8px_24px_rgba(21,23,28,0.12)] ring-1 ring-line'
 export const POPOVER_GAP = 6
-const ITEM = 'flex w-full items-center rounded-xl pr-1.5 pl-2.5 text-left'
-const ITEM_DESKTOP = 'h-9 text-[13px]'
+export const ITEM = 'flex w-full items-center rounded-xl pr-1.5 pl-2.5 text-left'
+export const ITEM_DESKTOP = 'h-9 text-[13px]'
 const ITEM_PHONE = 'h-12 text-[15px]'
 interface SelectOption {
   value: string
@@ -669,8 +669,12 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   )
 }
 
-export function Avatar({ name, className }: { name: string; className?: string }) {
+export function Avatar({ name, src, className }: { name: string; src?: string | null; className?: string }) {
   const n = name || '?'
+  // помним, какая именно ссылка не загрузилась: новая ссылка снова пробует показать фото
+  const [broken, setBroken] = useState<string | null>(null)
+  if (src && broken !== src)
+    return <img src={src} alt={n} title={n} onError={() => setBroken(src)} className={cx('inline-block size-8 shrink-0 rounded-full bg-ink/8 object-cover', className)} />
   return (
     <span className={cx('inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-ink/8 text-xs font-medium text-ink', className)} title={n}>
       {n
