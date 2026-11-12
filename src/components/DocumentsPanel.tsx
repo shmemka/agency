@@ -193,7 +193,7 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }
         className={cx('rounded-inner p-3 transition-colors duration-150', hover ? 'bg-lime/40' : 'hatch')}
       >
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={kind} onChange={(e) => setKind(e.target.value as DocKind)} aria-label="Тип документа" className="w-36 [&_select]:bg-surface">
+          <Select value={kind} onChange={(e) => setKind(e.target.value as DocKind)} aria-label="Тип документа" tone="surface" className="w-36">
             {DOC_KINDS.map((k) => (
               <option key={k.id} value={k.id}>
                 {k.label}
@@ -201,7 +201,7 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }
             ))}
           </Select>
           {choices && choices.length > 0 && (
-            <Select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="К чему относится" className="w-56 [&_select]:bg-surface">
+            <Select value={target} onChange={(e) => setTarget(e.target.value)} aria-label="К чему относится" tone="surface" className="w-56">
               <option value="">К блогеру в целом</option>
               {choices.map((i) => (
                 <option key={i.id} value={i.id}>

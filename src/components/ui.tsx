@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import { Children, isValidElement, useEffect, useRef, useState, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, ChevronLeft, Loader2, X } from 'lucide-react'
 import { BLOGGER_STATUSES, PHASES, STATUSES, STATUS_ORDER, bloggerStatusInfo, nextStatus, phaseInfo, statusInfo, type BloggerStatus, type Status } from '../lib/constants'
@@ -63,14 +63,244 @@ export function Input(props: InputHTMLAttributes<HTMLInputElement>) {
 export function Textarea(props: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea {...props} className={cx(fieldBase, 'py-3 leading-5', props.className)} />
 }
-export function Select({ children, className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+type SelectEvent = { target: { value: string } }
+interface SelectOption {
+  value: string
+  label: ReactNode
+  text: string
+  disabled?: boolean
+}
+
+function readOptions(children: ReactNode): SelectOption[] {
+  const out: SelectOption[] = []
+  const walk = (nodes: ReactNode) =>
+    Children.forEach(nodes, (n) => {
+      if (!isValidElement(n)) return
+      const props = n.props as { value?: string | number; children?: ReactNode; disabled?: boolean }
+      if (n.type === 'option') {
+        const text = Children.toArray(props.children).join('')
+        out.push({ value: String(props.value ?? text), label: props.children, text, disabled: props.disabled })
+      } else if (props.children) walk(props.children)
+    })
+  walk(children)
+  return out
+}
+
+/**
+ * Выпадающий список в стиле сайта. Принимает те же <option>, что и обычный select,
+ * и отдаёт onChange({ target: { value } }). На телефоне открывается панелью снизу,
+ * в длинных списках появляется поиск.
+ */
+export function Select({
+  value,
+  onChange,
+  children,
+  className,
+  disabled,
+  tone = 'field',
+  placeholder,
+  'aria-label': ariaLabel,
+}: {
+  value: string | number | null | undefined
+  onChange?: (e: SelectEvent) => void
+  children: ReactNode
+  className?: string
+  disabled?: boolean
+  /** field — серое поле в форме, surface — белое на сером фоне страницы, dark — на тёмной панели */
+  tone?: 'field' | 'surface' | 'dark'
+  placeholder?: string
+  'aria-label'?: string
+}) {
+  const options = readOptions(children)
+  const current = options.find((o) => o.value === String(value ?? ''))
+  const [open, setOpen] = useState(false)
+  const [q, setQ] = useState('')
+  const [active, setActive] = useState(0)
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number; width: number; maxH: number }>({ left: 0, width: 0, maxH: 320 })
+  const btn = useRef<HTMLButtonElement>(null)
+  const list = useRef<HTMLDivElement>(null)
+  const phone = isPhone()
+  const searchable = options.length > 12
+  const shown = q.trim() ? options.filter((o) => o.text.toLowerCase().includes(q.trim().toLowerCase())) : options
+
+  function place() {
+    const r = btn.current!.getBoundingClientRect()
+    const below = window.innerHeight - r.bottom - 12
+    const above = r.top - 12
+    const want = Math.min(360, options.length * 36 + (searchable ? 56 : 12))
+    const width = Math.max(r.width, 200)
+    const left = Math.min(r.left, window.innerWidth - width - 8)
+    if (below >= Math.min(want, 240) || below >= above) setPos({ top: r.bottom + 4, left, width, maxH: Math.max(160, Math.min(360, below)) })
+    else setPos({ bottom: window.innerHeight - r.top + 4, left, width, maxH: Math.max(160, Math.min(360, above)) })
+  }
+
+  function show() {
+    if (disabled) return
+    place()
+    setQ('')
+    setActive(Math.max(0, options.findIndex((o) => o.value === String(value ?? ''))))
+    setOpen(true)
+  }
+
+  function pick(o: SelectOption) {
+    if (o.disabled) return
+    setOpen(false)
+    btn.current?.focus()
+    if (o.value !== String(value ?? '')) onChange?.({ target: { value: o.value } })
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e: Event) => {
+      if (list.current?.contains(e.target as Node) || btn.current?.contains(e.target as Node)) return
+      setOpen(false)
+    }
+    const reflow = () => (phone ? null : setOpen(false))
+    window.addEventListener('mousedown', close)
+    window.addEventListener('resize', reflow)
+    window.addEventListener('scroll', reflow, true)
+    return () => {
+      window.removeEventListener('mousedown', close)
+      window.removeEventListener('resize', reflow)
+      window.removeEventListener('scroll', reflow, true)
+    }
+  }, [open, phone])
+
+  useEffect(() => {
+    if (open) list.current?.querySelector<HTMLElement>(`[data-i="${active}"]`)?.scrollIntoView({ block: 'nearest' })
+  }, [open, active])
+
+  function onKey(e: React.KeyboardEvent) {
+    if (!open) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
+        e.preventDefault()
+        show()
+      }
+      return
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      setOpen(false)
+      btn.current?.focus()
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setActive((i) => Math.min(shown.length - 1, i + 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setActive((i) => Math.max(0, i - 1))
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      if (shown[active]) pick(shown[active])
+    } else if (e.key === 'Tab') setOpen(false)
+  }
+
+  const items = (
+    <>
+      {searchable && (
+        <div className="p-1.5 pb-1">
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value)
+              setActive(0)
+            }}
+            onKeyDown={onKey}
+            placeholder="Найти"
+            aria-label="Поиск по списку"
+            className="h-9 w-full rounded-xl bg-soft px-3 text-[13px] placeholder:text-faint focus:outline-none"
+          />
+        </div>
+      )}
+      <div className="overflow-y-auto p-1.5 pt-1" style={{ maxHeight: phone ? '60vh' : pos.maxH - (searchable ? 48 : 0) }}>
+        {shown.map((o, i) => {
+          const sel = o.value === String(value ?? '')
+          return (
+            <button
+              key={o.value + i}
+              type="button"
+              role="option"
+              aria-selected={sel}
+              aria-disabled={o.disabled}
+              data-i={i}
+              onMouseEnter={() => setActive(i)}
+              onClick={() => pick(o)}
+              className={cx(
+                'flex w-full items-center gap-2.5 rounded-xl px-3 text-left',
+                phone ? 'min-h-11 text-[15px]' : 'min-h-8 py-1.5 text-[13px]',
+                i === active && 'bg-soft',
+                o.disabled && 'opacity-40',
+                o.value === '' && !sel && 'text-muted',
+              )}
+            >
+              <span className="min-w-0 flex-1 truncate">{o.label}</span>
+              {sel && <Check className="size-4 shrink-0" strokeWidth={1.5} />}
+            </button>
+          )
+        })}
+        {shown.length === 0 && <div className="px-3 py-2 text-[13px] text-muted">Ничего не нашли</div>}
+      </div>
+    </>
+  )
+
   return (
-    <div className={cx('relative', className)}>
-      <select {...props} className={cx(fieldBase, 'h-10 appearance-none pr-9')}>
-        {children}
-      </select>
-      <ChevronDown className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-faint" strokeWidth={1.5} />
+    <div className={cx('relative min-w-0', className)}>
+      <button
+        ref={btn}
+        type="button"
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={ariaLabel}
+        onClick={() => (open ? setOpen(false) : show())}
+        onKeyDown={onKey}
+        className={cx(
+          'flex h-10 w-full items-center gap-2 rounded-2xl pr-3 pl-4 text-left text-sm transition-[background-color,box-shadow] duration-150 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
+          tone === 'field' && 'bg-soft text-ink hover:bg-ink/[0.06] focus-visible:ring-ink/25',
+          tone === 'surface' && 'bg-surface text-ink hover:bg-white/70 focus-visible:ring-ink/25',
+          tone === 'dark' && 'bg-white/15 text-white hover:bg-white/25 focus-visible:ring-white/50',
+          open && tone !== 'dark' && 'ring-1 ring-ink/25',
+        )}
+      >
+        <span className={cx('min-w-0 flex-1 truncate', !current?.text && !placeholder && 'text-faint', current?.value === '' && tone !== 'dark' && 'text-muted')}>{current?.label ?? placeholder ?? '—'}</span>
+        <ChevronDown className={cx('size-4 shrink-0 transition-transform duration-150', tone === 'dark' ? 'text-white/70' : 'text-faint', open && 'rotate-180')} strokeWidth={1.5} />
+      </button>
+      {open &&
+        createPortal(
+          phone ? (
+            <div className="fade fixed inset-0 z-[70] flex items-end bg-ink/30" onMouseDown={() => setOpen(false)}>
+              <div ref={list} role="listbox" aria-label={ariaLabel} className="sheet safe-bottom w-full rounded-t-[28px] bg-surface p-2" onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
+                {ariaLabel && <div className="px-4 pt-2 pb-1 text-[13px] text-muted">{ariaLabel}</div>}
+                {items}
+              </div>
+            </div>
+          ) : (
+            <div
+              ref={list}
+              role="listbox"
+              aria-label={ariaLabel}
+              onKeyDown={onKey}
+              className="fade fixed z-[70] flex flex-col overflow-hidden rounded-2xl bg-surface shadow-[0_8px_24px_rgba(21,23,28,0.12)] ring-1 ring-line"
+              style={{ top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width, maxHeight: pos.maxH }}
+            >
+              {items}
+            </div>
+          ),
+          document.body,
+        )}
     </div>
+  )
+}
+
+/** Подгруппа полей внутри формы: тонкая рамка вместо заливки, чтобы серые поля не сливались с фоном */
+export function FieldGroup({ title, children, className }: { title: string; children: ReactNode; className?: string }) {
+  return (
+    <fieldset className={cx('rounded-inner p-4 ring-1 ring-ink/10 ring-inset', className)}>
+      <legend className="sr-only">{title}</legend>
+      <div className="mb-3 text-[13px] font-medium text-ink">{title}</div>
+      {children}
+    </fieldset>
   )
 }
 

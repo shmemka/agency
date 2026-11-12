@@ -40,7 +40,7 @@ export function Documents() {
           <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-faint" strokeWidth={1.5} />
           <Input className="bg-surface pl-10" placeholder="Название или ник" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Поиск" />
         </div>
-        <Select value={kind} onChange={(e) => setKind(e.target.value)} className="w-44 [&_select]:bg-surface" aria-label="Тип">
+        <Select value={kind} onChange={(e) => setKind(e.target.value)} tone="surface" className="w-44" aria-label="Тип">
           <option value="">Все типы</option>
           {DOC_KINDS.map((k) => (
             <option key={k.id} value={k.id}>

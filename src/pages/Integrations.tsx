@@ -100,7 +100,7 @@ export function Integrations() {
           <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-faint" strokeWidth={1.5} />
           <Input className="bg-surface pl-10" placeholder="Ник, промокод, erid" value={q} onChange={(e) => set('q', e.target.value)} aria-label="Поиск" />
         </div>
-        <Select value={cid} onChange={(e) => set('campaign', e.target.value)} className="w-56 [&_select]:bg-surface" aria-label="Кампания">
+        <Select value={cid} onChange={(e) => set('campaign', e.target.value)} tone="surface" className="w-56" aria-label="Кампания">
           <option value="">Все кампании</option>
           <option value="none">Без кампании</option>
           {campaigns.map((c) => (
@@ -109,7 +109,7 @@ export function Integrations() {
             </option>
           ))}
         </Select>
-        <Select value={phase} onChange={(e) => set('phase', e.target.value)} className="w-40 [&_select]:bg-surface" aria-label="Этап">
+        <Select value={phase} onChange={(e) => set('phase', e.target.value)} tone="surface" className="w-40" aria-label="Этап">
           <option value="">Любой этап</option>
           {PHASES.map((p) => (
             <option key={p.id} value={p.id}>

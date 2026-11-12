@@ -104,7 +104,7 @@ export function Calendar() {
         }
       />
       <div className="mb-4 flex flex-wrap gap-2">
-        <Select value={cid} onChange={(e) => set('campaign', e.target.value)} aria-label="Кампания" className="w-56 [&_select]:bg-surface">
+        <Select value={cid} onChange={(e) => set('campaign', e.target.value)} aria-label="Кампания" tone="surface" className="w-56">
           <option value="">Все кампании</option>
           {campaigns.map((c) => (
             <option key={c.id} value={c.id}>
@@ -113,7 +113,7 @@ export function Calendar() {
           ))}
         </Select>
         {isAdmin && (
-          <Select value={owner} onChange={(e) => set('owner', e.target.value)} aria-label="Ответственный" className="w-48 [&_select]:bg-surface">
+          <Select value={owner} onChange={(e) => set('owner', e.target.value)} aria-label="Ответственный" tone="surface" className="w-48">
             <option value="">Все ответственные</option>
             {team
               .filter((t) => t.is_active)

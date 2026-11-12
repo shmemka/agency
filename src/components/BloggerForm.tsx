@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { TriangleAlert } from 'lucide-react'
+import { ChevronDown, TriangleAlert } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useData } from '../lib/data'
 import { useAuth } from '../auth/AuthProvider'
@@ -7,140 +7,211 @@ import { AGE_GROUPS, LEGAL, PLATFORMS, legalInfo, platformInfo } from '../lib/co
 import { nickFromUrl, parseNumber, platformFromUrl } from '../lib/format'
 import type { Blogger, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Field, Input, Modal, Select, Textarea } from './ui'
+import { Button, Field, FieldGroup, Input, Modal, Select, Textarea, cx } from './ui'
 
 export type BloggerDraft = Partial<Blogger>
 
-export function BloggerFields({ d, set }: { d: BloggerDraft; set: <K extends keyof Blogger>(k: K, v: Blogger[K] | null) => void }) {
+/** Ссылка, ник или @ник → ник и площадка */
+function parseProfile(input: string) {
+  const v = input.trim()
+  if (/[./]/.test(v) && /[a-z]/i.test(v)) return { url: v, nick: nickFromUrl(v), platform: platformFromUrl(v) }
+  return { url: null, nick: v.replace(/^@/, '') || null, platform: null }
+}
+
+export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <K extends keyof Blogger>(k: K, v: Blogger[K] | null) => void; collapsible?: boolean }) {
   const { team, isAdmin } = useAuth()
+  const [more, setMore] = useState(!collapsible)
+  const [editNick, setEditNick] = useState(false)
+  const [link, setLink] = useState(d.url ?? d.nick ?? '')
   const p = platformInfo(d.platform ?? 'tiktok')
   const legal = legalInfo(d.legal_status ?? 'unknown')
   const ageSum = AGE_GROUPS.reduce((a, g) => a + (d.audience_age?.[g.id] ?? 0), 0)
-  const num = (k: 'followers' | 'avg_reach' | 'clip_views' | 'price' | 'audience_female_pct') => (
-    <Input inputMode="numeric" className="num" value={d[k] ?? ''} onChange={(e) => set(k, parseNumber(e.target.value))} />
+  const num = (k: 'followers' | 'avg_reach' | 'clip_views' | 'price' | 'audience_female_pct', placeholder?: string) => (
+    <Input inputMode="numeric" className="num" placeholder={placeholder} value={d[k] ?? ''} onChange={(e) => set(k, parseNumber(e.target.value))} />
   )
+  const showNick = editNick || !collapsible || (link.trim() !== '' && !d.nick)
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <Field label="Ссылка на профиль" className="sm:col-span-2" hint="Ник и площадка подставятся сами">
-        <Input
-          value={d.url ?? ''}
-          placeholder="https://www.tiktok.com/@nick или https://vk.com/name"
-          onChange={(e) => {
-            const url = e.target.value
-            set('url', url)
-            const n = nickFromUrl(url)
-            if (n && !d.nick) set('nick', n)
-            if (url.includes('.')) set('platform', platformFromUrl(url))
-          }}
-        />
-      </Field>
-      <Field label="Ник">
-        <Input value={d.nick ?? ''} onChange={(e) => set('nick', e.target.value.replace(/^@/, ''))} />
-      </Field>
-      <Field label="Имя">
-        <Input value={d.name ?? ''} onChange={(e) => set('name', e.target.value)} />
-      </Field>
-      <Field label="Площадка">
-        <Select value={d.platform ?? 'tiktok'} onChange={(e) => set('platform', e.target.value as Blogger['platform'])}>
-          {PLATFORMS.map((x) => (
-            <option key={x.id} value={x.id}>
-              {x.label}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field label="Цена за интеграцию, ₽">{num('price')}</Field>
-      <Field label={p.followers}>{num('followers')}</Field>
-      <Field label={p.reach} hint={d.platform === 'tiktok' ? 'По последним 9–10 видео' : undefined}>
-        {num('avg_reach')}
-      </Field>
-      {d.platform === 'vk' && <Field label="Средние просмотры клипа">{num('clip_views')}</Field>}
-
-      <div className="rounded-inner bg-soft p-4 sm:col-span-2">
-        <div className="mb-3 text-[13px] text-muted">Аудитория</div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          <Field label="Женщины, %">{num('audience_female_pct')}</Field>
-          {AGE_GROUPS.map((g) => (
-            <Field key={g.id} label={`${g.label}, %`}>
-              <Input
-                inputMode="numeric"
-                className="num"
-                value={d.audience_age?.[g.id] ?? ''}
-                onChange={(e) => {
-                  const next = { ...(d.audience_age ?? {}) }
-                  const n = parseNumber(e.target.value)
-                  if (n === null) delete next[g.id]
-                  else next[g.id] = n
-                  set('audience_age', Object.keys(next).length ? next : null)
-                }}
-              />
-            </Field>
-          ))}
-        </div>
-        {ageSum > 0 && Math.round(ageSum) !== 100 && <p className="mt-2 text-[13px] text-warn">Возрастные группы дают в сумме {Math.round(ageSum)}%, а должно быть 100</p>}
-      </div>
-
-      <Field label="Тематика">
-        <Input value={d.topic ?? ''} onChange={(e) => set('topic', e.target.value)} placeholder="учёба, лайфстайл, бьюти" />
-      </Field>
-      <Field label="Формат контента">
-        <Input value={d.content_type ?? ''} onChange={(e) => set('content_type', e.target.value)} placeholder="разговорник, скетчи, влоги" />
-      </Field>
-      <Field label="Контакт" hint="Telegram блогера или менеджера">
-        <Input value={d.contact ?? ''} onChange={(e) => set('contact', e.target.value)} placeholder="@manager" />
-      </Field>
-      <Field label="Город">
-        <Input value={d.city ?? ''} onChange={(e) => set('city', e.target.value)} />
-      </Field>
-
-      <div className="rounded-inner bg-soft p-4 sm:col-span-2">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Правовой статус">
-            <Select value={d.legal_status ?? 'unknown'} onChange={(e) => set('legal_status', e.target.value as Blogger['legal_status'])}>
-              {LEGAL.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.label}
-                </option>
-              ))}
-            </Select>
+    <div className="space-y-4">
+      <div className="grid gap-4 sm:grid-cols-2">
+        {collapsible ? (
+          <Field label="Ссылка на профиль или ник" className="sm:col-span-2">
+            <Input
+              autoFocus
+              value={link}
+              placeholder="https://www.tiktok.com/@nick, vk.com/name или @nick"
+              onChange={(e) => {
+                setLink(e.target.value)
+                const r = parseProfile(e.target.value)
+                set('url', r.url)
+                set('nick', r.nick)
+                if (r.platform) set('platform', r.platform)
+              }}
+            />
+            {d.nick && !editNick && (
+              <span className="mt-1.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+                <span>
+                  Ник <span className="text-ink">{d.nick}</span>, {p.label}
+                </span>
+                <button type="button" className="underline underline-offset-2 hover:text-ink" onClick={() => setEditNick(true)}>
+                  изменить
+                </button>
+              </span>
+            )}
           </Field>
-          <Field label="Регистрация в перечне РКН" hint="Обязательна от 10 000 подписчиков">
-            <Select value={d.rkn_registered === true ? 'yes' : d.rkn_registered === false ? 'no' : ''} onChange={(e) => set('rkn_registered', e.target.value === '' ? null : e.target.value === 'yes')}>
-              <option value="">Не знаем</option>
-              <option value="yes">Есть</option>
-              <option value="no">Нет</option>
-            </Select>
+        ) : (
+          <Field label="Ссылка на профиль" className="sm:col-span-2">
+            <Input
+              value={d.url ?? ''}
+              placeholder="https://www.tiktok.com/@nick или https://vk.com/name"
+              onChange={(e) => {
+                const url = e.target.value
+                set('url', url)
+                if (url.includes('.')) set('platform', platformFromUrl(url))
+              }}
+            />
           </Field>
-        </div>
-        {!legal.ok && (
-          <p className="mt-3 flex items-start gap-2 text-[13px] text-warn">
-            <TriangleAlert className="mt-0.5 size-4 shrink-0" strokeWidth={1.5} />
-            Работаем только с самозанятыми и ИП. Уточните статус до договора
-          </p>
         )}
+        {showNick && (
+          <>
+            <Field label="Ник">
+              <Input value={d.nick ?? ''} onChange={(e) => set('nick', e.target.value.replace(/^@/, ''))} />
+            </Field>
+            <Field label="Площадка">
+              <Select value={d.platform ?? 'tiktok'} onChange={(e) => set('platform', e.target.value as Blogger['platform'])} aria-label="Площадка">
+                {PLATFORMS.map((x) => (
+                  <option key={x.id} value={x.id}>
+                    {x.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </>
+        )}
+        <Field label={p.followers}>{num('followers')}</Field>
+        <Field label="Контакт для связи" hint="Telegram блогера или менеджера">
+          <Input value={d.contact ?? ''} onChange={(e) => set('contact', e.target.value)} placeholder="@manager" />
+        </Field>
       </div>
 
-      {isAdmin && (
-        <Field label="Ответственный">
-          <Select value={d.owner_id ?? ''} onChange={(e) => set('owner_id', e.target.value || null)}>
-            <option value="">Не назначен</option>
-            {team
-              .filter((t) => t.is_active)
-              .map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.full_name || t.email}
-                </option>
-              ))}
-          </Select>
-        </Field>
+      {collapsible && (
+        <button
+          type="button"
+          aria-expanded={more}
+          onClick={() => setMore((m) => !m)}
+          className="flex w-full items-center gap-3 rounded-inner px-4 py-3 text-left ring-1 ring-ink/10 transition-colors duration-150 ring-inset hover:bg-soft"
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block">Подробнее о блогере</span>
+            <span className="block truncate text-xs text-muted">Цена и охват, аудитория, правовой статус, заметки. Можно заполнить позже</span>
+          </span>
+          <ChevronDown className={cx('size-4 shrink-0 text-faint transition-transform duration-150', more && 'rotate-180')} strokeWidth={1.5} />
+        </button>
       )}
-      <Field label="Теги" hint="Через запятую">
-        <Input value={(d.tags ?? []).join(', ')} onChange={(e) => set('tags', e.target.value.split(',').map((t) => t.trimStart()))} />
-      </Field>
-      <Field label="Заметки" className="sm:col-span-2">
-        <Textarea rows={3} value={d.notes ?? ''} onChange={(e) => set('notes', e.target.value)} />
-      </Field>
+
+      {more && (
+        <div className={cx('space-y-4', collapsible && 'rise')}>
+          <FieldGroup title="Цена и охват">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Цена за интеграцию, ₽">{num('price')}</Field>
+              <Field label={p.reach} hint={d.platform === 'tiktok' ? 'По последним 9–10 видео' : undefined}>
+                {num('avg_reach')}
+              </Field>
+              {d.platform === 'vk' && <Field label="Средние просмотры клипа">{num('clip_views')}</Field>}
+            </div>
+          </FieldGroup>
+
+          <FieldGroup title="Аудитория">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <Field label="Женщины, %">{num('audience_female_pct')}</Field>
+              {AGE_GROUPS.map((g) => (
+                <Field key={g.id} label={`${g.label}, %`}>
+                  <Input
+                    inputMode="numeric"
+                    className="num"
+                    value={d.audience_age?.[g.id] ?? ''}
+                    onChange={(e) => {
+                      const next = { ...(d.audience_age ?? {}) }
+                      const n = parseNumber(e.target.value)
+                      if (n === null) delete next[g.id]
+                      else next[g.id] = n
+                      set('audience_age', Object.keys(next).length ? next : null)
+                    }}
+                  />
+                </Field>
+              ))}
+            </div>
+            {ageSum > 0 && Math.round(ageSum) !== 100 && <p className="mt-2 text-[13px] text-warn">Возрастные группы дают в сумме {Math.round(ageSum)}%, а должно быть 100</p>}
+          </FieldGroup>
+
+          <FieldGroup title="О блогере">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Имя">
+                <Input value={d.name ?? ''} onChange={(e) => set('name', e.target.value)} />
+              </Field>
+              <Field label="Город">
+                <Input value={d.city ?? ''} onChange={(e) => set('city', e.target.value)} />
+              </Field>
+              <Field label="Тематика">
+                <Input value={d.topic ?? ''} onChange={(e) => set('topic', e.target.value)} placeholder="учёба, лайфстайл, бьюти" />
+              </Field>
+              <Field label="Формат контента">
+                <Input value={d.content_type ?? ''} onChange={(e) => set('content_type', e.target.value)} placeholder="разговорник, скетчи, влоги" />
+              </Field>
+            </div>
+          </FieldGroup>
+
+          <FieldGroup title="Документы и ответственный">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Правовой статус">
+                <Select value={d.legal_status ?? 'unknown'} onChange={(e) => set('legal_status', e.target.value as Blogger['legal_status'])} aria-label="Правовой статус">
+                  {LEGAL.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.label}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Регистрация в перечне РКН" hint="Обязательна от 10 000 подписчиков">
+                <Select value={d.rkn_registered === true ? 'yes' : d.rkn_registered === false ? 'no' : ''} onChange={(e) => set('rkn_registered', e.target.value === '' ? null : e.target.value === 'yes')} aria-label="Регистрация в РКН">
+                  <option value="">Не знаем</option>
+                  <option value="yes">Есть</option>
+                  <option value="no">Нет</option>
+                </Select>
+              </Field>
+              {isAdmin && (
+                <Field label="Ответственный">
+                  <Select value={d.owner_id ?? ''} onChange={(e) => set('owner_id', e.target.value || null)} aria-label="Ответственный">
+                    <option value="">Не назначен</option>
+                    {team
+                      .filter((t) => t.is_active)
+                      .map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.full_name || t.email}
+                        </option>
+                      ))}
+                  </Select>
+                </Field>
+              )}
+            </div>
+            {!legal.ok && (
+              <p className="mt-3 flex items-start gap-2 text-[13px] text-warn">
+                <TriangleAlert className="mt-0.5 size-4 shrink-0" strokeWidth={1.5} />
+                Работаем только с самозанятыми и ИП. Уточните статус до договора
+              </p>
+            )}
+          </FieldGroup>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Теги" hint="Через запятую">
+              <Input value={(d.tags ?? []).join(', ')} onChange={(e) => set('tags', e.target.value.split(',').map((t) => t.trimStart()))} />
+            </Field>
+            <Field label="Заметки" className="sm:col-span-2">
+              <Textarea rows={3} value={d.notes ?? ''} onChange={(e) => set('notes', e.target.value)} />
+            </Field>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -187,7 +258,7 @@ export function BloggerFormModal({ open, onClose, onCreated }: { open: boolean; 
 
   async function save() {
     const nick = d.nick?.trim()
-    if (!nick) return toast('Укажите ник')
+    if (!nick) return toast('Вставьте ссылку на профиль или ник')
     setBusy(true)
     try {
       const [ex] = await findExisting([`${d.platform}:${nick.toLowerCase()}`])
@@ -245,7 +316,7 @@ export function BloggerFormModal({ open, onClose, onCreated }: { open: boolean; 
           )}
         </div>
       )}
-      <BloggerFields d={d} set={(k, v) => setD((x) => ({ ...x, [k]: v }))} />
+      <BloggerFields key={String(open)} collapsible d={d} set={(k, v) => setD((x) => ({ ...x, [k]: v }))} />
     </Modal>
   )
 }

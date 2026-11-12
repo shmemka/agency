@@ -150,7 +150,7 @@ export function Bloggers() {
           <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-faint" strokeWidth={1.5} />
           <Input className="bg-surface pl-10" placeholder="Ник, тематика, контакт" value={q} onChange={(e) => set('q', e.target.value)} aria-label="Поиск" />
         </div>
-        <Select value={platform} onChange={(e) => set('platform', e.target.value)} aria-label="Площадка" className="w-40 [&_select]:bg-surface">
+        <Select value={platform} onChange={(e) => set('platform', e.target.value)} aria-label="Площадка" tone="surface" className="w-40">
           <option value="">Все площадки</option>
           {PLATFORMS.map((p) => (
             <option key={p.id} value={p.id}>
@@ -159,7 +159,7 @@ export function Bloggers() {
           ))}
         </Select>
         {isAdmin && (
-          <Select value={owner} onChange={(e) => set('owner', e.target.value)} aria-label="Ответственный" className="w-48 [&_select]:bg-surface">
+          <Select value={owner} onChange={(e) => set('owner', e.target.value)} aria-label="Ответственный" tone="surface" className="w-48">
             <option value="">Все ответственные</option>
             <option value="me">Мои</option>
             <option value="none">Без ответственного</option>
@@ -286,7 +286,7 @@ export function Bloggers() {
                   <div className="num mt-3 flex justify-between text-[13px] text-muted">
                     <span>{count(b.followers)} подп.</span>
                     <span>охват {count(b.avg_reach)}</span>
-                    <span className="text-ink">{money(b.price)}</span>
+                    <span>{money(b.price)}</span>
                   </div>
                   {activeBy.has(b.id) && <div className="mt-3">{work(b)}</div>}
                 </div>
@@ -306,23 +306,23 @@ export function Bloggers() {
           <span className="flex-1 whitespace-nowrap">
             {picked.size} {plural(picked.size, 'блогер', 'блогера', 'блогеров')}
           </span>
-          <Select value="" onChange={(e) => e.target.value && toShortlist(e.target.value)} aria-label="Добавить в подборку" className="w-44 [&_select]:bg-white/15 [&_select]:text-white [&_svg]:text-white">
+          <Select value="" onChange={(e) => e.target.value && toShortlist(e.target.value)} aria-label="Добавить в подборку" tone="dark" className="w-44">
             <option value="">В подборку…</option>
             {campaigns
               .filter((c) => c.status === 'planning' || c.status === 'active')
               .map((c) => (
-                <option key={c.id} value={c.id} className="text-ink">
+                <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
           </Select>
           {isAdmin && (
-            <Select value="" onChange={(e) => e.target.value && transfer(e.target.value)} aria-label="Передать специалисту" className="w-40 [&_select]:bg-white/15 [&_select]:text-white [&_svg]:text-white">
+            <Select value="" onChange={(e) => e.target.value && transfer(e.target.value)} aria-label="Передать специалисту" tone="dark" className="w-40">
               <option value="">Передать…</option>
               {team
                 .filter((t) => t.is_active)
                 .map((t) => (
-                  <option key={t.id} value={t.id} className="text-ink">
+                  <option key={t.id} value={t.id}>
                     {t.full_name || t.email}
                   </option>
                 ))}
