@@ -205,7 +205,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
                 <Button variant="ghost" onClick={() => setD(null)}>
                   Отменить
                 </Button>
-                <Button variant="primary" loading={busy} onClick={save}>
+                <Button variant="primary" data-save loading={busy} onClick={save}>
                   Сохранить изменения
                 </Button>
               </div>

@@ -151,7 +151,11 @@ export function TaskList({ tasks, scope, showDone, empty, noForm }: { tasks: Tas
   return (
     <div>
       <div className={cx('flex flex-wrap items-center gap-2', noForm && 'hidden')}>
-        <Input className="min-w-0 basis-full sm:min-w-40 sm:flex-1 sm:basis-0" placeholder="Новая задача" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && add()} aria-label="Новая задача" />
+        <Input className="min-w-0 basis-full sm:min-w-40 sm:flex-1 sm:basis-0" placeholder="Новая задача" value={title} onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => {
+          if (e.key !== 'Enter') return
+          e.preventDefault()
+          add()
+        }} aria-label="Новая задача" />
         {people.length > 1 && (
           <Select className="min-w-0 flex-1 sm:w-32 sm:flex-none" value={assignee} onChange={(e) => setAssignee(e.target.value)} aria-label="Исполнитель">
             {people.map((p) => (

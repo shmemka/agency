@@ -10,7 +10,7 @@ import { isLive } from '../lib/rules'
 import { count, cpm, date, downloadXlsx, money, parseNumber, plural } from '../lib/format'
 import type { Blogger, Campaign, Decision, Income, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Card, Chip, Empty, Field, IconButton, Input, Menu, Modal, PageHeader, Progress, Segmented, Select, Spinner, StatusBadge, StatusSelect, Table, Toggle, cx } from '../components/ui'
+import { Button, Card, Chip, Empty, Field, IconButton, Input, Menu, Modal, PageHeader, Progress, Segmented, Select, Spinner, StatusBadge, StatusSelect, Table, Toggle, cx, submitOnEnter } from '../components/ui'
 import { AudienceBar, BloggerName, useIntegrationPanel } from '../components/bits'
 import { CampaignModal, ShareBox } from '../components/CampaignForm'
 import { DocumentsPanel } from '../components/DocumentsPanel'
@@ -126,7 +126,11 @@ function PriceCell({ value, onSave, bold }: { value: number | null; onSave: (n: 
         const n = parseNumber(v)
         if (n !== value) onSave(n)
       }}
-      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter') return
+        e.preventDefault()
+        ;(e.target as HTMLInputElement).blur()
+      }}
       aria-label="Цена"
       className={cx('num h-8 w-24 rounded-full bg-soft px-3 text-right text-[13px] focus:bg-surface focus:ring-1 focus:ring-ink/25 focus:outline-none', bold && 'font-medium')}
     />
@@ -646,7 +650,7 @@ function Money({ c, rows }: { c: Campaign; rows: Integration[] }) {
           />
         </div>
       </Card>
-      <Card className="lg:col-span-2">
+      <Card className="lg:col-span-2" onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')}>
         <div className="grid items-end gap-4 sm:grid-cols-3">
           <Field label="Бюджет клиента, ₽" hint="Виден только учредителям">
             <Input inputMode="numeric" className="num" value={budget} onChange={(e) => setBudget(e.target.value)} />
@@ -654,7 +658,7 @@ function Money({ c, rows }: { c: Campaign; rows: Integration[] }) {
           <Field label="Наценка, %" hint="При изменении цены для клиента пересчитаются">
             <Input inputMode="numeric" className="num" value={markup} onChange={(e) => setMarkup(e.target.value)} />
           </Field>
-          <Button variant="primary" className="mb-5" onClick={save} disabled={parseNumber(budget) === saved && (parseNumber(markup) ?? 0) === c.markup_pct}>
+          <Button variant="primary" data-save className="mb-5" onClick={save} disabled={parseNumber(budget) === saved && (parseNumber(markup) ?? 0) === c.markup_pct}>
             Сохранить
           </Button>
         </div>

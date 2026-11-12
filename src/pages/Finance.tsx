@@ -7,7 +7,7 @@ import { useData } from '../lib/data'
 import { date, downloadXlsx, money, parseNumber, todayISO } from '../lib/format'
 import type { Expense, Income, Settings } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Card, Chip, Empty, Field, IconButton, Input, Modal, PageHeader, Progress, Segmented, Select, StatusBadge, Table, Toggle, cx } from '../components/ui'
+import { Button, Card, Chip, Empty, Field, IconButton, Input, Modal, PageHeader, Progress, Segmented, Select, StatusBadge, Table, Toggle, cx, submitOnEnter } from '../components/ui'
 import { BloggerName, useIntegrationPanel } from '../components/bits'
 import { confirmDialog } from '../components/dialogs'
 import { DateInput } from '../components/DateInput'
@@ -499,7 +499,7 @@ function SettingsCard({ s }: { s: Settings }) {
     </Field>
   )
   return (
-    <Card className={cx('max-w-2xl')}>
+    <Card className={cx('max-w-2xl')} onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')}>
       <div className="grid gap-4 sm:grid-cols-2">
         {num('default_markup_pct', 'Наценка по умолчанию, %', 'Подставляется в новые кампании')}
         {num('ord_deadline_days', 'Срок сдачи статистики в ОРД, дней', 'После конца месяца первого показа')}
@@ -510,6 +510,7 @@ function SettingsCard({ s }: { s: Settings }) {
       <p className="mt-4 text-[13px] text-muted">При переходе на ИП с УСН поставьте обе ставки 6% и увеличьте лимит</p>
       <Button
         variant="primary"
+        data-save
         className="mt-4"
         disabled={!dirty}
         onClick={async () => {

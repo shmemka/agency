@@ -8,7 +8,7 @@ import { DOC_KINDS, docKindLabel } from '../lib/constants'
 import { date, fileSize } from '../lib/format'
 import type { Doc, DocKind, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Chip, IconButton, Input, Select, Spinner, cx } from './ui'
+import { Button, Chip, IconButton, Input, Select, Spinner, cx, submitOnEnter } from './ui'
 import { confirmDialog } from './dialogs'
 
 const BUCKET = 'documents'
@@ -222,10 +222,10 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }
           </Button>
         </div>
         {linkMode && (
-          <div className="mt-2 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-2" onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')}>
             <Input placeholder="Название" value={link.name} onChange={(e) => setLink({ ...link, name: e.target.value })} className="min-w-40 flex-1 bg-surface" />
             <Input placeholder="https://disk.yandex.ru/…" value={link.url} onChange={(e) => setLink({ ...link, url: e.target.value })} className="min-w-40 flex-1 bg-surface" />
-            <Button variant="primary" onClick={addLink}>
+            <Button variant="primary" data-save onClick={addLink}>
               Сохранить
             </Button>
           </div>

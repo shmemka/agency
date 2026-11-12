@@ -22,6 +22,7 @@ export function Button({
   return (
     <button
       type="button"
+      data-variant={variant}
       {...rest}
       disabled={rest.disabled || loading}
       className={cx(
@@ -604,7 +605,25 @@ export function Progress({ value, max, over, className }: { value: number; max: 
   )
 }
 
+/**
+ * Enter в поле сохраняет форму: нажимает кнопку сохранения в той же модалке или панели.
+ * В многострочном поле Enter — перенос строки, сохраняет Cmd/Ctrl+Enter.
+ */
+export function submitOnEnter(e: React.KeyboardEvent, scope: HTMLElement | null, selector: string) {
+  if (e.key !== 'Enter' || e.defaultPrevented || e.nativeEvent.isComposing || e.shiftKey || e.altKey) return
+  const t = e.target as HTMLElement
+  const field = t instanceof HTMLInputElement && !['checkbox', 'radio', 'file', 'button', 'submit', 'reset'].includes(t.type)
+  const area = t instanceof HTMLTextAreaElement && (e.metaKey || e.ctrlKey)
+  if (!field && !area) return
+  const buttons = scope?.querySelectorAll<HTMLButtonElement>(selector)
+  const btn = buttons && [...buttons].reverse().find((b) => !b.disabled)
+  if (!btn) return
+  e.preventDefault()
+  btn.click()
+}
+
 export function Modal({ open, onClose, title, children, footer, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
+  const footerRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!open) return
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -620,6 +639,7 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
         aria-label={title}
         className={cx('sheet safe-bottom flex max-h-[92vh] w-full flex-col rounded-t-[28px] bg-surface md:max-h-none md:rounded-card', wide ? 'md:max-w-3xl' : 'md:max-w-lg')}
         onMouseDown={(e) => e.stopPropagation()}
+        onKeyDown={(e) => submitOnEnter(e, footerRef.current, 'button[data-variant="primary"], button[data-save]')}
       >
         <div className="flex items-center justify-between py-3 pr-3 pl-6">
           <h2 className="text-lg">{title}</h2>
@@ -628,7 +648,7 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
           </IconButton>
         </div>
         <div className="overflow-y-auto px-6 pb-6 md:overflow-visible">{children}</div>
-        {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-line px-6 py-4">{footer}</div>}
+        {footer && <div ref={footerRef} className="flex flex-wrap justify-end gap-2 border-t border-line px-6 py-4">{footer}</div>}
       </div>
     </div>,
     document.body,
@@ -647,7 +667,7 @@ export function Drawer({ onClose, children, label }: { onClose: () => void; chil
   return createPortal(
     <div className="fixed inset-0 z-50">
       <div className="fade absolute inset-0 hidden bg-ink/25 md:block" onClick={onClose} />
-      <aside role="complementary" aria-label={label} className="slide absolute inset-0 flex flex-col overflow-y-auto bg-canvas md:inset-y-3 md:right-3 md:left-auto md:w-[720px] md:rounded-card md:shadow-[0_8px_24px_rgba(21,23,28,0.1)]">
+      <aside role="complementary" aria-label={label} onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')} className="slide absolute inset-0 flex flex-col overflow-y-auto bg-canvas md:inset-y-3 md:right-3 md:left-auto md:w-[720px] md:rounded-card md:shadow-[0_8px_24px_rgba(21,23,28,0.1)]">
         <button onClick={onClose} className="flex h-12 shrink-0 items-center gap-1 px-3 text-muted md:hidden">
           <ChevronLeft className="size-5" strokeWidth={1.5} />
           Назад

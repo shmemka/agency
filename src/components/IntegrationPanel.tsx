@@ -290,7 +290,7 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
                 <Button variant="ghost" onClick={() => setD({})}>
                   Отменить
                 </Button>
-                <Button variant="primary" loading={busy} onClick={save}>
+                <Button variant="primary" data-save loading={busy} onClick={save}>
                   Сохранить изменения
                 </Button>
               </div>
