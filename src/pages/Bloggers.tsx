@@ -261,10 +261,7 @@ export function Bloggers() {
                     {isAdmin && (
                       <td>
                         {b.owner_id ? (
-                          <span className="inline-flex items-center gap-2">
-                            <Avatar name={personName(b.owner_id)} src={personAvatar(b.owner_id)} className="size-6 text-[10px]" />
-                            {personName(b.owner_id).split(' ')[0]}
-                          </span>
+                          <Avatar name={personName(b.owner_id)} src={personAvatar(b.owner_id)} className="size-6 align-middle text-[10px]" />
                         ) : (
                           <span className="text-faint">—</span>
                         )}

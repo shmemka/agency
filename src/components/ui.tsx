@@ -718,9 +718,9 @@ export function Table({ head, children, min }: { head: ReactNode; children: Reac
   )
 }
 
-export function PlatformTag({ short, label }: { short: string; label: string }) {
+export function PlatformTag({ short, label, className }: { short: string; label: string; className?: string }) {
   return (
-    <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-soft text-[10px] font-medium text-muted" title={label}>
+    <span className={cx('inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-soft text-[10px] font-medium text-muted', className)} title={label}>
       {short}
     </span>
   )

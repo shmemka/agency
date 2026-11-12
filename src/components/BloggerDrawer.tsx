@@ -84,7 +84,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
         <Card>
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1 text-xl">
-              <BloggerName b={b} />
+              <BloggerName b={b} big />
             </div>
             {tg && (
               <a href={`https://t.me/${tg}`} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-full bg-soft px-4 text-sm hover:bg-ink/10">

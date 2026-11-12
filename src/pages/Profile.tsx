@@ -3,29 +3,8 @@ import { ImageUp, Trash2 } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { Avatar, Button, Card, Field, Input, PageHeader } from '../components/ui'
 import { supabase } from '../lib/supabase'
+import { removeAvatar, uploadAvatar } from '../lib/avatars'
 import { toast } from '../lib/toast'
-
-const BUCKET = 'avatars'
-const SIZE = 512
-
-/** Квадрат по центру, 512×512, webp: аватарка весит десятки килобайт, а не мегабайты с телефона */
-async function squareImage(file: File): Promise<Blob> {
-  const bmp = await createImageBitmap(file)
-  const side = Math.min(bmp.width, bmp.height)
-  const canvas = document.createElement('canvas')
-  canvas.width = canvas.height = Math.min(SIZE, side)
-  const ctx = canvas.getContext('2d')!
-  ctx.imageSmoothingQuality = 'high'
-  ctx.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, canvas.width, canvas.height)
-  bmp.close()
-  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Не удалось обработать фото'))), 'image/webp', 0.88))
-}
-
-/** Путь файла внутри бакета из публичной ссылки */
-function pathFromUrl(url: string | null | undefined) {
-  const i = url?.indexOf(`/${BUCKET}/`) ?? -1
-  return url && i >= 0 ? decodeURIComponent(url.slice(i + BUCKET.length + 2).split('?')[0]) : null
-}
 
 export function Profile() {
   const { profile, isAdmin, reloadProfile, reloadTeam } = useAuth()
@@ -38,27 +17,21 @@ export function Profile() {
   const display = profile.full_name || profile.email || ''
 
   async function setAvatar(url: string | null) {
-    const old = pathFromUrl(profile!.avatar_url)
+    const old = profile!.avatar_url
     const { error } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', profile!.id)
     if (error) return toast(error.message)
-    if (old) await supabase.storage.from(BUCKET).remove([old])
+    await removeAvatar(old)
     await Promise.all([reloadProfile(), reloadTeam()])
   }
 
   async function upload(file: File | undefined) {
     if (!file) return
-    if (!file.type.startsWith('image/')) return toast('Нужна картинка: JPG, PNG или WebP')
     setBusy(true)
     try {
-      const blob = await squareImage(file)
-      const path = `${profile!.id}/${Date.now()}.webp`
-      const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { contentType: 'image/webp', cacheControl: '31536000' })
-      if (error) throw error
-      await setAvatar(supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl)
+      await setAvatar(await uploadAvatar(profile!.id, file))
       toast('Фото обновлено')
     } catch (e) {
-      const msg = (e as Error).message
-      toast(/bucket not found/i.test(msg) ? 'В базе ещё нет хранилища для фото: нужно запустить миграцию 003_avatars.sql' : msg)
+      toast((e as Error).message)
     } finally {
       setBusy(false)
       if (input.current) input.current.value = ''

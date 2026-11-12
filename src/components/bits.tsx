@@ -26,12 +26,16 @@ export function useIntegrationPanel() {
   }
 }
 
-export function BloggerName({ b, link }: { b: Blogger | undefined; link?: boolean }) {
+export function BloggerName({ b, link, big }: { b: Blogger | undefined; link?: boolean; big?: boolean }) {
   if (!b) return <span className="text-faint">нет доступа</span>
   const p = platformInfo(b.platform)
   return (
     <span className="flex min-w-0 items-center gap-2">
-      <PlatformTag short={p.short} label={p.label} />
+      {b.avatar_url ? (
+        <Avatar name={`${b.nick}, ${p.label}`} src={b.avatar_url} className={big ? 'size-10' : 'size-6'} />
+      ) : (
+        <PlatformTag short={p.short} label={p.label} className={big ? 'size-10 text-xs' : 'size-6 text-[9px]'} />
+      )}
       <span className="min-w-0">
         <span className="flex items-center gap-1">
           {link ? (

@@ -1,15 +1,68 @@
-import { useEffect, useState } from 'react'
-import { ChevronDown, TriangleAlert } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { ChevronDown, ImageUp, TriangleAlert } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useData } from '../lib/data'
 import { useAuth } from '../auth/AuthProvider'
 import { AGE_GROUPS, LEGAL, PLATFORMS, legalInfo, platformInfo } from '../lib/constants'
 import { nickFromUrl, parseNumber, platformFromUrl } from '../lib/format'
+import { removeAvatar, uploadAvatar } from '../lib/avatars'
 import type { Blogger, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Field, FieldGroup, Input, Modal, Select, Textarea, cx } from './ui'
+import { Avatar, Button, Field, FieldGroup, Input, Modal, Select, Textarea, cx } from './ui'
 
 export type BloggerDraft = Partial<Blogger>
+
+/** Фото блогера: загружается сразу, в форму попадает ссылка. Старый файл удаляется при замене */
+function BloggerPhoto({ url, nick, onChange }: { url: string | null | undefined; nick: string | null | undefined; onChange: (v: string | null) => void }) {
+  const [busy, setBusy] = useState(false)
+  const input = useRef<HTMLInputElement>(null)
+  async function pick(file: File | undefined) {
+    if (!file) return
+    setBusy(true)
+    try {
+      const next = await uploadAvatar(`bloggers/${crypto.randomUUID()}`, file)
+      if (url) removeAvatar(url)
+      onChange(next)
+    } catch (e) {
+      toast((e as Error).message)
+    } finally {
+      setBusy(false)
+      if (input.current) input.current.value = ''
+    }
+  }
+  return (
+    <div
+      className="mb-4 flex items-center gap-4"
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault()
+        pick(e.dataTransfer.files[0])
+      }}
+    >
+      <Avatar name={nick || '?'} src={url} className="size-14 text-base" />
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" loading={busy} onClick={() => input.current?.click()}>
+          <ImageUp className="size-3.5" strokeWidth={1.5} />
+          {url ? 'Заменить фото' : 'Загрузить фото'}
+        </Button>
+        {url && (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={busy}
+            onClick={() => {
+              removeAvatar(url)
+              onChange(null)
+            }}
+          >
+            Удалить
+          </Button>
+        )}
+      </div>
+      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+    </div>
+  )
+}
 
 /** Ссылка, ник или @ник → ник и площадка */
 function parseProfile(input: string) {
@@ -103,7 +156,7 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
         >
           <span className="min-w-0 flex-1">
             <span className="block">Подробнее о блогере</span>
-            <span className="block truncate text-xs text-muted">Цена и охват, аудитория, правовой статус, заметки. Можно заполнить позже</span>
+            <span className="block truncate text-xs text-muted">Фото, цена и охват, аудитория, правовой статус. Можно заполнить позже</span>
           </span>
           <ChevronDown className={cx('size-4 shrink-0 text-faint transition-transform duration-150', more && 'rotate-180')} strokeWidth={1.5} />
         </button>
@@ -111,6 +164,36 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
 
       {more && (
         <div className={cx('space-y-4', collapsible && 'rise')}>
+          <FieldGroup title="О блогере">
+            <BloggerPhoto url={d.avatar_url} nick={d.nick} onChange={(v) => set('avatar_url', v)} />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Имя">
+                <Input value={d.name ?? ''} onChange={(e) => set('name', e.target.value)} />
+              </Field>
+              <Field label="Возраст">
+                <Input
+                  inputMode="numeric"
+                  className="num"
+                  placeholder="лет"
+                  value={d.age ?? ''}
+                  onChange={(e) => {
+                    const n = parseNumber(e.target.value)
+                    set('age', n === null ? null : Math.min(100, Math.round(n)))
+                  }}
+                />
+              </Field>
+              <Field label="Город">
+                <Input value={d.city ?? ''} onChange={(e) => set('city', e.target.value)} />
+              </Field>
+              <Field label="Тематика">
+                <Input value={d.topic ?? ''} onChange={(e) => set('topic', e.target.value)} placeholder="учёба, лайфстайл, бьюти" />
+              </Field>
+              <Field label="Формат контента" className="sm:col-span-2">
+                <Input value={d.content_type ?? ''} onChange={(e) => set('content_type', e.target.value)} placeholder="разговорник, скетчи, влоги" />
+              </Field>
+            </div>
+          </FieldGroup>
+
           <FieldGroup title="Цена и охват">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Цена за интеграцию, ₽">{num('price')}</Field>
@@ -142,35 +225,6 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
               ))}
             </div>
             {ageSum > 0 && Math.round(ageSum) !== 100 && <p className="mt-2 text-[13px] text-warn">Возрастные группы дают в сумме {Math.round(ageSum)}%, а должно быть 100</p>}
-          </FieldGroup>
-
-          <FieldGroup title="О блогере">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Имя">
-                <Input value={d.name ?? ''} onChange={(e) => set('name', e.target.value)} />
-              </Field>
-              <Field label="Возраст">
-                <Input
-                  inputMode="numeric"
-                  className="num"
-                  placeholder="лет"
-                  value={d.age ?? ''}
-                  onChange={(e) => {
-                    const n = parseNumber(e.target.value)
-                    set('age', n === null ? null : Math.min(100, Math.round(n)))
-                  }}
-                />
-              </Field>
-              <Field label="Город">
-                <Input value={d.city ?? ''} onChange={(e) => set('city', e.target.value)} />
-              </Field>
-              <Field label="Тематика">
-                <Input value={d.topic ?? ''} onChange={(e) => set('topic', e.target.value)} placeholder="учёба, лайфстайл, бьюти" />
-              </Field>
-              <Field label="Формат контента" className="sm:col-span-2">
-                <Input value={d.content_type ?? ''} onChange={(e) => set('content_type', e.target.value)} placeholder="разговорник, скетчи, влоги" />
-              </Field>
-            </div>
           </FieldGroup>
 
           <FieldGroup title="Документы и ответственный">
@@ -228,7 +282,7 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
   )
 }
 
-const EDITABLE = ['nick', 'name', 'platform', 'url', 'topic', 'audience', 'content_type', 'city', 'age', 'followers', 'avg_reach', 'clip_views', 'audience_female_pct', 'audience_age', 'price', 'contact', 'email', 'phone', 'legal_status', 'rkn_registered', 'owner_id', 'tags', 'notes'] as const
+const EDITABLE = ['nick', 'name', 'platform', 'url', 'topic', 'audience', 'content_type', 'city', 'age', 'avatar_url', 'followers', 'avg_reach', 'clip_views', 'audience_female_pct', 'audience_age', 'price', 'contact', 'email', 'phone', 'legal_status', 'rkn_registered', 'owner_id', 'tags', 'notes'] as const
 
 export function cleanBlogger(d: BloggerDraft): BloggerDraft {
   const out: Record<string, unknown> = {}
