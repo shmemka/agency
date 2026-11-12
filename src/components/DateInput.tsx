@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { cx } from './ui'
+import { POPOVER_GAP, cx } from './ui'
 
 const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
 const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
@@ -52,8 +52,8 @@ export function DateInput({
     const r = btn.current!.getBoundingClientRect()
     const h = 392
     const left = Math.max(8, Math.min(r.left, window.innerWidth - 312))
-    if (window.innerHeight - r.bottom > h || r.top < h) setPos({ top: r.bottom + 4, left })
-    else setPos({ bottom: window.innerHeight - r.top + 4, left })
+    if (window.innerHeight - r.bottom > h || r.top < h) setPos({ top: r.bottom + POPOVER_GAP, left })
+    else setPos({ bottom: window.innerHeight - r.top + POPOVER_GAP, left })
     setFocus(sel ?? today)
     setOpen(true)
   }

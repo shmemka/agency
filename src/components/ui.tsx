@@ -64,6 +64,18 @@ export function Textarea(props: ComponentProps<'textarea'>) {
   return <textarea {...props} className={cx(fieldBase, 'min-h-20 resize-none py-3 leading-5 [field-sizing:content]', props.className)} />
 }
 type SelectEvent = { target: { value: string } }
+
+/*
+ * Общая геометрия выпадающих списков.
+ * Радиус оболочки 18 = радиус пункта 12 + отступ 6, чтобы скругления шли параллельно.
+ * Текст пункта: отступ оболочки 6 + 10 = 16, ровно как pl-4 у кнопки, поэтому текст в списке стоит под текстом кнопки.
+ * Галочка: 6 + 6 = 12, как pr-3 у кнопки, поэтому она встаёт под стрелку.
+ */
+export const POPOVER = 'rounded-[18px] bg-surface p-1.5 shadow-[0_8px_24px_rgba(21,23,28,0.12)] ring-1 ring-line'
+export const POPOVER_GAP = 6
+const ITEM = 'flex w-full items-center rounded-xl pr-1.5 pl-2.5 text-left'
+const ITEM_DESKTOP = 'h-9 text-[13px]'
+const ITEM_PHONE = 'h-12 text-[15px]'
 interface SelectOption {
   value: string
   label: ReactNode
@@ -117,6 +129,7 @@ export function Select({
   const [q, setQ] = useState('')
   const [active, setActive] = useState(0)
   const [pos, setPos] = useState<{ top?: number; bottom?: number; left: number; width: number; maxH: number }>({ left: 0, width: 0, maxH: 320 })
+  const maxW = Math.max(pos.width, 320)
   const btn = useRef<HTMLButtonElement>(null)
   const list = useRef<HTMLDivElement>(null)
   const phone = isPhone()
@@ -127,11 +140,11 @@ export function Select({
     const r = btn.current!.getBoundingClientRect()
     const below = window.innerHeight - r.bottom - 12
     const above = r.top - 12
-    const want = Math.min(360, options.length * 36 + (searchable ? 56 : 12))
-    const width = Math.max(r.width, 200)
-    const left = Math.min(r.left, window.innerWidth - width - 8)
-    if (below >= Math.min(want, 240) || below >= above) setPos({ top: r.bottom + 4, left, width, maxH: Math.max(160, Math.min(360, below)) })
-    else setPos({ bottom: window.innerHeight - r.top + 4, left, width, maxH: Math.max(160, Math.min(360, above)) })
+    const want = Math.min(360, options.length * 36 + (searchable ? 54 : 12))
+    const width = r.width
+    const left = Math.max(8, Math.min(r.left, window.innerWidth - Math.max(width, 320) - 8))
+    if (below >= Math.min(want, 240) || below >= above) setPos({ top: r.bottom + POPOVER_GAP, left, width, maxH: Math.max(160, Math.min(360, below)) })
+    else setPos({ bottom: window.innerHeight - r.top + POPOVER_GAP, left, width, maxH: Math.max(160, Math.min(360, above)) })
   }
 
   function show() {
@@ -198,7 +211,7 @@ export function Select({
   const items = (
     <>
       {searchable && (
-        <div className="p-1.5 pb-1">
+        <div className="pb-1.5">
           <input
             autoFocus
             value={q}
@@ -209,11 +222,11 @@ export function Select({
             onKeyDown={onKey}
             placeholder="Найти"
             aria-label="Поиск по списку"
-            className="h-9 w-full rounded-xl bg-soft px-3 text-[13px] placeholder:text-faint focus:outline-none"
+            className="h-9 w-full rounded-xl bg-soft pr-1.5 pl-2.5 text-[13px] placeholder:text-faint focus:outline-none"
           />
         </div>
       )}
-      <div className="overflow-y-auto p-1.5 pt-1" style={{ maxHeight: phone ? '60vh' : pos.maxH - (searchable ? 48 : 0) }}>
+      <div className="min-h-0 overflow-y-auto" style={{ maxHeight: phone ? '60vh' : pos.maxH - 12 - (searchable ? 42 : 0) }}>
         {shown.map((o, i) => {
           const sel = o.value === String(value ?? '')
           return (
@@ -227,8 +240,8 @@ export function Select({
               onMouseEnter={() => setActive(i)}
               onClick={() => pick(o)}
               className={cx(
-                'flex w-full items-center gap-2.5 rounded-xl px-3 text-left',
-                phone ? 'min-h-11 text-[15px]' : 'min-h-8 py-1.5 text-[13px]',
+                ITEM, 'gap-2.5',
+                phone ? ITEM_PHONE : ITEM_DESKTOP,
                 i === active && 'bg-soft',
                 o.disabled && 'opacity-40',
                 o.value === '' && !sel && 'text-muted',
@@ -260,7 +273,7 @@ export function Select({
           tone === 'field' && 'bg-soft text-ink hover:bg-ink/[0.06] focus-visible:ring-ink/25',
           tone === 'surface' && 'bg-surface text-ink hover:bg-white/70 focus-visible:ring-ink/25',
           tone === 'dark' && 'bg-white/15 text-white hover:bg-white/25 focus-visible:ring-white/50',
-          open && tone !== 'dark' && 'ring-1 ring-ink/25',
+          open && tone !== 'dark' && 'ring-1 ring-ink/15',
         )}
       >
         <span className={cx('min-w-0 flex-1 truncate', !current?.text && !placeholder && 'text-faint', current?.value === '' && tone !== 'dark' && 'text-muted')}>{current?.label ?? placeholder ?? '—'}</span>
@@ -270,8 +283,8 @@ export function Select({
         createPortal(
           phone ? (
             <div className="fade fixed inset-0 z-[70] flex items-end bg-ink/30" onMouseDown={() => setOpen(false)}>
-              <div ref={list} role="listbox" aria-label={ariaLabel} className="sheet safe-bottom w-full rounded-t-[28px] bg-surface p-2" onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
-                {ariaLabel && <div className="px-4 pt-2 pb-1 text-[13px] text-muted">{ariaLabel}</div>}
+              <div ref={list} role="listbox" aria-label={ariaLabel} className="sheet safe-bottom w-full rounded-t-[28px] bg-surface p-3" onMouseDown={(e) => e.stopPropagation()} onKeyDown={onKey}>
+                {ariaLabel && <div className="pt-2 pr-1.5 pb-2 pl-2.5 text-[13px] text-muted">{ariaLabel}</div>}
                 {items}
               </div>
             </div>
@@ -281,8 +294,8 @@ export function Select({
               role="listbox"
               aria-label={ariaLabel}
               onKeyDown={onKey}
-              className="fade fixed z-[70] flex flex-col overflow-hidden rounded-2xl bg-surface shadow-[0_8px_24px_rgba(21,23,28,0.12)] ring-1 ring-line"
-              style={{ top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width, maxHeight: pos.maxH }}
+              className={cx('fade fixed z-[70] flex flex-col overflow-hidden', POPOVER)}
+              style={{ top: pos.top, bottom: pos.bottom, left: pos.left, width: 'max-content', minWidth: pos.width, maxWidth: maxW, maxHeight: pos.maxH }}
             >
               {items}
             </div>
@@ -416,19 +429,19 @@ export function Menu<T extends string>({
 
   const list = options.map((o, i) => (
     <div key={o.id}>
-      {i > 0 && o.group !== options[i - 1].group && <div className="mx-3 my-1 h-px bg-line" />}
+      {i > 0 && o.group !== options[i - 1].group && <div className="mx-2.5 my-1.5 h-px bg-line" />}
       <button
         role="option"
         aria-selected={o.id === value}
-        className={cx('flex w-full items-center gap-2.5 rounded-xl px-3 text-left hover:bg-soft', phone ? 'h-11 text-[15px]' : 'h-8 text-[13px]')}
+        className={cx(ITEM, 'gap-1.5 hover:bg-soft', phone ? ITEM_PHONE : ITEM_DESKTOP)}
         onClick={() => {
           setOpen(false)
           if (o.id !== value) onChange(o.id)
         }}
       >
-        {o.dot && <span className={cx('size-2 rounded-full', o.dot)} />}
+        {o.dot && <span className={cx('size-2 shrink-0 rounded-full', o.dot)} />}
         <span className="flex-1">{o.label}</span>
-        {o.id === value && <Check className="size-4" strokeWidth={1.5} />}
+        {o.id === value && <Check className="size-4 shrink-0" strokeWidth={1.5} />}
       </button>
     </div>
   ))
@@ -446,8 +459,10 @@ export function Menu<T extends string>({
         onClick={(e) => {
           e.stopPropagation()
           const r = btn.current!.getBoundingClientRect()
-          const h = options.length * 32 + 40
-          setPos({ top: Math.max(8, Math.min(r.bottom + 4, window.innerHeight - h)), left: Math.min(r.left, window.innerWidth - 232) })
+          const groups = new Set(options.map((o) => o.group)).size
+          const h = options.length * 36 + (groups - 1) * 13 + 12
+          const below = window.innerHeight - r.bottom - POPOVER_GAP - 8
+          setPos({ top: below >= h ? r.bottom + POPOVER_GAP : Math.max(8, r.top - POPOVER_GAP - h), left: Math.max(8, Math.min(r.left - 6, window.innerWidth - 232)) })
           setOpen((o) => !o)
         }}
       >
@@ -459,12 +474,12 @@ export function Menu<T extends string>({
           phone ? (
             <div className="fade fixed inset-0 z-[70] flex items-end bg-ink/30" onMouseDown={() => setOpen(false)}>
               <div role="listbox" className="sheet safe-bottom max-h-[80vh] w-full overflow-y-auto rounded-t-[28px] bg-surface p-3" onMouseDown={(e) => e.stopPropagation()}>
-                <div className="px-3 pt-1 pb-2 text-[13px] text-muted">{title}</div>
+                <div className="pt-1 pr-1.5 pb-2 pl-2.5 text-[13px] text-muted">{title}</div>
                 {list}
               </div>
             </div>
           ) : (
-            <div role="listbox" className="fade fixed z-[70] w-56 rounded-2xl bg-surface p-1.5 shadow-[0_8px_24px_rgba(21,23,28,0.1)] ring-1 ring-line" style={pos} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+            <div role="listbox" className={cx('fade fixed z-[70] w-56', POPOVER)} style={pos} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
               {list}
             </div>
           ),
