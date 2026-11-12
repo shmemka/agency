@@ -13,7 +13,7 @@ import { AudienceBar, BloggerName, TaskList, statsStale, useIntegrationPanel } f
 import { BloggerFields, NewIntegrationModal, cleanBlogger, type BloggerDraft } from './BloggerForm'
 import { DocumentsPanel } from './DocumentsPanel'
 import { Feed } from './Feed'
-import { OfferCard } from './OfferCard'
+import { OfferCard, tgUsername } from './OfferCard'
 import { confirmDialog, promptDialog } from './dialogs'
 
 type Tab = 'work' | 'data' | 'docs'
@@ -58,7 +58,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
   const draft = d ?? b
   const dirty = d !== null && JSON.stringify(cleanBlogger(d)) !== JSON.stringify(cleanBlogger(b))
   const c = cpm(b.price, b.avg_reach)
-  const tg = b.contact?.match(/^@?([A-Za-z0-9_]{4,})$/)?.[1]
+  const tg = tgUsername(b.contact)
 
   async function save() {
     if (!d?.nick?.trim()) return toast('Ник не может быть пустым')

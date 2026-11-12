@@ -13,6 +13,7 @@ import { toast } from '../lib/toast'
 import { Avatar, BloggerStatusBadge, BloggerStatusSelect, Button, Empty, Input, PageHeader, Segmented, Select, Spinner, StatusSelect, Table, cx } from '../components/ui'
 import { AudienceBar, BloggerName, statsStale } from '../components/bits'
 import { BloggerDrawer, useBloggerStatus } from '../components/BloggerDrawer'
+import { SendOfferButton } from '../components/OfferCard'
 import { BloggerFormModal } from '../components/BloggerForm'
 import { ImportModal } from '../components/ImportModal'
 
@@ -238,12 +239,17 @@ export function Bloggers() {
               {rows.slice(0, limit).map((b) => {
                 const c = cpm(b.price, b.avg_reach)
                 return (
-                  <tr key={b.id} onClick={() => open(b)} onKeyDown={(e) => e.key === 'Enter' && open(b)} tabIndex={0} className={cx('cursor-pointer transition-colors duration-150 hover:bg-soft', (id === b.id || picked.has(b.id)) && 'bg-soft')}>
+                  <tr key={b.id} onClick={() => open(b)} onKeyDown={(e) => e.key === 'Enter' && open(b)} tabIndex={0} className={cx('group cursor-pointer transition-colors duration-150 hover:bg-soft', (id === b.id || picked.has(b.id)) && 'bg-soft')}>
                     <td onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={picked.has(b.id)} onChange={() => toggle(b.id)} aria-label={`Выбрать ${b.nick}`} />
                     </td>
-                    <td className="max-w-44">
-                      <BloggerName b={b} />
+                    <td className="max-w-52">
+                      <div className="flex items-center gap-1">
+                        <span className="min-w-0 flex-1">
+                          <BloggerName b={b} />
+                        </span>
+                        <SendOfferButton b={b} className="-my-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100" />
+                      </div>
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <BloggerStatusSelect value={b.status} onChange={(s) => setStatus(b, s)} />
