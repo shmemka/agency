@@ -8,6 +8,8 @@ interface AuthState {
   profile: Profile | null
   team: Profile[]
   loading: boolean
+  /** профиль не загрузился (нет связи, VPN, Supabase недоступен) — это не то же самое, что «нет доступа» */
+  profileError: string | null
   /** пришли по ссылке «Забыли пароль?» — нужно задать новый */
   recovery: boolean
   endRecovery: () => void
@@ -27,6 +29,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [team, setTeam] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [recovery, setRecovery] = useState(false)
+  const [profileError, setProfileError] = useState<string | null>(null)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -49,12 +52,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const reloadProfile = useCallback(async () => {
     const uid = session?.user.id
     if (!uid) return
-    const { data } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle()
-    setProfile((data as Profile) ?? null)
+    try {
+      // не ждём бесконечно: при плохой связи через 8 секунд показываем «Нет связи», а не крутим загрузку
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).abortSignal(AbortSignal.timeout(8000)).maybeSingle()
+      if (error) throw new Error(/abort|timeout/i.test(error.message) ? 'База не ответила за 8 секунд' : error.message)
+      setProfile((data as Profile) ?? null)
+      setProfileError(null)
+    } catch (e) {
+      // профиль, который уже был, не стираем: при обрыве связи сайт продолжает работать
+      setProfileError((e as Error).message || 'Нет связи с базой')
+    }
   }, [session?.user.id])
 
   const reloadTeam = useCallback(async () => {
-    const { data } = await supabase.from('profiles').select('*').order('created_at')
+    const { data } = await supabase.from('profiles').select('*').order('created_at').abortSignal(AbortSignal.timeout(8000))
     setTeam((data as Profile[]) ?? [])
   }, [])
 
@@ -66,8 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let alive = true
     ;(async () => {
       setLoading(true)
-      await reloadProfile()
-      await reloadTeam()
+      await Promise.all([reloadProfile(), reloadTeam()])
       if (alive) setLoading(false)
     })()
     return () => {
@@ -81,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       team,
       loading,
+      profileError,
       recovery,
       endRecovery: () => setRecovery(false),
       isAdmin: profile?.role === 'admin' && profile.is_active,
@@ -96,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       personAvatar: (id) => (id ? (team.find((t) => t.id === id)?.avatar_url ?? null) : null),
     }),
-    [session, profile, team, loading, recovery, reloadTeam, reloadProfile],
+    [session, profile, team, loading, profileError, recovery, reloadTeam, reloadProfile],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

@@ -755,3 +755,14 @@ export function PlatformTag({ short, label, className }: { short: string; label:
     </span>
   )
 }
+
+/**
+ * Комментарий: Enter — отправить, Shift+Enter — новая строка.
+ * На телефоне Shift+Enter не набрать, поэтому там Enter — перенос строки, а отправляет кнопка
+ */
+export function sendOnEnter(e: React.KeyboardEvent): boolean {
+  if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return false
+  if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return false
+  e.preventDefault()
+  return true
+}

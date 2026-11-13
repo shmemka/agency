@@ -36,6 +36,8 @@ export function Team() {
       supabase.from('integrations').update({ owner_id: to }).eq('owner_id', closing.id),
       supabase.from('campaigns').update({ owner_id: to }).eq('owner_id', closing.id),
       supabase.from('tasks').update({ assignee_id: to }).eq('assignee_id', closing.id).is('done_at', null),
+      // задачи без исполнителя, которые он поставил, иначе никому не напомнят о себе: отдаём наследнику, а без него — тому, кто закрывает доступ
+      supabase.from('tasks').update({ assignee_id: to ?? profile?.id ?? null }).is('assignee_id', null).eq('created_by', closing.id).is('done_at', null),
     ])
     const err = res.find((r) => r.error)?.error
     if (err) return toast(err.message)

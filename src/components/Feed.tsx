@@ -7,7 +7,7 @@ import { BLOGGER_STATUSES, STATUSES } from '../lib/constants'
 import { dateTime } from '../lib/format'
 import type { Activity } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Button, Spinner, Textarea } from './ui'
+import { Avatar, Button, Spinner, Textarea, sendOnEnter } from './ui'
 import { confirmDialog } from './dialogs'
 
 const label = (s: string | null) => STATUSES.find((x) => x.id === s)?.label ?? BLOGGER_STATUSES.find((x) => x.id === s)?.label ?? s ?? ''
@@ -48,11 +48,7 @@ export function Feed({ bloggerId, integrationId }: { bloggerId: string; integrat
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => {
-          // как в комментариях к задачам: Enter — отправить, Shift+Enter — новая строка
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            send()
-          }
+          if (sendOnEnter(e)) send()
         }}
         placeholder="Что произошло: написали, ответил, прислал реквизиты"
         aria-label="Комментарий"

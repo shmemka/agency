@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { phaseInfo, statusInfo } from '../lib/constants'
-import { isLive, ordDeadline } from '../lib/rules'
+import { isLive, ordDeadline, taskOwner } from '../lib/rules'
 import { todayISO } from '../lib/format'
 import { Button, Card, IconButton, PageHeader, Select, cx } from '../components/ui'
 import { useIntegrationPanel } from '../components/bits'
@@ -55,7 +55,7 @@ export function Calendar() {
     if (!cid) {
       for (const t of tasks) {
         if (!t.due_date || t.done_at) continue
-        if (owner ? t.assignee_id !== owner : t.assignee_id !== profile?.id && !isAdmin) continue
+        if (owner ? taskOwner(t) !== owner : taskOwner(t) !== profile?.id && !isAdmin) continue
         out.push({ key: `t${t.id}`, day: t.due_date, text: t.title, dot: 'bg-ink', onClick: () => navigate(`/tasks/${t.id}`) })
       }
     }

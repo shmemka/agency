@@ -3,7 +3,7 @@ import { ArrowUpRight } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { PHASES, statusInfo } from '../lib/constants'
-import { isActive, isLive, ordDeadline } from '../lib/rules'
+import { isActive, isLive, ordDeadline, taskOwner } from '../lib/rules'
 import { count, date, money, plural, todayISO } from '../lib/format'
 import { Card, PageHeader, StatusBadge, cx } from '../components/ui'
 import { BloggerName, TaskList, useIntegrationPanel } from '../components/bits'
@@ -16,7 +16,8 @@ export function Dashboard() {
   const { integrations, campaigns, tasks, settings, blogger, campaign, bloggers, loading } = useData()
   const { profile, isAdmin } = useAuth()
   const { open } = useIntegrationPanel()
-  const items = useAttention()
+  // свои задачи уже в «Мои задачи на сегодня» — во «Требует внимания» их не повторяем
+  const items = useAttention().filter((a) => !a.key.startsWith('t'))
   const today = todayISO()
   const month = today.slice(0, 7)
 
@@ -26,7 +27,7 @@ export function Dashboard() {
   const total = active.length || 1
   const livePhase = flow.findIndex((p) => p.id === 'live')
 
-  const myTasks = tasks.filter((t) => t.assignee_id === profile?.id && !t.done_at && !!t.due_date && t.due_date <= today).sort((a, b) => (a.due_date ?? '9').localeCompare(b.due_date ?? '9'))
+  const myTasks = tasks.filter((t) => taskOwner(t) === profile?.id && !t.done_at && !!t.due_date && t.due_date <= today).sort((a, b) => (a.due_date ?? '9').localeCompare(b.due_date ?? '9'))
   const thisMonth = integrations.filter((i) => i.publish_date?.startsWith(month) && i.status !== 'declined' && (!i.campaign_id || i.client_decision === 'approved'))
   const out = thisMonth.filter(isLive)
   const upcoming = active.filter((i) => i.publish_date && i.publish_date >= today && !isLive(i)).sort((a, b) => a.publish_date!.localeCompare(b.publish_date!)).slice(0, 6)

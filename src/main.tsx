@@ -9,7 +9,7 @@ import { Layout } from './components/Layout'
 import { Spinner, ToastHost } from './components/ui'
 import { DialogHost } from './components/dialogs'
 import { TooltipHost } from './components/Tooltip'
-import { Login, NewPassword, NotConfigured, Pending } from './pages/Login'
+import { Login, NewPassword, NotConfigured, Offline, Pending } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { Bloggers } from './pages/Bloggers'
 import { Integrations } from './pages/Integrations'
@@ -26,7 +26,7 @@ import { Profile } from './pages/Profile'
 import { Settings } from './pages/Settings'
 
 function Gate() {
-  const { session, profile, loading, isAdmin, recovery, endRecovery } = useAuth()
+  const { session, profile, profileError, loading, isAdmin, recovery, endRecovery } = useAuth()
   if (loading)
     return (
       <div className="flex h-full items-center justify-center">
@@ -35,6 +35,7 @@ function Gate() {
     )
   if (!session) return <Login />
   if (recovery) return <NewPassword onDone={endRecovery} />
+  if (!profile && profileError) return <Offline reason={profileError} />
   if (!profile?.is_active) return <Pending />
   return (
     <DataProvider>
@@ -53,7 +54,7 @@ function Gate() {
           {isAdmin && <Route path="finance" element={<Finance />} />}
           <Route path="team" element={<Team />} />
           <Route path="profile" element={<Profile />} />
-          <Route path="settings" element={<Settings />} />
+          {isAdmin && <Route path="settings" element={<Settings />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

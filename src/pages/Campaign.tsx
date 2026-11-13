@@ -29,7 +29,10 @@ export function CampaignPage() {
   const c = campaign(id)
   const rows = useMemo(() => integrations.filter((i) => i.campaign_id === id), [integrations, id])
   const approved = rows.filter((i) => i.client_decision === 'approved' && i.status !== 'declined')
-  const tab = (sp.get('tab') as Tab) ?? (approved.length && !rows.some((i) => i.client_decision === 'pending') ? 'work' : 'shortlist')
+  // вкладка из ссылки, если она есть и доступна; иначе — по умолчанию (специалисту «Деньги» не открываются)
+  const allowed: Tab[] = ['shortlist', 'work', 'docs', 'report', ...(isAdmin ? (['money'] as Tab[]) : [])]
+  const asked = sp.get('tab') as Tab | null
+  const tab: Tab = asked && allowed.includes(asked) ? asked : approved.length && !rows.some((i) => i.client_decision === 'pending') ? 'work' : 'shortlist'
   const setTab = (t: Tab) => {
     const p = new URLSearchParams(sp)
     p.set('tab', t)

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { siteUrl, supabase } from '../lib/supabase'
-import { AGENCY, PHASES } from '../lib/constants'
+import { PHASES } from '../lib/constants'
+import { useAgencyName } from '../lib/agency'
 import { Button, Field, Input, cx } from '../components/ui'
 
 const ERRORS: Record<string, string> = {
@@ -10,6 +11,7 @@ const ERRORS: Record<string, string> = {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
+  const agency = useAgencyName()
   return (
     <div className="flex min-h-full items-center justify-center p-4">
       <div className="rise grid w-full max-w-4xl overflow-hidden rounded-card bg-surface md:grid-cols-2">
@@ -18,7 +20,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <span className="flex size-8 items-center justify-center rounded-full bg-ink">
               <span className="bar-lime size-2.5 rounded-full" />
             </span>
-            <span className="text-[15px] font-medium">{AGENCY}</span>
+            <span className="text-[15px] font-medium">{agency}</span>
           </div>
           <div>
             <p className="text-[32px] leading-9 tracking-tight">Блогеры, договоры и выходы в одном кабинете</p>
@@ -144,6 +146,25 @@ export function Pending() {
       <div className="mt-6 flex gap-2">
         <Button variant="primary" onClick={() => window.location.reload()}>
           Обновить
+        </Button>
+        <Button variant="ghost" onClick={() => supabase.auth.signOut()}>
+          Выйти
+        </Button>
+      </div>
+    </Shell>
+  )
+}
+
+/** Профиль не загрузился: связь, VPN или сама база. Доступ при этом может быть — не пугаем экраном для новичков */
+export function Offline({ reason }: { reason: string }) {
+  return (
+    <Shell>
+      <h1 className="text-2xl tracking-tight">Нет связи с базой</h1>
+      <p className="mt-2 text-muted">Не получилось загрузить ваш профиль. Проверьте интернет или VPN и попробуйте ещё раз. Доступ к кабинету при этом никуда не делся</p>
+      <p className="mt-3 text-xs break-words text-faint">{reason}</p>
+      <div className="mt-6 flex gap-2">
+        <Button variant="primary" onClick={() => window.location.reload()}>
+          Попробовать снова
         </Button>
         <Button variant="ghost" onClick={() => supabase.auth.signOut()}>
           Выйти

@@ -5,7 +5,8 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { AGENCY } from '../lib/constants'
-import { attention, type Attention } from '../lib/rules'
+import { rememberAgency } from '../lib/agency'
+import { attention, taskOwner, type Attention } from '../lib/rules'
 import { dateTime } from '../lib/format'
 import { Avatar, IconButton, ITEM, ITEM_DESKTOP, Modal, POPOVER, cx } from './ui'
 import { useIntegrationPanel } from './bits'
@@ -125,13 +126,18 @@ export function Layout() {
   const { profile, signOut, isAdmin, team } = useAuth()
   const { tasks, settings } = useData()
   const agency = settings?.agency_name?.trim() || AGENCY
+  // название агентства — во вкладке браузера и на странице входа (запоминаем для следующего раза)
+  useEffect(() => {
+    document.title = agency
+    rememberAgency(agency)
+  }, [agency])
   const { openId, open } = useIntegrationPanel()
   const loc = useLocation()
   const [more, setMore] = useState(false)
   const nav = NAV.filter((n) => !n.admin || isAdmin)
   const current = nav.find((n) => (n.end ? loc.pathname === n.to : loc.pathname.startsWith(n.to)))
   const name = profile?.full_name || profile?.email || ''
-  const myTasks = tasks.filter((t) => !t.done_at && t.assignee_id === profile?.id).length
+  const myTasks = tasks.filter((t) => !t.done_at && taskOwner(t) === profile?.id).length
   const pending = isAdmin ? team.filter((t) => !t.is_active).length : 0
   const badge = (to: string) => (to === '/tasks' ? myTasks : to === '/team' ? pending : 0)
 
@@ -198,7 +204,7 @@ export function Layout() {
               </NavLink>
             ))}
           <div className="mx-3 my-2 h-px bg-line" />
-          {ACCOUNT.map((n) => (
+          {accountFor(isAdmin).map((n) => (
             <NavLink key={n.to} to={n.to} onClick={() => setMore(false)} className="flex h-12 items-center gap-3 rounded-2xl px-3 text-[15px] hover:bg-soft">
               <n.icon className="size-5 text-muted" strokeWidth={1.5} />
               <span className="flex-1">{n.label}</span>
@@ -218,8 +224,10 @@ export function Layout() {
 
 const ACCOUNT = [
   { to: '/profile', label: 'Мой профиль', icon: UserRound },
-  { to: '/settings', label: 'Настройки', icon: Settings },
+  // настройки агентства меняют только учредители: специалисту там нечего делать
+  { to: '/settings', label: 'Настройки', icon: Settings, admin: true },
 ]
+const accountFor = (isAdmin: boolean) => ACCOUNT.filter((a) => !a.admin || isAdmin)
 
 /** Карточка пользователя внизу сайдбара: при наведении или по клику открывает меню аккаунта */
 function UserCard({ name, avatar, role, onSignOut }: { name: string; avatar?: string | null; role: string; onSignOut: () => void }) {
@@ -227,6 +235,7 @@ function UserCard({ name, avatar, role, onSignOut }: { name: string; avatar?: st
   const timer = useRef<number | undefined>(undefined)
   const box = useRef<HTMLDivElement>(null)
   const loc = useLocation()
+  const { isAdmin } = useAuth()
   const here = ACCOUNT.some((a) => loc.pathname.startsWith(a.to))
 
   const show = () => {
@@ -263,7 +272,7 @@ function UserCard({ name, avatar, role, onSignOut }: { name: string; avatar?: st
         // pb-1.5 — невидимый мостик: курсор доходит до меню, не покидая блок
         <div className="absolute inset-x-0 bottom-full pb-1.5">
           <div role="menu" aria-label="Аккаунт" className={cx('fade', POPOVER)}>
-            {ACCOUNT.map((a) => (
+            {accountFor(isAdmin).map((a) => (
               <NavLink key={a.to} to={a.to} role="menuitem" className={({ isActive }) => cx(ITEM, ITEM_DESKTOP, 'gap-2.5 transition-colors duration-150 hover:bg-soft', isActive && 'bg-soft')}>
                 <a.icon className="size-4 shrink-0 text-muted" strokeWidth={1.5} />
                 {a.label}

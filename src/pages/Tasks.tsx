@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { CalendarDays, Check, MessageCircle, MoreHorizontal, Paperclip, Plus, UserRound } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
@@ -12,6 +12,7 @@ import { TaskDrawer } from '../components/TaskDrawer'
 import { confirmDialog } from '../components/dialogs'
 import { DateInput } from '../components/DateInput'
 import { daysBetween, todayISO } from '../lib/format'
+import { taskOwner } from '../lib/rules'
 
 type Who = 'all' | 'mine' | 'given'
 type Counts = Record<string, { c: number; f: number }>
@@ -209,12 +210,25 @@ function TaskCard({ t, counts, dragging, onOpen, onToggle, onPatch, onDragStart,
 }
 
 export function Tasks() {
-  const { tasks, sections, reload } = useData()
+  const { tasks, sections, reload, loading } = useData()
   const { profile, isAdmin } = useAuth()
   const { id } = useParams()
   const navigate = useNavigate()
-  const [who, setWho] = useState<Who>('all')
-  const [hideDone, setHideDone] = useState(false)
+  // фильтры живут в адресе страницы: переживают обновление и открытие задачи
+  const [params, setParams] = useSearchParams()
+  const who = (['mine', 'given'].includes(params.get('who') ?? '') ? params.get('who') : 'all') as Who
+  const hideDone = params.get('done') === 'hide'
+  const setParam = (k: string, v: string | null) => {
+    const p = new URLSearchParams(params)
+    if (v) p.set(k, v)
+    else p.delete(k)
+    setParams(p, { replace: true })
+  }
+  const setWho = (v: Who) => setParam('who', v === 'all' ? null : v)
+  const setHideDone = (v: boolean) => setParam('done', v ? 'hide' : null)
+  const search = params.toString() ? `?${params}` : ''
+  // колонки общие для всей команды: создают, переименовывают, переставляют и удаляют их учредители
+  const canEditCols = isAdmin
   const [counts, setCounts] = useState<Counts>({})
   const [local, setLocal] = useState<Record<string, Partial<Task>>>({})
   const [drag, setDrag] = useState<string | null>(null)
@@ -244,28 +258,46 @@ export function Tasks() {
   const [renaming, setRenaming] = useState<string | null>(null)
   const [newCol, setNewCol] = useState(false)
 
-  // счётчики комментариев и вложений на карточках
+  // счётчики комментариев и вложений на карточках: база считает сама и присылает только числа.
+  // Пересчитываем, когда открыли или закрыли задачу (там могли написать или прикрепить) и когда задач стало больше или меньше
   useEffect(() => {
     let alive = true
-    Promise.all([supabase.from('task_comments').select('task_id'), supabase.from('task_files').select('task_id')]).then(([c, f]) => {
-      if (!alive) return
+    ;(async () => {
       const out: Counts = {}
-      for (const r of (c.data ?? []) as { task_id: string }[]) (out[r.task_id] ??= { c: 0, f: 0 }).c++
-      for (const r of (f.data ?? []) as { task_id: string }[]) (out[r.task_id] ??= { c: 0, f: 0 }).f++
-      setCounts(out)
-    })
+      const { data, error } = await supabase.rpc('task_counts')
+      if (!error) {
+        for (const r of (data ?? []) as { task_id: string; comments: number; files: number }[]) out[r.task_id] = { c: r.comments, f: r.files }
+      } else {
+        // до миграции 012 функции нет — считаем по-старому
+        const [c, f] = await Promise.all([supabase.from('task_comments').select('task_id'), supabase.from('task_files').select('task_id')])
+        for (const r of (c.data ?? []) as { task_id: string }[]) (out[r.task_id] ??= { c: 0, f: 0 }).c++
+        for (const r of (f.data ?? []) as { task_id: string }[]) (out[r.task_id] ??= { c: 0, f: 0 }).f++
+      }
+      if (alive) setCounts(out)
+    })()
     return () => {
       alive = false
     }
-  }, [tasks, id])
+  }, [tasks.length, id])
 
   const all = useMemo(() => tasks.map((t) => (local[t.id] ? { ...t, ...local[t.id] } : t)), [tasks, local])
   const first = sections[0]?.id
   const colOf = (t: Task) => (t.section_id && sections.some((s) => s.id === t.section_id) ? t.section_id : first)
-  const visible = all.filter((t) => (who === 'mine' ? t.assignee_id === profile?.id : who === 'given' ? t.created_by === profile?.id && t.assignee_id !== profile?.id : true) && (!hideDone || !t.done_at))
+  // «Мне» — задачи на мне и мои задачи без исполнителя (о них напоминают мне же); «Я поставил» — отданные другим
+  const visible = all.filter((t) => (who === 'mine' ? taskOwner(t) === profile?.id : who === 'given' ? t.created_by === profile?.id && !!t.assignee_id && t.assignee_id !== profile?.id : true) && (!hideDone || !t.done_at))
   const byCol = (sid: string) => visible.filter((t) => colOf(t) === sid).sort((a, b) => a.position - b.position)
   const open = all.filter((t) => !t.done_at).length
   const current = id ? all.find((t) => t.id === id) : undefined
+
+  // ссылка на задачу, которой нет (удалили или нет доступа), — говорим об этом, а не молча показываем доску.
+  // Если задачу только что удалили из открытой карточки, молчим: она была на экране
+  const seen = useRef<string | null>(null)
+  if (current) seen.current = current.id
+  useEffect(() => {
+    if (!id || loading || current) return
+    if (seen.current !== id) toast('Задача не найдена или нет доступа')
+    navigate(`/tasks${search}`, { replace: true })
+  }, [id, loading, current])
 
   async function update(t: Task, patch: Partial<Task>) {
     setLocal((l) => ({ ...l, [t.id]: { ...l[t.id], ...patch } }))
@@ -444,8 +476,8 @@ export function Tasks() {
                   {dragCol && colOver === sections.length && si === sections.length - 1 && <span aria-hidden className="absolute inset-y-2 -right-2 w-1 rounded-full bg-ink/70" />}
                   {/* заголовок колонки: за него колонку можно перетащить */}
                   <div
-                    className={cx('flex h-10 items-center gap-2 pl-3', renaming !== s.id && 'cursor-grab active:cursor-grabbing')}
-                    draggable={renaming !== s.id}
+                    className={cx('flex h-10 items-center gap-2 pl-3', canEditCols && renaming !== s.id && 'cursor-grab active:cursor-grabbing')}
+                    draggable={canEditCols && renaming !== s.id}
                     onDragStart={(e) => {
                       if (drag) return
                       e.stopPropagation()
@@ -480,15 +512,20 @@ export function Tasks() {
                       </div>
                     ) : (
                       <>
-                        <button onDoubleClick={() => setRenaming(s.id)} className="min-w-0 truncate text-[15px] font-medium" title="Дважды нажмите, чтобы переименовать">
-                          {s.name}
-                        </button>
+                        {canEditCols ? (
+                          <button onDoubleClick={() => setRenaming(s.id)} className="min-w-0 truncate text-[15px] font-medium" title="Дважды нажмите, чтобы переименовать">
+                            {s.name}
+                          </button>
+                        ) : (
+                          <span className="min-w-0 truncate text-[15px] font-medium">{s.name}</span>
+                        )}
                         <span className="num text-[13px] text-faint">{list.length}</span>
                         <span className="flex-1" />
                         <button onClick={() => openComposer(s.id)} aria-label={`Добавить задачу в «${s.name}»`} className="flex size-8 items-center justify-center rounded-full text-muted hover:bg-ink/5 hover:text-ink">
                           <Plus className="size-4" strokeWidth={1.5} />
                         </button>
-                        <Menu
+                        {canEditCols && (
+                          <Menu
                           value={'' as string}
                           chevron={false}
                           title={`Колонка «${s.name}»`}
@@ -506,6 +543,7 @@ export function Tasks() {
                             </span>
                           }
                         />
+                        )}
                       </>
                     )}
                   </div>
@@ -521,7 +559,7 @@ export function Tasks() {
                             t={t}
                             counts={counts[t.id]}
                             dragging={drag === t.id}
-                            onOpen={() => navigate(`/tasks/${t.id}`)}
+                            onOpen={() => navigate(`/tasks/${t.id}${search}`)}
                             onToggle={() => update(t, { done_at: t.done_at ? null : new Date().toISOString() })}
                             onPatch={(p) => update(t, p)}
                             onDragStart={(e) => {
@@ -574,7 +612,8 @@ export function Tasks() {
               )
             })}
 
-            {/* новая колонка */}
+            {/* новая колонка: только учредители */}
+            {canEditCols && (
             <div className="w-[85vw] max-w-[300px] shrink-0 snap-start md:w-[300px]">
               {newCol ? (
                 <div className="mt-1 rounded-2xl bg-surface px-3 py-2 text-[15px] ring-1 ring-ink/15">
@@ -587,11 +626,12 @@ export function Tasks() {
                 </button>
               )}
             </div>
+            )}
           </div>
         </div>
       )}
 
-      {current && <TaskDrawer key={current.id} task={current} onClose={() => navigate('/tasks')} />}
+      {current && <TaskDrawer key={current.id} task={current} onClose={() => navigate(`/tasks${search}`)} />}
     </>
   )
 }

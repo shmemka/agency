@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowDown, ArrowUp, FileSpreadsheet, MoreHorizontal, Plus, Search } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -79,6 +79,21 @@ export function Bloggers() {
     const val = (b: Blogger): number | string => (sort === 'nick' ? b.nick.toLowerCase() : sort === 'cpm' ? (cpm(b.price, b.avg_reach) ?? Infinity * dir) : sort === 'updated_at' ? b.updated_at : (b[sort] ?? -1))
     return [...list].sort((a, z) => (val(a) < val(z) ? -dir : val(a) > val(z) ? dir : 0))
   }, [inList, status, sort, dir, activeBy])
+
+  // фильтр сменился — галочки остаются только на тех, кого видно: массовые действия не цепляют скрытых
+  useEffect(() => {
+    setPicked((s) => {
+      if (!s.size) return s
+      const seen = new Set(rows.map((b) => b.id))
+      const n = new Set([...s].filter((x) => seen.has(x)))
+      return n.size === s.size ? s : n
+    })
+  }, [rows])
+
+  // список удалили (или ссылка старая) — убираем его из адреса, чтобы не путал
+  useEffect(() => {
+    if (!loading && list && !current) set('list', null)
+  }, [loading, list, current])
 
   const open = (b: Blogger) => nav({ pathname: `/bloggers/${b.id}`, search: params.toString() })
   // Shift+клик по галочке выделяет всех между прошлой отмеченной и этой

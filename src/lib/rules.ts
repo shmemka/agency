@@ -8,6 +8,9 @@ export type DocLite = Pick<Doc, 'id' | 'integration_id' | 'blogger_id' | 'campai
 export const isActive = (i: Integration) =>
   i.status !== 'done' && i.status !== 'declined' && (!i.campaign_id || i.client_decision === 'approved')
 
+/** Чья задача: исполнителя, а если его нет — того, кто поставил. Так задача без исполнителя не теряется */
+export const taskOwner = (t: Pick<Task, 'assignee_id' | 'created_by'>) => t.assignee_id ?? t.created_by
+
 export const isLive = (i: Integration) => i.status === 'published' || i.status === 'done'
 
 export function checklist(i: Integration, docs: DocLite[]) {
@@ -75,8 +78,8 @@ export function attention(opts: {
   const mine = (i: Integration) => isAdmin || i.owner_id === me || campaigns.find((c) => c.id === i.campaign_id)?.owner_id === me
 
   for (const t of tasks) {
-    if (t.done_at || t.assignee_id !== me || !t.due_date || t.due_date > today) continue
-    out.push({ key: `t${t.id}`, text: `${t.due_date < today ? 'Просрочена задача' : 'Задача на сегодня'}: ${t.title}`, link: `/tasks/${t.id}`, tone: t.due_date < today ? 'bad' : 'warn' })
+    if (t.done_at || taskOwner(t) !== me || !t.due_date || t.due_date > today) continue
+    out.push({ key: `t${t.id}`, text: `${t.due_date < today ? 'Просрочена задача' : 'Задача на сегодня'}${t.assignee_id ? '' : ' (без исполнителя)'}: ${t.title}`, link: `/tasks/${t.id}`, tone: t.due_date < today ? 'bad' : 'warn' })
   }
   for (const i of integrations) {
     if (!mine(i)) continue

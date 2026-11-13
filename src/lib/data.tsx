@@ -127,8 +127,23 @@ export function DataProvider({ children }: { children: ReactNode }) {
     [loadOne],
   )
 
+  // сначала то, без чего не нарисовать экран; документы, ссылки, уведомления и деньги догружаются следом и не держат загрузку
   useEffect(() => {
-    reload('bloggers', 'blogger_lists', 'blogger_list_items', 'integrations', 'campaigns', 'clients', 'tasks', 'task_sections', 'notifications', 'documents', 'campaign_members', 'share_links', 'campaign_money', 'settings').then(() => setLoading(false))
+    reload('bloggers', 'blogger_lists', 'blogger_list_items', 'integrations', 'campaigns', 'clients', 'tasks', 'task_sections', 'settings').then(() => {
+      setLoading(false)
+      reload('notifications', 'documents', 'campaign_members', 'share_links', 'campaign_money')
+    })
+  }, [reload])
+
+  // вкладка долго была в фоне — живые обновления могли потеряться (сон ноутбука, VPN): перечитываем всё один раз
+  useEffect(() => {
+    let hiddenAt = 0
+    const on = () => {
+      if (document.hidden) hiddenAt = Date.now()
+      else if (hiddenAt && Date.now() - hiddenAt > 5 * 60_000) reload('bloggers', 'blogger_lists', 'blogger_list_items', 'integrations', 'campaigns', 'tasks', 'task_sections', 'notifications', 'documents', 'share_links')
+    }
+    document.addEventListener('visibilitychange', on)
+    return () => document.removeEventListener('visibilitychange', on)
   }, [reload])
 
   // живые обновления: изменения коллег и клиента приходят сами
@@ -137,8 +152,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(timers.current[t])
       timers.current[t] = window.setTimeout(() => reload(t), 500)
     }
+    // большие таблицы не перекачиваем целиком на каждую правку коллеги: меняем одну строку из события
+    const patchRow =
+      (key: 'bloggers' | 'integrations' | 'tasks') =>
+      (e: { eventType: string; new: Record<string, unknown>; old: Record<string, unknown> }) => {
+        setS((prev) => {
+          const list = prev[key] as { id: string }[]
+          if (e.eventType === 'DELETE') return { ...prev, [key]: list.filter((r) => r.id !== e.old.id) }
+          const row = e.new as { id: string }
+          if (!row?.id) return prev
+          const at = list.findIndex((r) => r.id === row.id)
+          return { ...prev, [key]: at < 0 ? [row, ...list] : list.map((r, k) => (k === at ? row : r)) }
+        })
+      }
     let ch = supabase.channel('crm-live')
-    for (const t of ['bloggers', 'blogger_lists', 'blogger_list_items', 'integrations', 'campaigns', 'tasks', 'task_sections', 'notifications', 'documents'] as TableName[]) {
+    for (const key of ['bloggers', 'integrations', 'tasks'] as const) {
+      ch = ch.on('postgres_changes', { event: '*', schema: 'public', table: key }, patchRow(key))
+    }
+    for (const t of ['blogger_lists', 'blogger_list_items', 'campaigns', 'task_sections', 'notifications', 'documents'] as TableName[]) {
       ch = ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, later(t))
     }
     ch = ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity' }, () => setPulse((p) => p + 1))

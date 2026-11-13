@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { BadgeCheck, Check, FileCheck2, Handshake, Repeat, Target, TrendingUp, UserRound, Zap } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { AGENCY } from '../lib/constants'
+import { useAgencyName } from '../lib/agency'
 import type { Platform } from '../lib/types'
 import { Avatar, Field, Input, Spinner, Textarea, cx } from '../components/ui'
 
@@ -60,6 +61,7 @@ export function OfferPage() {
   const params = useParams()
   const [sp] = useSearchParams()
   const token = params.token ?? sp.get('t') ?? ''
+  const fallback = useAgencyName(false)
   const [d, setD] = useState<Data | null>(null)
   const [state, setState] = useState<'loading' | 'ok' | 'missing'>('loading')
   const [contact, setContact] = useState('')
@@ -105,7 +107,7 @@ export function OfferPage() {
   if (state === 'missing' || !d)
     return (
       <div className="mx-auto flex min-h-full max-w-md flex-col px-4 pt-6 pb-16">
-        <Logo name={AGENCY} />
+        <Logo name={fallback} />
         <div className="mt-16 rounded-card bg-surface p-6 text-center">
           <h1 className="text-xl">Страница не найдена</h1>
           <p className="mt-2 text-muted">Проверь, что ссылка скопирована целиком, или напиши менеджеру, который её прислал</p>

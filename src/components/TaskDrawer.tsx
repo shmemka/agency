@@ -7,7 +7,7 @@ import { useData } from '../lib/data'
 import { dateTime } from '../lib/format'
 import type { Task, TaskComment, TaskFile } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Button, Drawer, IconButton, Select, Spinner, Textarea, cx } from './ui'
+import { Avatar, Button, Drawer, IconButton, Select, Spinner, Textarea, cx, sendOnEnter } from './ui'
 import { DateInput } from './DateInput'
 import { confirmDialog, confirmDiscard } from './dialogs'
 
@@ -392,10 +392,7 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
               value={text}
               onChange={(e) => setText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  send()
-                }
+                if (sendOnEnter(e)) send()
               }}
               placeholder="Написать комментарий"
               aria-label="Комментарий"
