@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { POPOVER_GAP, cx } from './ui'
@@ -29,6 +29,8 @@ export function DateInput({
   compact,
   clearable = true,
   'aria-label': ariaLabel,
+  trigger,
+  triggerClassName,
 }: {
   value: string | null | undefined
   onChange: (v: string | null) => void
@@ -38,6 +40,9 @@ export function DateInput({
   compact?: boolean
   clearable?: boolean
   'aria-label'?: string
+  /** Своя кнопка вместо поля: например, кружок с датой на карточке задачи */
+  trigger?: (sel: Date | null) => ReactNode
+  triggerClassName?: string
 }) {
   const sel = parse(value)
   const today = new Date()
@@ -191,15 +196,25 @@ export function DateInput({
             show()
           }
         }}
-        className={cx(
-          'flex h-10 w-full items-center gap-2 rounded-2xl bg-soft pr-3 pl-4 text-left text-sm transition-[background-color,box-shadow] duration-150 hover:bg-ink/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/25',
-          open && 'ring-1 ring-ink/25',
-        )}
+        className={
+          trigger
+            ? cx('flex items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/25', triggerClassName)
+            : cx(
+                'flex h-10 w-full items-center gap-2 rounded-2xl bg-soft pr-3 pl-4 text-left text-sm transition-[background-color,box-shadow] duration-150 hover:bg-ink/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-ink/25',
+                open && 'ring-1 ring-ink/25',
+              )
+        }
       >
-        <span className={cx('num min-w-0 flex-1 truncate', !sel && 'text-faint')}>{sel ? label(sel, compact) : placeholder}</span>
-        <CalendarDays className={cx('size-4 shrink-0 text-faint', clearable && sel && !compact && 'invisible')} strokeWidth={1.5} />
+        {trigger ? (
+          trigger(sel)
+        ) : (
+          <>
+            <span className={cx('num min-w-0 flex-1 truncate', !sel && 'text-faint')}>{sel ? label(sel, compact) : placeholder}</span>
+            <CalendarDays className={cx('size-4 shrink-0 text-faint', clearable && sel && !compact && 'invisible')} strokeWidth={1.5} />
+          </>
+        )}
       </button>
-      {clearable && sel && !compact && (
+      {!trigger && clearable && sel && !compact && (
         <button
           type="button"
           aria-label="Очистить дату"
