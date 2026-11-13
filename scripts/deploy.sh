@@ -13,7 +13,9 @@ fi
 # /agency/ — подпапка на shmemka.github.io. Со своим доменом: BASE_PATH=/ npm run deploy
 export BASE_PATH="${BASE_PATH:-/agency/}"
 npm run build
-cp dist/index.html dist/404.html   # прямые ссылки (/s/токен, /bloggers) открываются через 404.html
+cp dist/index.html dist/404.html   # прямые ссылки (/bloggers, старые /s/токен) открываются через 404.html
+# ссылки для клиентов и блогеров (/s/?t=…, /o/?t=…) — настоящие страницы с кодом 200, чтобы мессенджеры показывали превью
+mkdir -p dist/s dist/o && cp dist/index.html dist/s/index.html && cp dist/index.html dist/o/index.html
 touch dist/.nojekyll
 
 REMOTE="$(git remote get-url origin)"

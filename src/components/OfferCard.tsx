@@ -9,10 +9,11 @@ import { toast } from '../lib/toast'
 import { Button, Card, IconButton, Spinner, cx } from './ui'
 import { promptDialog } from './dialogs'
 
-export const offerUrl = (token: string) => siteUrl(`/o/${token}`)
+// /o/?t=… — настоящая страница на GitHub Pages (код 200), поэтому у ссылки в мессенджерах есть превью
+export const offerUrl = (token: string) => siteUrl(`o/?t=${token}`)
 
-const message = (url: string) =>
-  `Привет! Это ${AGENCY}, агентство рекламы у блогеров. Посмотрели твой контент и хотим предложить сотрудничество. Собрали условия на одной странице, там же можно сразу ответить: ${url}`
+const message = (url: string, agency?: string | null) =>
+  `Привет! Это ${agency?.trim() || AGENCY}, агентство рекламы у блогеров. Посмотрели твой контент и хотим предложить сотрудничество. Собрали условия на одной странице, там же можно сразу ответить: ${url}`
 
 /** Ник в Telegram из поля «Контакт»: @nick, nick, t.me/nick, «tg: @nick, звонить вечером» */
 export function tgUsername(contact: string | null | undefined) {
@@ -44,7 +45,7 @@ async function createOffer(bloggerId: string): Promise<Offer | string> {
  * Вкладку открываем сразу, до запросов к базе, иначе браузер на телефоне посчитает её всплывающим окном и заблокирует
  */
 export function useSendOffer() {
-  const { patchBlogger } = useData()
+  const { patchBlogger, settings } = useData()
   return async (b: Blogger, known?: Offer | null): Promise<Offer | null> => {
     const user = tgUsername(b.contact)
     if (!user) return null
@@ -59,7 +60,7 @@ export function useSendOffer() {
       }
       o = res
     }
-    const url = tgLink(user, message(offerUrl(o.token)))
+    const url = tgLink(user, message(offerUrl(o.token), settings?.agency_name))
     if (w) {
       w.opener = null
       w.location.href = url
@@ -103,7 +104,7 @@ async function copy(text: string, done: string) {
 
 /** Приглашение к сотрудничеству: персональная страница для блогера и её статистика */
 export function OfferCard({ b }: { b: Blogger }) {
-  const { patchBlogger } = useData()
+  const { patchBlogger, settings } = useData()
   const send = useSendOffer()
   const user = tgUsername(b.contact)
   const [offer, setOffer] = useState<Offer | null | undefined>(undefined)
@@ -123,7 +124,7 @@ export function OfferCard({ b }: { b: Blogger }) {
     setOffer(o)
     if (b.status === 'in_base') await patchBlogger(b.id, { status: 'offer_sent' })
     try {
-      await navigator.clipboard.writeText(message(offerUrl(o.token)))
+      await navigator.clipboard.writeText(message(offerUrl(o.token), settings?.agency_name))
       toast(b.status === 'in_base' ? 'Сообщение со ссылкой скопировано, статус: Отправили предложение' : 'Сообщение со ссылкой скопировано')
     } catch {
       toast('Предложение готово')
@@ -188,7 +189,7 @@ export function OfferCard({ b }: { b: Blogger }) {
                 Написать в Telegram
               </Button>
             )}
-            <Button size="sm" variant={user ? 'secondary' : 'primary'} onClick={() => copy(message(url), 'Сообщение со ссылкой скопировано')}>
+            <Button size="sm" variant={user ? 'secondary' : 'primary'} onClick={() => copy(message(url, settings?.agency_name), 'Сообщение со ссылкой скопировано')}>
               <MessageSquareText className="size-3.5" strokeWidth={1.5} />
               Скопировать сообщение
             </Button>

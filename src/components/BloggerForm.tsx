@@ -65,9 +65,15 @@ function BloggerPhoto({ url, nick, onChange }: { url: string | null | undefined;
 }
 
 /** Ссылка, ник или @ник → ник и площадка */
+// ссылкой считаем только адрес: с http, косой чертой или доменом соцсети. «lil.anya» и «@lil.anya» — это ник
+const LINK = /^https?:\/\/|\/|(^|\.)(tiktok\.com|youtube\.com|youtu\.be|t\.me|vk\.com|vk\.ru|instagram\.com)\b/i
+
 function parseProfile(input: string) {
   const v = input.trim()
-  if (/[./]/.test(v) && /[a-z]/i.test(v)) return { url: v, nick: nickFromUrl(v), platform: platformFromUrl(v) }
+  if (LINK.test(v)) {
+    const platform = platformFromUrl(v)
+    return { url: v, nick: nickFromUrl(v), platform: platform === 'other' ? null : platform }
+  }
   return { url: null, nick: v.replace(/^@/, '') || null, platform: null }
 }
 
@@ -120,7 +126,8 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
               onChange={(e) => {
                 const url = e.target.value
                 set('url', url)
-                if (url.includes('.')) set('platform', platformFromUrl(url))
+                const pl = platformFromUrl(url)
+                if (pl !== 'other') set('platform', pl)
               }}
             />
           </Field>
@@ -383,7 +390,7 @@ export function BloggerFormModal({ open, onClose, onCreated }: { open: boolean; 
 
 /** Новая интеграция: блогер + (необязательно) кампания. Остальное заполняется в панели */
 export function NewIntegrationModal({ open, onClose, bloggerId, onCreated }: { open: boolean; onClose: () => void; bloggerId?: string; onCreated: (i: Integration) => void }) {
-  const { bloggers, campaigns, blogger, reload } = useData()
+  const { bloggers, campaigns, integrations, blogger, reload } = useData()
   const [bid, setBid] = useState('')
   const [cid, setCid] = useState('')
   const [busy, setBusy] = useState(false)
@@ -397,6 +404,7 @@ export function NewIntegrationModal({ open, onClose, bloggerId, onCreated }: { o
 
   async function create() {
     if (!bid) return toast('Выберите блогера')
+    if (cid && integrations.some((i) => i.blogger_id === bid && i.campaign_id === cid)) return toast('Этот блогер уже есть в кампании')
     setBusy(true)
     const { data, error } = await supabase
       .from('integrations')
@@ -404,7 +412,7 @@ export function NewIntegrationModal({ open, onClose, bloggerId, onCreated }: { o
       .select()
       .single()
     setBusy(false)
-    if (error) return toast(error.message)
+    if (error) return toast(error.code === '23505' ? 'Этот блогер уже есть в кампании' : error.message)
     await reload('integrations')
     onClose()
     onCreated(data as Integration)

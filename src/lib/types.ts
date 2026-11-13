@@ -7,6 +7,8 @@ export interface Profile {
   avatar_url: string | null
   role: 'admin' | 'manager'
   is_active: boolean
+  /** когда учредитель закрыл доступ; null — новый человек, ещё не допущен */
+  deactivated_at?: string | null
   created_at: string
 }
 
@@ -106,6 +108,8 @@ export interface Integration {
   notes: string | null
   created_at: string
   updated_at: string
+  /** когда интеграция последний раз сменила этап (миграция 009) */
+  status_changed_at?: string | null
 }
 
 export type DocKind = 'contract' | 'act' | 'receipt' | 'invoice' | 'stats' | 'brief' | 'other'

@@ -14,7 +14,9 @@ export function Team() {
   const { bloggers, integrations, reload } = useData()
   const [closing, setClosing] = useState<Profile | null>(null)
   const [heir, setHeir] = useState('')
-  const pending = team.filter((t) => !t.is_active)
+  // закрытый доступ отличается от новой регистрации отметкой deactivated_at
+  const pending = team.filter((t) => !t.is_active && !t.deactivated_at)
+  const closed = team.filter((t) => !t.is_active && t.deactivated_at)
   const active = team.filter((t) => t.is_active)
   const count = (pid: string) => bloggers.filter((b) => b.owner_id === pid).length
 
@@ -27,13 +29,18 @@ export function Team() {
 
   async function close() {
     if (!closing) return
-    if (heir) {
-      const a = await supabase.from('bloggers').update({ owner_id: heir }).eq('owner_id', closing.id)
-      const b = await supabase.from('integrations').update({ owner_id: heir }).eq('owner_id', closing.id)
-      if (a.error || b.error) return toast((a.error ?? b.error)!.message)
-    }
-    await update(closing, { is_active: false })
-    await reload('bloggers', 'integrations')
+    // передаём всё, что вёл человек: блогеров, интеграции, кампании и открытые задачи. Без наследника — снимаем ответственного
+    const to = heir || null
+    const res = await Promise.all([
+      supabase.from('bloggers').update({ owner_id: to }).eq('owner_id', closing.id),
+      supabase.from('integrations').update({ owner_id: to }).eq('owner_id', closing.id),
+      supabase.from('campaigns').update({ owner_id: to }).eq('owner_id', closing.id),
+      supabase.from('tasks').update({ assignee_id: to }).eq('assignee_id', closing.id).is('done_at', null),
+    ])
+    const err = res.find((r) => r.error)?.error
+    if (err) return toast(err.message)
+    await update(closing, { is_active: false, deactivated_at: new Date().toISOString() })
+    await reload('bloggers', 'integrations', 'campaigns', 'tasks')
     setClosing(null)
   }
 
@@ -54,7 +61,7 @@ export function Team() {
                     {p.email}, с {date(p.created_at)}
                   </div>
                 </div>
-                <Button variant="primary" size="sm" onClick={() => update(p, { is_active: true })}>
+                <Button variant="primary" size="sm" onClick={() => update(p, { is_active: true, deactivated_at: null })}>
                   Открыть доступ
                 </Button>
               </li>
@@ -127,6 +134,28 @@ export function Team() {
         })}
       </Table>
 
+      {isAdmin && closed.length > 0 && (
+        <Card className="mt-3">
+          <h2 className="text-base">Доступ закрыт</h2>
+          <ul className="mt-2">
+            {closed.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center gap-3 border-t border-line py-3 first:border-0">
+                <Avatar name={p.full_name || p.email || ''} src={p.avatar_url} />
+                <div className="min-w-0 flex-1">
+                  <div>{p.full_name}</div>
+                  <div className="text-xs text-muted">
+                    {p.email}, закрыт {date(p.deactivated_at!)}
+                  </div>
+                </div>
+                <Button size="sm" onClick={() => update(p, { is_active: true, deactivated_at: null })}>
+                  Вернуть доступ
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
       <p className="mt-4 px-1 text-[13px] text-muted">{isAdmin ? 'Чтобы добавить человека, отправьте ему адрес сайта. Он зарегистрируется, а вы откроете доступ здесь' : 'Новых людей подключают учредители'}</p>
 
       <Modal
@@ -138,15 +167,15 @@ export function Team() {
             <Button variant="ghost" onClick={() => setClosing(null)}>
               Отмена
             </Button>
-            <Button variant="primary" onClick={close}>
+            <Button variant="danger" onClick={close}>
               Закрыть доступ
             </Button>
           </>
         }
       >
         <p className="mb-4 text-muted">Человек больше не войдёт в кабинет. Его данные останутся</p>
-        {closing && count(closing.id) > 0 && (
-          <Field label={`Кому передать его блогеров: ${count(closing.id)}`}>
+        {closing && (
+          <Field label={`Кому передать блогеров (${count(closing.id)}), интеграции, кампании и открытые задачи`}>
             <Select value={heir} onChange={(e) => setHeir(e.target.value)}>
               <option value="">Оставить без ответственного (видны только учредителям)</option>
               {active

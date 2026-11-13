@@ -9,11 +9,14 @@ import { Card, PageHeader, StatusBadge, cx } from '../components/ui'
 import { BloggerName, TaskList, useIntegrationPanel } from '../components/bits'
 import { useAttention } from '../components/Layout'
 
+/** На телефоне полоска узкая: подписи этапов короче, чтобы не обрезались */
+const SHORT: Record<string, string> = { talks: 'Перегов.', papers: 'Докум.' }
+
 export function Dashboard() {
   const { integrations, campaigns, tasks, settings, blogger, campaign, bloggers, loading } = useData()
   const { profile, isAdmin } = useAuth()
   const { open } = useIntegrationPanel()
-  const items = useAttention().filter((a) => !a.key.startsWith('t'))
+  const items = useAttention()
   const today = todayISO()
   const month = today.slice(0, 7)
 
@@ -23,7 +26,7 @@ export function Dashboard() {
   const total = active.length || 1
   const livePhase = flow.findIndex((p) => p.id === 'live')
 
-  const myTasks = tasks.filter((t) => t.assignee_id === profile?.id && !t.done_at && (!t.due_date || t.due_date <= today)).sort((a, b) => (a.due_date ?? '9').localeCompare(b.due_date ?? '9'))
+  const myTasks = tasks.filter((t) => t.assignee_id === profile?.id && !t.done_at && !!t.due_date && t.due_date <= today).sort((a, b) => (a.due_date ?? '9').localeCompare(b.due_date ?? '9'))
   const thisMonth = integrations.filter((i) => i.publish_date?.startsWith(month) && i.status !== 'declined' && (!i.campaign_id || i.client_decision === 'approved'))
   const out = thisMonth.filter(isLive)
   const upcoming = active.filter((i) => i.publish_date && i.publish_date >= today && !isLive(i)).sort((a, b) => a.publish_date!.localeCompare(b.publish_date!)).slice(0, 6)
@@ -39,7 +42,7 @@ export function Dashboard() {
     <>
       <PageHeader title={new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, (c) => c.toUpperCase())} sub={isAdmin ? 'Все блогеры и кампании агентства' : 'Ваши блогеры и кампании'} />
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <Card className="rise lg:col-span-2">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="text-base">В работе сейчас</h2>
@@ -55,9 +58,12 @@ export function Dashboard() {
             {flow.map((p, idx) => {
               const n = byPhase(p.id).length
               return (
-                <Link key={p.id} to={`/integrations?tab=active&phase=${p.id}`} className="group min-w-0 sm:min-w-24" style={{ flex: `${Math.max(n / total, 0.08)} 1 0` }}>
+                <Link key={p.id} to={`/integrations?tab=active&phase=${p.id}`} className="group min-w-12 sm:min-w-24" style={{ flex: `${Math.max(n / total, 0.08)} 1 0` }}>
                   <div className={cx('h-10 rounded-full transition-opacity duration-150 group-hover:opacity-80', n === 0 ? 'hatch' : idx >= livePhase - 1 ? 'bar-lime' : 'bg-ink')} style={n > 0 && idx < livePhase - 1 ? { opacity: 0.25 + idx * 0.25 } : undefined} />
-                  <div className="mt-2 truncate text-[11px] text-muted sm:text-xs">{p.label}</div>
+                  <div className="mt-2 truncate text-[11px] text-muted sm:text-xs">
+                    <span className="sm:hidden">{SHORT[p.id] ?? p.label}</span>
+                    <span className="max-sm:hidden">{p.label}</span>
+                  </div>
                   <div className="num text-base">{n}</div>
                 </Link>
               )
@@ -91,7 +97,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
         <Card>
           <div className="mb-3 flex items-baseline justify-between">
             <h2 className="text-base">Мои задачи на сегодня</h2>

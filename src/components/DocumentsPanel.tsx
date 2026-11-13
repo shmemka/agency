@@ -48,8 +48,9 @@ export function ImageViewer({ url, name, onClose }: { url: string; name: string;
 }
 
 export function DocRow({ d, extra, onChanged }: { d: Doc; extra?: ReactNode; onChanged: () => void }) {
-  const { isAdmin, personName } = useAuth()
+  const { isAdmin, personName, profile } = useAuth()
   const [view, setView] = useState<string | null>(null)
+  const canDelete = isAdmin || d.uploaded_by === profile?.id
 
   async function open() {
     if (d.external_url) return void window.open(d.external_url, '_blank', 'noopener')
@@ -65,9 +66,10 @@ export function DocRow({ d, extra, onChanged }: { d: Doc; extra?: ReactNode; onC
 
   async function remove() {
     if (!(await confirmDialog({ title: 'Удалить документ?', body: `«${d.name}» удалится без возможности восстановить`, ok: 'Удалить', danger: true }))) return
-    if (d.storage_path) await supabase.storage.from(BUCKET).remove([d.storage_path])
+    // сначала запись, потом файл: если запись не удалилась, файл остаётся на месте
     const { error } = await supabase.from('documents').delete().eq('id', d.id)
     if (error) return toast(error.message)
+    if (d.storage_path) await supabase.storage.from(BUCKET).remove([d.storage_path])
     toast('Документ удалён')
     onChanged()
   }
@@ -90,7 +92,8 @@ export function DocRow({ d, extra, onChanged }: { d: Doc; extra?: ReactNode; onC
           label={d.hide_from_client ? 'Скрыт от клиента. Показать в отчёте' : 'Виден клиенту в отчёте. Скрыть'}
           className={cx('size-9', d.hide_from_client && 'bg-ink text-white hover:bg-ink/85 hover:text-white')}
           onClick={async () => {
-            await supabase.from('documents').update({ hide_from_client: !d.hide_from_client }).eq('id', d.id)
+            const { error } = await supabase.from('documents').update({ hide_from_client: !d.hide_from_client }).eq('id', d.id)
+            if (error) toast(`Не сохранилось: ${error.message}`)
             onChanged()
           }}
         >
@@ -100,7 +103,7 @@ export function DocRow({ d, extra, onChanged }: { d: Doc; extra?: ReactNode; onC
       <IconButton label={d.external_url ? 'Открыть ссылку' : 'Открыть файл'} className="size-9" onClick={open}>
         {d.external_url ? <ExternalLink className="size-4" strokeWidth={1.5} /> : <Download className="size-4" strokeWidth={1.5} />}
       </IconButton>
-      {isAdmin && (
+      {canDelete && (
         <IconButton label="Удалить" className="size-9 hover:text-bad" onClick={remove}>
           <Trash2 className="size-4" strokeWidth={1.5} />
         </IconButton>
@@ -157,8 +160,11 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }
         continue
       }
       const { error } = await supabase.from('documents').insert({ ...base(), name: f.name, storage_path: path, size: f.size, mime: f.type })
-      if (error) toast(`«${f.name}»: ${error.message}`)
-      else ok++
+      if (error) {
+        toast(`«${f.name}»: ${error.message}`)
+        // запись не создалась — убираем файл, чтобы он не висел в хранилище без документа
+        await supabase.storage.from(BUCKET).remove([path])
+      } else ok++
     }
     setBusy(false)
     if (ok) toast(ok === 1 ? 'Файл загружен' : `Загружено файлов: ${ok}`)

@@ -29,7 +29,7 @@ export function transitionWarnings(i: Integration, b: Blogger | undefined, docs:
   const at = STATUS_ORDER[to]
   if (to === 'declined') return w
   if (b && at >= STATUS_ORDER.waiting_contract) {
-    if (!legalInfo(b.legal_status).ok) w.push('У блогера не указан статус самозанятого или ИП')
+    if (!legalInfo(b.legal_status).ok) w.push(b.legal_status === 'unknown' ? 'У блогера не указан статус самозанятого или ИП' : `Работаем только с самозанятыми и ИП, а у блогера: ${legalInfo(b.legal_status).label}`)
     if ((b.followers ?? 0) >= 10_000 && b.rkn_registered !== true) w.push('У блогера 10 000+ подписчиков, а регистрация в перечне РКН не отмечена')
   }
   if (at >= STATUS_ORDER.published && !i.erid) w.push('Нет erid — выход без маркировки публиковать нельзя')
@@ -76,12 +76,14 @@ export function attention(opts: {
 
   for (const t of tasks) {
     if (t.done_at || t.assignee_id !== me || !t.due_date || t.due_date > today) continue
-    out.push({ key: `t${t.id}`, text: `${t.due_date < today ? 'Просрочена задача' : 'Задача на сегодня'}: ${t.title}`, link: '/tasks', tone: t.due_date < today ? 'bad' : 'warn' })
+    out.push({ key: `t${t.id}`, text: `${t.due_date < today ? 'Просрочена задача' : 'Задача на сегодня'}: ${t.title}`, link: `/tasks/${t.id}`, tone: t.due_date < today ? 'bad' : 'warn' })
   }
   for (const i of integrations) {
     if (!mine(i)) continue
-    if (isActive(i) && (i.status === 'contacted' || i.status === 'waiting_reply') && daysBetween(i.updated_at, today) >= 3) {
-      out.push({ key: `s${i.id}`, text: `${nick(i.blogger_id)} молчит ${daysBetween(i.updated_at, today)} дн. — пора напомнить`, link: `?i=${i.id}`, tone: 'warn' })
+    // молчание считаем от смены этапа: правка заметки или цены не сбрасывает напоминание
+    const since = i.status_changed_at ?? i.updated_at
+    if (isActive(i) && (i.status === 'contacted' || i.status === 'waiting_reply') && daysBetween(since, today) >= 3) {
+      out.push({ key: `s${i.id}`, text: `${nick(i.blogger_id)} молчит ${daysBetween(since, today)} дн. — пора напомнить`, link: `?i=${i.id}`, tone: 'warn' })
     }
     if (isActive(i) && i.publish_date && !isLive(i) && daysBetween(today, i.publish_date) >= 0 && daysBetween(today, i.publish_date) <= 1) {
       if (!i.erid) out.push({ key: `e${i.id}`, text: `Выход ${nick(i.blogger_id)} ${i.publish_date === today ? 'сегодня' : 'завтра'}, а erid нет`, link: `?i=${i.id}`, tone: 'bad' })

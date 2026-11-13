@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { Check, Download, ExternalLink, Printer, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { AGENCY, platformInfo } from '../lib/constants'
@@ -34,6 +34,8 @@ interface ShortRow {
   price: number | null
   decision: 'pending' | 'approved' | 'rejected'
   comment: string | null
+  /** с блогером уже оформляют документы: решение меняет только менеджер */
+  locked?: boolean
 }
 interface ReportRow {
   id: string
@@ -80,7 +82,12 @@ function Frame({ d, title, children, actions }: { d: Base | null; title: string;
 }
 
 export function Share() {
-  const { token = '' } = useParams()
+  // новая ссылка вида /s/?t=… отдаётся GitHub Pages как настоящая страница, старая /s/<токен> тоже работает
+  const params = useParams()
+  const [sp] = useSearchParams()
+  const token = params.token ?? sp.get('t') ?? ''
+  // «Открыть как клиент» из кабинета: смотреть можно, отметки не сохраняются
+  const preview = sp.get('preview') === '1'
   const [d, setD] = useState<Data | null>(null)
   const [state, setState] = useState<'loading' | 'ok' | 'revoked' | 'missing'>('loading')
 
@@ -111,10 +118,10 @@ export function Share() {
         </Card>
       </Frame>
     )
-  return d.kind === 'shortlist' ? <Shortlist d={d} rows={d.rows as ShortRow[]} token={token} reload={load} /> : <Report d={d} rows={d.rows as ReportRow[]} />
+  return d.kind === 'shortlist' ? <Shortlist d={d} rows={d.rows as ShortRow[]} token={token} reload={load} preview={preview} /> : <Report d={d} rows={d.rows as ReportRow[]} />
 }
 
-function Shortlist({ d, rows, token, reload }: { d: Data; rows: ShortRow[]; token: string; reload: () => void }) {
+function Shortlist({ d, rows, token, reload, preview }: { d: Data; rows: ShortRow[]; token: string; reload: () => void; preview: boolean }) {
   const [local, setLocal] = useState<Record<string, { decision: ShortRow['decision']; comment: string }>>({})
   const state = (r: ShortRow) => local[r.id] ?? { decision: r.decision, comment: r.comment ?? '' }
   const chosen = rows.filter((r) => state(r).decision === 'approved')
@@ -122,10 +129,12 @@ function Shortlist({ d, rows, token, reload }: { d: Data; rows: ShortRow[]; toke
   const reach = chosen.reduce((a, r) => a + (r.avg_reach ?? 0), 0)
 
   async function decide(r: ShortRow, decision: ShortRow['decision'], comment = state(r).comment) {
+    if (preview) return toast('Это просмотр для команды: отметки здесь не сохраняются')
+    if (r.locked && decision !== r.decision) return toast('С этим блогером уже оформляют документы. Чтобы изменить решение, напишите менеджеру')
     setLocal((l) => ({ ...l, [r.id]: { decision, comment } }))
     const { data, error } = await supabase.rpc('set_share_decision', { p_token: token, p_integration: r.id, p_decision: decision, p_comment: comment })
     if (error || (data as { error?: string })?.error) {
-      toast('Выбор не сохранился. Обновите страницу и попробуйте ещё раз')
+      toast((data as { error?: string })?.error === 'locked' ? 'С этим блогером уже оформляют документы. Чтобы изменить решение, напишите менеджеру' : 'Выбор не сохранился. Обновите страницу и попробуйте ещё раз')
       reload()
     }
   }
@@ -147,7 +156,8 @@ function Shortlist({ d, rows, token, reload }: { d: Data; rows: ShortRow[]; toke
         </Button>
       }
     >
-      <p className="mb-4 max-w-xl text-muted">Отметьте, кого берёте в кампанию. Выбор сохраняется сразу, менеджер увидит его без звонка. Передумать можно в любой момент</p>
+      {preview && <p className="mb-4 max-w-xl rounded-2xl bg-lime/40 px-4 py-3">Так подборку видит клиент. Это просмотр для команды: отметки здесь не сохраняются</p>}
+      <p className="mb-4 max-w-xl text-muted">Отметьте, кого берёте в кампанию. Выбор сохраняется сразу, менеджер увидит его без звонка. Передумать можно, пока с блогером не начали оформлять документы</p>
       {rows.length === 0 && <Card className="text-muted">Менеджер ещё собирает подборку. Загляните позже</Card>}
       <ul className="space-y-2">
         {rows.map((r) => {
@@ -188,18 +198,21 @@ function Shortlist({ d, rows, token, reload }: { d: Data; rows: ShortRow[]; toke
               </div>
               <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
                 <span className="num mr-auto text-xl">{money(r.price)}</span>
+                {r.locked && <span className="text-[13px] text-muted">Уже в работе</span>}
                 <button
+                  disabled={r.locked}
                   onClick={() => decide(r, s.decision === 'rejected' ? 'pending' : 'rejected')}
                   aria-pressed={s.decision === 'rejected'}
-                  className={cx('inline-flex h-11 items-center gap-2 rounded-full px-4 transition-colors duration-150', s.decision === 'rejected' ? 'bg-ink/10' : 'text-muted hover:bg-ink/5 hover:text-ink')}
+                  className={cx('inline-flex h-11 items-center gap-2 rounded-full px-4 transition-colors duration-150 disabled:pointer-events-none disabled:opacity-40', s.decision === 'rejected' ? 'bg-ink/10' : 'text-muted hover:bg-ink/5 hover:text-ink')}
                 >
                   <X className="size-4" strokeWidth={1.5} />
                   Не надо
                 </button>
                 <button
+                  disabled={r.locked}
                   onClick={() => decide(r, s.decision === 'approved' ? 'pending' : 'approved')}
                   aria-pressed={s.decision === 'approved'}
-                  className={cx('inline-flex h-11 items-center gap-2 rounded-full px-5 transition-colors duration-150', s.decision === 'approved' ? 'bar-lime text-ink' : 'bg-ink text-white hover:bg-ink/85')}
+                  className={cx('inline-flex h-11 items-center gap-2 rounded-full px-5 transition-colors duration-150 disabled:pointer-events-none', s.decision === 'approved' ? 'bar-lime text-ink' : 'bg-ink text-white hover:bg-ink/85')}
                 >
                   <Check className="size-4" strokeWidth={2} />
                   Берём

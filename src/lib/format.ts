@@ -92,8 +92,15 @@ export function addDays(iso: string, n: number) {
   return d.toISOString().slice(0, 10)
 }
 
+/** Дата в часовом поясе пользователя: у отметок времени из базы (UTC) первые 10 символов ночью — ещё вчерашний день */
+const localDay = (v: string) => {
+  if (v.length <= 10) return v
+  const d = new Date(v)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
 export function daysBetween(a: string, b: string) {
-  return Math.round((new Date(`${b.slice(0, 10)}T12:00:00`).getTime() - new Date(`${a.slice(0, 10)}T12:00:00`).getTime()) / 86_400_000)
+  return Math.round((new Date(`${localDay(b)}T12:00:00`).getTime() - new Date(`${localDay(a)}T12:00:00`).getTime()) / 86_400_000)
 }
 
 export function pct(v: number | null | undefined) {

@@ -47,11 +47,18 @@ export function Feed({ bloggerId, integrationId }: { bloggerId: string; integrat
         rows={2}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && send()}
+        onKeyDown={(e) => {
+          // как в комментариях к задачам: Enter — отправить, Shift+Enter — новая строка
+          if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault()
+            send()
+          }
+        }}
         placeholder="Что произошло: написали, ответил, прислал реквизиты"
         aria-label="Комментарий"
       />
-      <div className="mt-2 flex justify-end">
+      <div className="mt-2 flex items-center justify-end gap-3">
+        <span className="text-xs text-faint max-sm:hidden">Enter — отправить, Shift+Enter — новая строка</span>
         <Button size="sm" variant="primary" loading={busy} disabled={!text.trim()} onClick={send}>
           Добавить комментарий
         </Button>
@@ -61,7 +68,8 @@ export function Feed({ bloggerId, integrationId }: { bloggerId: string; integrat
       ) : (
         <ol className="mt-2">
           {items.map((a) => {
-            const who = a.actor_id ? personName(a.actor_id) : 'Импорт'
+            // без автора: «создан» — это импорт, а смена статуса — автоматика (например, отклик блогера)
+            const who = a.actor_id ? personName(a.actor_id) : a.kind === 'created' ? 'Импорт' : 'Автоматически'
             const where = !integrationId && a.integration_id ? campaign(integrations.find((i) => i.id === a.integration_id)?.campaign_id)?.name : null
             return (
               <li key={a.id} className="group flex gap-3 border-t border-line py-3 first:border-0">
@@ -77,7 +85,8 @@ export function Feed({ bloggerId, integrationId }: { bloggerId: string; integrat
                         aria-label="Удалить комментарий"
                         onClick={async () => {
                           if (!(await confirmDialog({ title: 'Удалить комментарий?', ok: 'Удалить', danger: true }))) return
-                          await supabase.from('activity').delete().eq('id', a.id)
+                          const { error } = await supabase.from('activity').delete().eq('id', a.id)
+                          if (error) toast(`Комментарий не удалился: ${error.message}`)
                           load()
                         }}
                       >

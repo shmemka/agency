@@ -72,6 +72,17 @@ export function Login() {
     setBusy(false)
   }
 
+  async function forgot() {
+    setError(null)
+    setInfo(null)
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Впишите почту, и мы пришлём ссылку для нового пароля')
+    setBusy(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: siteUrl() })
+    setBusy(false)
+    if (error) setError(ERRORS[error.message] ?? error.message)
+    else setInfo('Отправили письмо со ссылкой. Откройте её, и сайт предложит задать новый пароль')
+  }
+
   return (
     <Shell>
       <form onSubmit={submit} noValidate className="space-y-4">
@@ -87,7 +98,18 @@ export function Login() {
         <Field label="Почта">
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
         </Field>
-        <Field label="Пароль" hint={mode === 'up' ? 'Не короче 6 символов' : undefined}>
+        <Field
+          label="Пароль"
+          hint={
+            mode === 'up' ? (
+              'Не короче 6 символов'
+            ) : (
+              <button type="button" className="underline underline-offset-2 hover:text-ink" onClick={forgot}>
+                Забыли пароль?
+              </button>
+            )
+          }
+        >
           <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'in' ? 'current-password' : 'new-password'} />
         </Field>
         {error && <p className="rounded-2xl bg-orange-100 px-4 py-3 text-bad">{error}</p>}
@@ -138,6 +160,41 @@ export function NotConfigured() {
       <p className="mt-2 text-muted">Сайту нужны адрес и ключ базы. Впишите их в файл .env.production и опубликуйте сайт заново</p>
       <pre className="mt-4 overflow-x-auto rounded-2xl bg-soft p-4 text-xs">{`VITE_SUPABASE_URL=https://xxxx.supabase.co\nVITE_SUPABASE_ANON_KEY=eyJhbGciOi...`}</pre>
       <p className="mt-3 text-muted">Они лежат в Supabase: Project Settings, раздел API. Подробности в README</p>
+    </Shell>
+  )
+}
+
+/** Пришли по ссылке из письма «Забыли пароль?»: задаём новый пароль */
+export function NewPassword({ onDone }: { onDone: () => void }) {
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    if (password.length < 6) return setError('Пароль должен быть не короче 6 символов')
+    setBusy(true)
+    const { error } = await supabase.auth.updateUser({ password })
+    setBusy(false)
+    if (error) return setError(error.message)
+    onDone()
+  }
+
+  return (
+    <Shell>
+      <form onSubmit={submit} noValidate className="space-y-4">
+        <div>
+          <h1 className="text-2xl tracking-tight">Новый пароль</h1>
+          <p className="mt-1 text-muted">Придумайте пароль, с ним вы будете входить дальше</p>
+        </div>
+        <Field label="Пароль" hint="Не короче 6 символов">
+          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" autoFocus />
+        </Field>
+        {error && <p className="rounded-2xl bg-orange-100 px-4 py-3 text-bad">{error}</p>}
+        <Button variant="primary" type="submit" loading={busy} className="w-full">
+          Сохранить пароль
+        </Button>
+      </form>
     </Shell>
   )
 }

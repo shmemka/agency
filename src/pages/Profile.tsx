@@ -100,7 +100,36 @@ export function Profile() {
             Сохранить
           </Button>
         </Card>
+
+        <PasswordCard />
       </div>
     </>
+  )
+}
+
+function PasswordCard() {
+  const [pw, setPw] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function save() {
+    if (pw.length < 6) return toast('Пароль должен быть не короче 6 символов')
+    setBusy(true)
+    const { error } = await supabase.auth.updateUser({ password: pw })
+    setBusy(false)
+    if (error) return toast(error.message)
+    setPw('')
+    toast('Пароль изменён')
+  }
+  return (
+    <Card>
+      <h2 className="mb-4 text-base">Пароль</h2>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Новый пароль" hint="Не короче 6 символов">
+          <Input type="password" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && pw.length >= 6 && save()} />
+        </Field>
+      </div>
+      <Button className="mt-4" variant="primary" loading={busy} disabled={pw.length < 6} onClick={save}>
+        Сменить пароль
+      </Button>
+    </Card>
   )
 }

@@ -21,6 +21,7 @@ export function Integrations() {
   const [params, setParams] = useSearchParams()
   const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [limit, setLimit] = useState(100)
   const q = params.get('q') ?? ''
   const tab = params.get('tab') ?? 'active'
   const cid = params.get('campaign') ?? ''
@@ -164,7 +165,7 @@ export function Integrations() {
                 </tr>
               }
             >
-              {rows.slice(0, 300).map((i) => {
+              {rows.slice(0, limit).map((i) => {
                 const f = cpm(i.price_client ?? i.price, i.fact_reach)
                 const r = ready(i)
                 return (
@@ -204,7 +205,7 @@ export function Integrations() {
             </Table>
           </div>
           <ul className="space-y-2 md:hidden">
-            {rows.slice(0, 100).map((i) => (
+            {rows.slice(0, limit).map((i) => (
               <li key={i.id}>
                 <div role="button" tabIndex={0} onClick={() => open(i.id)} className="rounded-inner bg-surface p-4">
                   <div className="flex items-start justify-between gap-2">
@@ -222,6 +223,11 @@ export function Integrations() {
             ))}
           </ul>
         </>
+      )}
+      {!loading && rows.length > limit && (
+        <div className="mt-3 text-center">
+          <Button onClick={() => setLimit((l) => l + 200)}>Показать ещё {Math.min(200, rows.length - limit)}</Button>
+        </div>
       )}
       <NewIntegrationModal open={adding} onClose={() => setAdding(false)} onCreated={(i) => (i.campaign_id ? toast('Блогер добавлен в подборку кампании') : open(i.id))} />
     </>

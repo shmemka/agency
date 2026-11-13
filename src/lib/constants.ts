@@ -55,10 +55,11 @@ export const nextStatus = (s: Status): Status | null => {
 }
 
 /** Статус отношений с блогером */
-export type BloggerStatus = 'in_base' | 'offer_sent' | 'verified' | 'worked' | 'blacklist'
+export type BloggerStatus = 'in_base' | 'offer_sent' | 'replied' | 'verified' | 'worked' | 'blacklist'
 export const BLOGGER_STATUSES: { id: BloggerStatus; label: string; dot: string; hint: string }[] = [
   { id: 'in_base', label: 'В базе', dot: 'bg-stone-300', hint: 'Добавили, ещё не проверяли' },
   { id: 'offer_sent', label: 'Отправили предложение', dot: 'bg-lime', hint: 'Отправили ссылку на персональное предложение, ждём ответа' },
+  { id: 'replied', label: 'Откликнулся', dot: 'bg-amber-400', hint: 'Ответил на предложение, ставится сам. Пора написать' },
   { id: 'verified', label: 'Проверенный', dot: 'bg-sky-400', hint: 'Охваты и цена актуальны, статус самозанятого или ИП известен' },
   { id: 'worked', label: 'Работали', dot: 'bg-leaf', hint: 'Ставится сам после первого выхода' },
   { id: 'blacklist', label: 'Чёрный список', dot: 'bg-ink', hint: 'Не работаем' },
@@ -86,7 +87,8 @@ export const AGE_GROUPS = [
 export const LEGAL: { id: LegalStatus; label: string; ok: boolean }[] = [
   { id: 'self_employed', label: 'Самозанятый', ok: true },
   { id: 'ip', label: 'ИП', ok: true },
-  { id: 'ooo', label: 'ООО', ok: true },
+  // по правилам агентства работаем только с самозанятыми и ИП
+  { id: 'ooo', label: 'ООО', ok: false },
   { id: 'individual', label: 'Физлицо', ok: false },
   { id: 'unknown', label: 'Не уточнили', ok: false },
 ]

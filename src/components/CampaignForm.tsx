@@ -40,8 +40,9 @@ export function CampaignModal({ value, onClose, onSaved }: { value: Partial<Camp
     const before = new Set(members.filter((m) => m.campaign_id === id).map((m) => m.profile_id))
     const add = [...crew].filter((p) => !before.has(p)).map((p) => ({ campaign_id: id, profile_id: p }))
     const drop = [...before].filter((p) => !crew.has(p))
-    if (add.length) await supabase.from('campaign_members').insert(add)
-    if (drop.length) await supabase.from('campaign_members').delete().eq('campaign_id', id).in('profile_id', drop)
+    const r1 = add.length ? await supabase.from('campaign_members').insert(add) : { error: null }
+    const r2 = drop.length ? await supabase.from('campaign_members').delete().eq('campaign_id', id).in('profile_id', drop) : { error: null }
+    if (r1.error || r2.error) toast(`Кампания сохранена, но команда не обновилась: ${(r1.error ?? r2.error)!.message}`)
     await reload('campaigns', 'campaign_members', 'integrations')
     setBusy(false)
     toast(d.id ? 'Кампания сохранена' : 'Кампания создана')
@@ -234,12 +235,12 @@ export function ShareBox({ campaignId, kind, onCreated }: { campaignId: string; 
         Создать ссылку для клиента
       </Button>
     )
-  const url = siteUrl(`s/${link.token}`)
+  const url = siteUrl(`s/?t=${link.token}`)
   return (
     <div className="space-y-2">
       <CopyLink url={url} />
       <div className="flex gap-2">
-        <Button size="sm" onClick={() => window.open(url, '_blank')}>
+        <Button size="sm" onClick={() => window.open(`${url}&preview=1`, '_blank')}>
           Открыть как клиент
         </Button>
         <Button size="sm" variant="danger" onClick={revoke}>

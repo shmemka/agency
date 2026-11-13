@@ -13,7 +13,7 @@ import { Button, Card, Drawer, Field, IconButton, Input, Segmented, Select, Spin
 import { BloggerName, TaskList } from './bits'
 import { DocumentsPanel } from './DocumentsPanel'
 import { Feed } from './Feed'
-import { confirmDialog } from './dialogs'
+import { confirmDialog, confirmDiscard } from './dialogs'
 import { DateInput } from './DateInput'
 
 type Tab = 'work' | 'terms' | 'docs'
@@ -31,7 +31,13 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
   }, [id])
 
   const dirty = Object.keys(d).length > 0
-  const v = useMemo(() => ({ ...i, ...d }) as Integration, [i, d])
+  // цена для клиента считается от цены блогера и наценки кампании прямо в черновике, как это сделает база при сохранении
+  const v = useMemo(() => {
+    const x = { ...i, ...d } as Integration
+    const m = campaigns.find((c) => c.id === x.campaign_id)?.markup_pct
+    if (x.campaign_id && !x.price_client_manual) x.price_client = x.price === null || x.price === undefined ? null : Math.ceil((x.price * (1 + (m ?? 0) / 100)) / 100) * 100
+    return x
+  }, [i, d, campaigns])
 
   if (!i) {
     return (
@@ -78,11 +84,16 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
     toast(err ?? (on ? 'Отмечено: статистика передана в ОРД' : 'Отметка снята'))
   }
 
+  const guard = async () => !dirty || (await confirmDiscard())
+  const closeSafe = async () => {
+    if (await guard()) onClose()
+  }
+
   const g = cpm(v.price_client ?? v.price, v.guaranteed_reach)
   const f = cpm(v.price_client ?? v.price, v.fact_reach)
 
   return (
-    <Drawer onClose={onClose} label={`Интеграция ${b?.nick ?? ''}`}>
+    <Drawer onClose={onClose} beforeClose={guard} label={`Интеграция ${b?.nick ?? ''}`}>
       <div className="flex flex-col gap-3 p-3 md:p-4">
         <Card>
           <div className="flex items-start gap-2">
@@ -107,7 +118,7 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
               </IconButton>
             )}
             <span className="hidden md:block">
-              <IconButton label="Закрыть" onClick={onClose}>
+              <IconButton label="Закрыть" onClick={closeSafe}>
                 <X className="size-[18px]" strokeWidth={1.5} />
               </IconButton>
             </span>
@@ -188,9 +199,15 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
           <Card className="pb-20">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Кампания">
-                <Select value={v.campaign_id ?? ''} onChange={(e) => setD((x) => ({ ...x, campaign_id: e.target.value || null }))}>
+                <Select
+                  value={v.campaign_id ?? ''}
+                  onChange={(e) =>
+                    // интеграцию без кампании уже ведут: привязка к кампании не должна прятать её в подборку
+                    setD((x) => ({ ...x, campaign_id: e.target.value || null, ...(e.target.value && !i.campaign_id ? { client_decision: 'approved' as Decision } : {}) }))
+                  }
+                >
                   <option value="">Без кампании</option>
-                  {campaigns.map((x) => (
+                  {campaigns.filter((x) => x.status === 'planning' || x.status === 'active' || x.id === i.campaign_id).map((x) => (
                     <option key={x.id} value={x.id}>
                       {x.name}
                     </option>

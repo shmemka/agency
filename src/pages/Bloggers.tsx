@@ -159,6 +159,13 @@ export function Bloggers() {
             </option>
           ))}
         </Select>
+        {/* специалисту тоже нужен этот выбор: уведомление «Вам передали блогеров» открывает список с фильтром «Мои» */}
+        {!isAdmin && (
+          <Select value={owner === 'me' ? 'me' : ''} onChange={(e) => set('owner', e.target.value)} aria-label="Ответственный" tone="surface" className="w-52">
+            <option value="">Все доступные</option>
+            <option value="me">Где я ответственный</option>
+          </Select>
+        )}
         {isAdmin && (
           <Select value={owner} onChange={(e) => set('owner', e.target.value)} aria-label="Ответственный" tone="surface" className="w-48">
             <option value="">Все ответственные</option>
@@ -182,7 +189,7 @@ export function Bloggers() {
           { id: 'all', label: `Все ${base.length}` },
           { id: 'active', label: `В работе ${base.filter((b) => activeBy.has(b.id)).length}` },
           ...BLOGGER_STATUSES.map((s) => ({ id: s.id as string, label: `${s.label} ${base.filter((b) => b.status === s.id).length}` })),
-          { id: 'stale', label: 'Статистика устарела' },
+          { id: 'stale', label: `Статистика устарела ${base.filter(statsStale).length}` },
         ]}
       />
 
@@ -281,9 +288,15 @@ export function Bloggers() {
           <ul className="space-y-2 md:hidden">
             {rows.slice(0, limit).map((b) => (
               <li key={b.id}>
-                <div role="button" tabIndex={0} onClick={() => open(b)} className="rounded-inner bg-surface p-4">
+                <div role="button" tabIndex={0} onClick={() => open(b)} className={cx('rounded-inner bg-surface p-4', picked.has(b.id) && 'ring-2 ring-ink/20')}>
                   <div className="flex items-start justify-between gap-2">
-                    <BloggerName b={b} />
+                    {/* галочка на телефоне: массовые действия (в подборку, передать) работают и здесь */}
+                    <label className="-m-2 flex items-center p-2" onClick={(e) => e.stopPropagation()}>
+                      <input type="checkbox" checked={picked.has(b.id)} onChange={() => toggle(b.id)} aria-label={`Выбрать ${b.nick}`} />
+                    </label>
+                    <span className="min-w-0 flex-1">
+                      <BloggerName b={b} />
+                    </span>
                     <BloggerStatusBadge status={b.status} />
                   </div>
                   <div className="num mt-3 flex justify-between text-[13px] text-muted">
@@ -337,7 +350,7 @@ export function Bloggers() {
         </div>
       )}
 
-      {id && <BloggerDrawer id={id} onClose={() => nav({ pathname: '/bloggers', search: params.toString() })} />}
+      {id && <BloggerDrawer key={id} id={id} onClose={() => nav({ pathname: '/bloggers', search: params.toString() })} />}
       <BloggerFormModal open={adding} onClose={() => setAdding(false)} onCreated={open} />
       <ImportModal open={importing} onClose={() => setImporting(false)} />
     </>

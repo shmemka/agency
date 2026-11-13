@@ -40,7 +40,18 @@ export function CampaignPage() {
   const canEdit = isAdmin || c.owner_id === profile?.id
 
   async function remove() {
-    if (!(await confirmDialog({ title: `Удалить кампанию «${c!.name}»?`, body: 'Интеграции останутся, но без кампании', ok: 'Удалить', danger: true }))) return
+    // кандидаты из подборки без кампании никому не нужны: удаляем их, а одобренные интеграции оставляем
+    const drafts = rows.filter((i) => i.client_decision !== 'approved')
+    const kept = rows.length - drafts.length
+    const body = [
+      drafts.length ? `Кандидаты из подборки удалятся: ${drafts.length}.` : '',
+      kept ? `Одобренные интеграции останутся у блогеров, но без кампании: ${kept}.` : '',
+    ].filter(Boolean).join(' ') || 'В кампании нет блогеров'
+    if (!(await confirmDialog({ title: `Удалить кампанию «${c!.name}»?`, body, ok: 'Удалить', danger: true }))) return
+    if (drafts.length) {
+      const d = await supabase.from('integrations').delete().in('id', drafts.map((i) => i.id))
+      if (d.error) return toast(d.error.message)
+    }
     const { error } = await supabase.from('campaigns').delete().eq('id', c!.id)
     if (error) return toast(error.message)
     await reload('campaigns', 'integrations')
@@ -139,7 +150,9 @@ function PriceCell({ value, onSave, bold }: { value: number | null; onSave: (n: 
 
 function Shortlist({ c, rows }: { c: Campaign; rows: Integration[] }) {
   const { blogger, patchIntegration, reload } = useData()
-  const { isAdmin } = useAuth()
+  const { isAdmin, profile } = useAuth()
+  // убрать кандидата может учредитель или тот, кто ведёт кампанию (одобренных — только учредитель)
+  const canRemove = (i: Integration) => isAdmin || (c.owner_id === profile?.id && i.client_decision !== 'approved')
   const { open } = useIntegrationPanel()
   const [picking, setPicking] = useState(false)
   const [sharing, setSharing] = useState(false)
@@ -236,7 +249,7 @@ function Shortlist({ c, rows }: { c: Campaign; rows: Integration[] }) {
                       {i.client_comment && <div className="mt-1 max-w-52 truncate text-xs text-muted" title={i.client_comment}>«{i.client_comment}»</div>}
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      {isAdmin && (
+                      {canRemove(i) && (
                         <IconButton label="Убрать из подборки" className="size-8 hover:text-bad" onClick={() => remove(i)}>
                           <Trash2 className="size-4" strokeWidth={1.5} />
                         </IconButton>
@@ -416,8 +429,8 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
       </div>
       <div className="mt-3 flex items-center justify-between text-[13px] text-muted">
         <span>Подходит: {list.length}</span>
-        <button className="hover:text-ink" onClick={() => setPicked(new Set(picked.size === list.length ? [] : list.slice(0, 200).map((b) => b.id)))}>
-          {picked.size === list.length && list.length ? 'Снять выбор' : 'Выбрать всех'}
+        <button className="hover:text-ink" onClick={() => setPicked(new Set(picked.size === list.length ? [] : list.map((b) => b.id)))}>
+          {picked.size === list.length && list.length ? 'Снять выбор' : `Выбрать всех: ${list.length}`}
         </button>
       </div>
       <ul className="mt-1 max-h-[46vh] overflow-y-auto">
@@ -449,6 +462,7 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
           </li>
         ))}
         {list.length === 0 && <li className="border-t border-line py-6 text-center text-muted">Под фильтры никто не подходит</li>}
+        {list.length > 200 && <li className="border-t border-line py-3 text-center text-[13px] text-muted">Показаны первые 200 из {list.length}. «Выбрать всех» отмечает всех {list.length}</li>}
       </ul>
     </Modal>
   )
@@ -644,7 +658,8 @@ function Money({ c, rows }: { c: Campaign; rows: Integration[] }) {
             checked={c.prepaid}
             label="Клиент внёс 100% предоплату"
             onChange={async (v) => {
-              await supabase.from('campaigns').update({ prepaid: v }).eq('id', c.id)
+              const { error } = await supabase.from('campaigns').update({ prepaid: v }).eq('id', c.id)
+              if (error) toast(`Не сохранилось: ${error.message}`)
               reload('campaigns')
             }}
           />

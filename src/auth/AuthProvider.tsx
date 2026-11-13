@@ -8,6 +8,9 @@ interface AuthState {
   profile: Profile | null
   team: Profile[]
   loading: boolean
+  /** пришли по ссылке «Забыли пароль?» — нужно задать новый */
+  recovery: boolean
+  endRecovery: () => void
   isAdmin: boolean
   reloadTeam: () => Promise<void>
   reloadProfile: () => Promise<void>
@@ -23,14 +26,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [team, setTeam] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
+  const [recovery, setRecovery] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session)
       if (!data.session) setLoading(false)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(s)
+    const { data: sub } = supabase.auth.onAuthStateChange((e, s) => {
+      if (e === 'PASSWORD_RECOVERY') setRecovery(true)
+      // тот же пользователь — не трогаем состояние, чтобы сайт не перерисовывался целиком
+      setSession((prev) => (prev && s && prev.user.id === s.user.id && prev.access_token === s.access_token ? prev : s))
       if (!s) {
         setProfile(null)
         setTeam([])
@@ -52,8 +58,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setTeam((data as Profile[]) ?? [])
   }, [])
 
+  // Supabase присылает новую сессию при каждом возврате на вкладку и обновлении токена.
+  // Перезагружаем профиль только когда сменился сам пользователь, иначе весь сайт пересобирался и терял черновики
+  const uid = session?.user.id
   useEffect(() => {
-    if (!session) return
+    if (!uid) return
     let alive = true
     ;(async () => {
       setLoading(true)
@@ -64,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       alive = false
     }
-  }, [session, reloadProfile, reloadTeam])
+  }, [uid, reloadProfile, reloadTeam])
 
   const value = useMemo<AuthState>(
     () => ({
@@ -72,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       team,
       loading,
+      recovery,
+      endRecovery: () => setRecovery(false),
       isAdmin: profile?.role === 'admin' && profile.is_active,
       reloadTeam,
       reloadProfile,
@@ -85,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       personAvatar: (id) => (id ? (team.find((t) => t.id === id)?.avatar_url ?? null) : null),
     }),
-    [session, profile, team, loading, reloadTeam, reloadProfile],
+    [session, profile, team, loading, recovery, reloadTeam, reloadProfile],
   )
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

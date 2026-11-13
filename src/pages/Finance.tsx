@@ -1,24 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import { Check, Download, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
-import { date, downloadXlsx, money, parseNumber, todayISO } from '../lib/format'
-import type { Expense, Income, Settings } from '../lib/types'
+import { date, downloadXlsx, money, parseNumber, plural, todayISO } from '../lib/format'
+import type { Expense, Income } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Card, Chip, Empty, Field, IconButton, Input, Modal, PageHeader, Progress, Segmented, Select, StatusBadge, Table, Toggle, cx, submitOnEnter } from '../components/ui'
+import { Button, Card, Chip, Empty, Field, IconButton, Input, Modal, PageHeader, Progress, Segmented, Select, StatusBadge, Table, Toggle, cx } from '../components/ui'
 import { BloggerName, useIntegrationPanel } from '../components/bits'
 import { confirmDialog } from '../components/dialogs'
 import { DateInput } from '../components/DateInput'
 
-type Tab = 'summary' | 'incomes' | 'payouts' | 'expenses' | 'settings'
+type Tab = 'summary' | 'incomes' | 'payouts' | 'expenses'
 type Period = 'month' | 'quarter' | 'year'
 
-function periodStart(p: Period) {
+/** Границы текущего периода: [from, to). Записи с будущими датами в текущий период не попадают */
+function periodRange(p: Period) {
   const d = new Date()
   const m = p === 'month' ? d.getMonth() : p === 'quarter' ? Math.floor(d.getMonth() / 3) * 3 : 0
-  return `${d.getFullYear()}-${String(m + 1).padStart(2, '0')}-01`
+  const len = p === 'month' ? 1 : p === 'quarter' ? 3 : 12
+  const iso = (y: number, mm: number) => `${y + Math.floor(mm / 12)}-${String((mm % 12) + 1).padStart(2, '0')}-01`
+  return { from: iso(d.getFullYear(), m), to: iso(d.getFullYear(), m + len) }
 }
 
 export function Finance() {
@@ -45,9 +48,10 @@ export function Finance() {
     load()
   }, [load])
 
-  const from = periodStart(period)
-  const inP = incomes.filter((i) => i.paid_on >= from)
-  const exP = expenses.filter((e) => e.paid_on >= from)
+  const { from, to } = periodRange(period)
+  const inPeriod = (day: string) => day >= from && day < to
+  const inP = incomes.filter((i) => inPeriod(i.paid_on))
+  const exP = expenses.filter((e) => inPeriod(e.paid_on))
   const sumIn = inP.reduce((a, i) => a + i.amount, 0)
   const tax = inP.reduce((a, i) => a + i.amount * rate(i), 0)
   const sumEx = exP.reduce((a, e) => a + e.amount, 0)
@@ -72,11 +76,15 @@ export function Finance() {
   }
 
   const commission = campaigns
+    .filter((c) => c.status !== 'cancelled')
     .map((c) => {
       const rows = integrations.filter((i) => i.campaign_id === c.id && i.client_decision === 'approved' && i.status !== 'declined')
       return { c, plan: rows.reduce((a, i) => a + Math.max(0, (i.price_client ?? i.price ?? 0) - (i.price ?? 0)), 0), fact: incomes.filter((i) => i.campaign_id === c.id).reduce((a, i) => a + i.amount, 0) }
     })
     .filter((x) => x.plan > 0 || x.fact > 0)
+
+  // настройки переехали на отдельную страницу
+  if ((sp.get('tab') as string | null) === 'settings') return <Navigate to="/settings" replace />
 
   return (
     <>
@@ -127,7 +135,6 @@ export function Finance() {
           { id: 'incomes', label: 'Поступления' },
           { id: 'payouts', label: 'Выплаты блогерам' },
           { id: 'expenses', label: 'Расходы' },
-          { id: 'settings', label: 'Настройки' },
         ]}
       />
 
@@ -136,9 +143,9 @@ export function Finance() {
           <Segmented<Period> className="mb-3" value={period} onChange={setPeriod} options={[{ id: 'month', label: 'Месяц' }, { id: 'quarter', label: 'Квартал' }, { id: 'year', label: 'Год' }]} />
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              ['Поступления', money(sumIn), `${inP.length} платежей`],
+              ['Поступления', money(sumIn), `${inP.length} ${plural(inP.length, 'платёж', 'платежа', 'платежей')}`],
               ['Налог к уплате', money(tax), 'по ставке каждого поступления'],
-              ['Расходы', money(sumEx), `${exP.length} записей`],
+              ['Расходы', money(sumEx), `${exP.length} ${plural(exP.length, 'запись', 'записи', 'записей')}`],
               ['Остаётся', money(sumIn - tax - sumEx), 'после налога и расходов'],
             ].map(([k, v, n]) => (
               <Card key={k}>
@@ -157,7 +164,7 @@ export function Finance() {
                   const mine = incomes.filter((i) => i.receiver_id === f.id && i.paid_on >= year)
                   const got = mine.reduce((a, i) => a + i.amount, 0)
                   const share = got / limit
-                  const mTax = mine.filter((i) => i.paid_on >= from).reduce((a, i) => a + i.amount * rate(i), 0)
+                  const mTax = mine.filter((i) => inPeriod(i.paid_on)).reduce((a, i) => a + i.amount * rate(i), 0)
                   return (
                     <li key={f.id}>
                       <div className="mb-2 flex items-baseline justify-between gap-2">
@@ -312,7 +319,6 @@ export function Finance() {
           </Table>
         ))}
 
-      {tab === 'settings' && settings && <SettingsCard s={settings} />}
 
       <IncomeModal value={editI} onClose={() => setEditI(null)} onSaved={load} founders={founders} />
       <ExpenseModal value={editE} onClose={() => setEditE(null)} onSaved={load} founders={founders} />
@@ -486,42 +492,5 @@ function ExpenseModal({ value, onClose, onSaved, founders }: { value: Partial<Ex
         </Field>
       </div>
     </Modal>
-  )
-}
-
-function SettingsCard({ s }: { s: Settings }) {
-  const { reload } = useData()
-  const [d, setD] = useState(s)
-  const dirty = JSON.stringify(d) !== JSON.stringify(s)
-  const num = (k: Exclude<keyof Settings, 'agency_name'>, label: string, hint?: string) => (
-    <Field label={label} hint={hint}>
-      <Input inputMode="numeric" className="num" value={d[k]} onChange={(e) => setD({ ...d, [k]: parseNumber(e.target.value) ?? 0 })} />
-    </Field>
-  )
-  return (
-    <Card className={cx('max-w-2xl')} onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')}>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {num('default_markup_pct', 'Наценка по умолчанию, %', 'Подставляется в новые кампании')}
-        {num('ord_deadline_days', 'Срок сдачи статистики в ОРД, дней', 'После конца месяца первого показа')}
-        {num('tax_org_pct', 'Налог с оплат организаций и ИП, %')}
-        {num('tax_person_pct', 'Налог с оплат физлиц, %')}
-        {num('income_limit', 'Годовой лимит дохода, ₽', 'Для самозанятого 2 400 000 ₽')}
-      </div>
-      <p className="mt-4 text-[13px] text-muted">При переходе на ИП с УСН поставьте обе ставки 6% и увеличьте лимит</p>
-      <Button
-        variant="primary"
-        data-save
-        className="mt-4"
-        disabled={!dirty}
-        onClick={async () => {
-          const { error } = await supabase.from('settings').update({ default_markup_pct: d.default_markup_pct, ord_deadline_days: d.ord_deadline_days, tax_org_pct: d.tax_org_pct, tax_person_pct: d.tax_person_pct, income_limit: d.income_limit }).eq('id', true)
-          if (error) return toast(error.message)
-          await reload('settings')
-          toast('Настройки сохранены')
-        }}
-      >
-        Сохранить настройки
-      </Button>
-    </Card>
   )
 }

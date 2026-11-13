@@ -6,7 +6,7 @@ import { useData } from '../lib/data'
 import { nickFromUrl, parseNumber, platformFromUrl, plural } from '../lib/format'
 import type { AgeSplit, Blogger } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Modal, cx } from './ui'
+import { Button, Modal, Toggle, cx } from './ui'
 import { findExisting } from './BloggerForm'
 
 type Row = Partial<Blogger> & { nick: string; platform: Blogger['platform'] }
@@ -122,8 +122,9 @@ function detect(sheetName: string, data: unknown[][], fileName: string): Sheet |
 }
 
 export function ImportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { reload } = useData()
+  const { reload, bloggers } = useData()
   const { profile } = useAuth()
+  const [refresh, setRefresh] = useState(true)
   const [file, setFile] = useState<string | null>(null)
   const [sheets, setSheets] = useState<Sheet[] | null>(null)
   const [taken, setTaken] = useState<Map<string, string>>(new Map())
@@ -153,9 +154,34 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
   const uniq = new Map((sheets ?? []).filter((s) => s.include).flatMap((s) => s.rows).map((r) => [key(r), r]))
   const fresh = [...uniq.entries()].filter(([k]) => !taken.has(k)).map(([, r]) => r)
   const owners = [...new Set([...uniq.keys()].filter((k) => taken.has(k)).map((k) => taken.get(k)!))]
+  // уже в базе и видны вам: у них можно обновить цифры из файла
+  const mine = new Map(bloggers.map((b) => [key(b), b]))
+  const known = [...uniq.entries()].filter(([k]) => mine.has(k)).map(([k, r]) => ({ id: mine.get(k)!.id, r }))
+  const STATS = ['followers', 'avg_reach', 'clip_views', 'price', 'audience_female_pct', 'audience_age', 'topic', 'content_type', 'contact', 'city', 'age', 'url', 'name'] as const
+
+  async function update() {
+    let n = 0
+    for (let i = 0; i < known.length; i += 20) {
+      const res = await Promise.all(
+        known.slice(i, i + 20).map(({ id, r }) => {
+          // пустые ячейки файла не затирают то, что уже есть в карточке
+          const patch = Object.fromEntries(STATS.filter((k) => r[k] !== null && r[k] !== undefined && r[k] !== '').map((k) => [k, r[k]]))
+          return Object.keys(patch).length ? supabase.from('bloggers').update(patch).eq('id', id) : Promise.resolve({ error: null })
+        }),
+      )
+      const err = res.find((x) => x.error)?.error
+      if (err) {
+        toast(`Обновление остановлено: ${err.message}`)
+        return n
+      }
+      n += res.length
+    }
+    return n
+  }
 
   async function run() {
     setBusy(true)
+    const updated = refresh && known.length ? await update() : 0
     for (let i = 0; i < fresh.length; i += 300) {
       const { error } = await supabase.from('bloggers').upsert(
         fresh.slice(i, i + 300).map((r) => ({ ...r, owner_id: profile?.id })),
@@ -168,7 +194,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
     }
     await reload('bloggers')
     setBusy(false)
-    toast(`Добавлено: ${fresh.length} ${plural(fresh.length, 'блогер', 'блогера', 'блогеров')}`)
+    toast([fresh.length && `Добавлено: ${fresh.length} ${plural(fresh.length, 'блогер', 'блогера', 'блогеров')}`, updated && `обновлено: ${updated}`].filter(Boolean).join(', ') || 'Ничего не изменилось')
     close()
   }
 
@@ -191,8 +217,8 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
             <Button variant="ghost" onClick={() => setSheets(null)}>
               Другой файл
             </Button>
-            <Button variant="primary" loading={busy} disabled={!fresh.length} onClick={run}>
-              {fresh.length ? `Добавить ${fresh.length} в базу` : 'Все уже в базе'}
+            <Button variant="primary" loading={busy} disabled={!fresh.length && !(refresh && known.length)} onClick={run}>
+              {fresh.length ? `Добавить ${fresh.length} в базу` : refresh && known.length ? `Обновить ${known.length}` : 'Все уже в базе'}
             </Button>
           </>
         )
@@ -217,7 +243,10 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
         <p className="text-muted">В файле «{file}» не нашлось листов с никами или ссылками на профили</p>
       ) : (
         <div className="space-y-2">
-          <p className="text-muted">Вы станете ответственным за новых блогеров. Тех, кто уже есть в базе{owners.length ? ` (ответственные: ${owners.join(', ')})` : ''}, пропускаем</p>
+          <p className="text-muted">Вы станете ответственным за новых блогеров. Тех, кто уже есть в базе{owners.length ? ` (ответственные: ${owners.join(', ')})` : ''}, заново не добавляем</p>
+          {known.length > 0 && (
+            <Toggle checked={refresh} onChange={setRefresh} label={`Обновить цифры у тех, кто уже есть: ${known.length}. Пустые ячейки файла данные не стирают`} />
+          )}
           {sheets.map((s, i) => {
             const n = s.rows.filter((r) => !taken.has(key(r))).length
             return (

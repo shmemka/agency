@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -24,6 +24,7 @@ export function Calendar() {
   const { integrations, tasks, campaigns, settings, blogger } = useData()
   const { profile, isAdmin, team } = useAuth()
   const { open } = useIntegrationPanel()
+  const navigate = useNavigate()
   const [sp, setSp] = useSearchParams()
   const [cursor, setCursor] = useState(() => {
     const d = new Date()
@@ -38,6 +39,7 @@ export function Calendar() {
     setSp(p, { replace: true })
   }
   const today = todayISO()
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   const events = useMemo(() => {
     const out: Ev[] = []
@@ -54,11 +56,11 @@ export function Calendar() {
       for (const t of tasks) {
         if (!t.due_date || t.done_at) continue
         if (owner ? t.assignee_id !== owner : t.assignee_id !== profile?.id && !isAdmin) continue
-        out.push({ key: `t${t.id}`, day: t.due_date, text: t.title, dot: 'bg-ink', onClick: t.integration_id ? () => open(t.integration_id) : undefined })
+        out.push({ key: `t${t.id}`, day: t.due_date, text: t.title, dot: 'bg-ink', onClick: () => navigate(`/tasks/${t.id}`) })
       }
     }
     return out
-  }, [integrations, tasks, settings, cid, owner, blogger, open, profile?.id, isAdmin])
+  }, [integrations, tasks, settings, cid, owner, blogger, open, navigate, profile?.id, isAdmin])
 
   const byDay = useMemo(() => {
     const m = new Map<string, Ev[]>()
@@ -142,8 +144,12 @@ export function Calendar() {
             return (
               <div key={k} className={cx('min-h-28 border-t border-l border-line p-1.5 first:border-l-0 [&:nth-child(7n+1)]:border-l-0', out && 'bg-soft/60')}>
                 <div className={cx('mb-1 flex size-6 items-center justify-center rounded-full text-xs', k === today ? 'bg-ink text-white' : out ? 'text-faint' : 'text-muted')}>{d.getDate()}</div>
-                {evs.slice(0, 3).map((e) => item(e))}
-                {evs.length > 3 && <div className="px-1.5 text-xs text-faint">ещё {evs.length - 3}</div>}
+                {(expanded === k ? evs : evs.slice(0, 3)).map((e) => item(e))}
+                {evs.length > 3 && (
+                  <button onClick={() => setExpanded(expanded === k ? null : k)} className="w-full rounded-full px-1.5 text-left text-xs text-muted hover:bg-soft hover:text-ink">
+                    {expanded === k ? 'свернуть' : `ещё ${evs.length - 3}`}
+                  </button>
+                )}
               </div>
             )
           })}

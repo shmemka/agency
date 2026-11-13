@@ -9,7 +9,7 @@ import { Layout } from './components/Layout'
 import { Spinner, ToastHost } from './components/ui'
 import { DialogHost } from './components/dialogs'
 import { TooltipHost } from './components/Tooltip'
-import { Login, NotConfigured, Pending } from './pages/Login'
+import { Login, NewPassword, NotConfigured, Pending } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
 import { Bloggers } from './pages/Bloggers'
 import { Integrations } from './pages/Integrations'
@@ -26,7 +26,7 @@ import { Profile } from './pages/Profile'
 import { Settings } from './pages/Settings'
 
 function Gate() {
-  const { session, profile, loading, isAdmin } = useAuth()
+  const { session, profile, loading, isAdmin, recovery, endRecovery } = useAuth()
   if (loading)
     return (
       <div className="flex h-full items-center justify-center">
@@ -34,6 +34,7 @@ function Gate() {
       </div>
     )
   if (!session) return <Login />
+  if (recovery) return <NewPassword onDone={endRecovery} />
   if (!profile?.is_active) return <Pending />
   return (
     <DataProvider>
@@ -68,6 +69,8 @@ createRoot(document.getElementById('root')!).render(
           {/* страницы для клиента: без входа, по ссылке */}
           <Route path="/s/:token" element={<Share />} />
           <Route path="/o/:token" element={<OfferPage />} />
+          <Route path="/s" element={<Share />} />
+          <Route path="/o" element={<OfferPage />} />
           <Route
             path="*"
             element={

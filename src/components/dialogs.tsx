@@ -150,3 +150,7 @@ function Dialog({ req, done }: { req: Pending; done: (v: unknown) => void }) {
     document.body,
   )
 }
+
+/** Закрыть без сохранения? true — можно закрывать */
+export const confirmDiscard = () =>
+  confirmDialog({ title: 'Закрыть без сохранения?', body: 'Изменения, которые вы не сохранили, пропадут', ok: 'Закрыть', cancel: 'Остаться', danger: true })

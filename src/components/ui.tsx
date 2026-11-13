@@ -1,4 +1,4 @@
-import { Children, isValidElement, useEffect, useRef, useState, type ButtonHTMLAttributes, type ComponentProps, type HTMLAttributes, type ReactNode } from 'react'
+import { Children, isValidElement, useEffect, useRef, useState, type ButtonHTMLAttributes, type ComponentProps, type HTMLAttributes, type ReactNode, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Check, ChevronDown, ChevronLeft, Loader2, X } from 'lucide-react'
 import { BLOGGER_STATUSES, PHASES, STATUSES, STATUS_ORDER, bloggerStatusInfo, nextStatus, phaseInfo, statusInfo, type BloggerStatus, type Status } from '../lib/constants'
@@ -318,7 +318,7 @@ export function FieldGroup({ title, children, className }: { title: string; chil
   )
 }
 
-export function Field({ label, hint, children, className }: { label: string; hint?: string; children: ReactNode; className?: string }) {
+export function Field({ label, hint, children, className }: { label: string; hint?: ReactNode; children: ReactNode; className?: string }) {
   return (
     <label className={cx('block', className)}>
       <span className="mb-1 block text-[13px] text-muted">{label}</span>
@@ -658,19 +658,24 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
 }
 
 /** Боковая панель; на телефоне — экран целиком с кнопкой «Назад» */
-export function Drawer({ onClose, children, label }: { onClose: () => void; children: ReactNode; label: string }) {
+export function Drawer({ onClose, children, label, beforeClose }: { onClose: () => void; children: ReactNode; label: string; beforeClose?: () => Promise<boolean> | boolean }) {
+  // beforeClose спрашивает, можно ли закрыть: например, когда есть несохранённые правки
+  const close = useCallback(async () => {
+    if (beforeClose && !(await beforeClose())) return
+    onClose()
+  }, [beforeClose, onClose])
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !document.querySelector('[role=dialog][aria-modal=true]')) onClose()
+      if (e.key === 'Escape' && !document.querySelector('[role=dialog][aria-modal=true]')) close()
     }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
-  }, [onClose])
+  }, [close])
   return createPortal(
     <div className="fixed inset-0 z-50">
-      <div className="fade absolute inset-0 hidden bg-ink/25 md:block" onClick={onClose} />
+      <div className="fade absolute inset-0 hidden bg-ink/25 md:block" onClick={close} />
       <aside role="complementary" aria-label={label} onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')} className="slide absolute inset-0 flex flex-col overflow-y-auto bg-canvas md:inset-y-3 md:right-3 md:left-auto md:w-[720px] md:rounded-card md:shadow-[0_8px_24px_rgba(21,23,28,0.1)]">
-        <button onClick={onClose} className="flex h-12 shrink-0 items-center gap-1 px-3 text-muted md:hidden">
+        <button onClick={close} className="flex h-12 shrink-0 items-center gap-1 px-3 text-muted md:hidden">
           <ChevronLeft className="size-5" strokeWidth={1.5} />
           Назад
         </button>

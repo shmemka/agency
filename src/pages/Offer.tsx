@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { BadgeCheck, Check, FileCheck2, Handshake, Repeat, Target, TrendingUp, UserRound, Zap } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { AGENCY } from '../lib/constants'
@@ -20,28 +20,28 @@ interface Data {
 /** Слова под площадку: в TikTok и YouTube — ролики, во VK и Telegram — посты */
 const words = (p: Platform) => (p === 'tiktok' || p === 'youtube' ? { one: 'ролик', make: 'снять ролик' } : { one: 'пост', make: 'выложить пост' })
 
+// Только то, что агентство действительно выполняет на старте: блогеру платит бренд, сроки фиксируются в договоре
 const STATS = [
-  ['140+', 'интеграций уже вышло'],
-  ['60+', 'брендов работают с нами'],
-  ['3 дня', 'на выплату после выхода'],
   ['0 ₽', 'комиссия для блогера'],
+  ['100%', 'выходов с маркировкой через ОРД'],
+  ['1', 'менеджер на все вопросы'],
+  ['1 день', 'на ответ менеджера'],
 ]
 
 const PERKS = [
   { icon: Target, title: 'Бренды под твою аудиторию', text: 'Предлагаем только тех рекламодателей, которые зайдут твоим зрителям. Не нравится бренд — просто отказываешься' },
   { icon: Zap, title: 'ТЗ без воды', text: 'Короткий бриф: что сказать, что показать и к какому сроку. Подачу придумываешь ты, это твой стиль' },
-  { icon: FileCheck2, title: 'Документы и маркировка на нас', text: 'Договор, акты, ОРД и erid оформляем сами. Никаких штрафов за немаркированную рекламу' },
-  { icon: UserRound, title: 'Личный менеджер', text: 'Один человек ведёт тебя от первого сообщения до отчёта и отвечает в течение часа' },
-  { icon: Repeat, title: 'Заказы каждый месяц', text: 'Если интеграция зашла, возвращаемся с новыми брендами. Постоянные блогеры не ищут рекламу сами' },
-  { icon: TrendingUp, title: 'Цена растёт вместе с тобой', text: 'Показываем брендам твою статистику и прошлые кейсы, чтобы ставка поднималась с каждым выходом' },
+  { icon: FileCheck2, title: 'Маркировка на нас', text: 'Регистрируем креатив в ОРД и выдаём erid. Помогаем с договором и актом, чтобы не было штрафов' },
+  { icon: UserRound, title: 'Личный менеджер', text: 'Один человек ведёт тебя от первого сообщения до отчёта и отвечает в течение рабочего дня' },
+  { icon: Repeat, title: 'Новые бренды после удачного выхода', text: 'Если интеграция зашла, возвращаемся с новыми предложениями, когда появляется подходящий рекламодатель' },
+  { icon: TrendingUp, title: 'Цена растёт вместе с тобой', text: 'Показываем брендам твою статистику и прошлые выходы, чтобы ставка поднималась' },
 ]
 
 const TERMS = [
   ['Твоя цена', 'Называешь сам, мы её не урезаем. Нашу комиссию платит бренд'],
-  ['Оплата', 'Бренд вносит 100% предоплату до старта, поэтому деньги гарантированы'],
-  ['Выплата', 'В течение 3 рабочих дней после выхода интеграции'],
+  ['Оплата', 'Бренд платит тебе по договору. Сумму, предоплату и сроки фиксируем до старта, а не после выхода'],
   ['Эксклюзив', 'Не нужен. Работай с кем хочешь, без абонентской платы'],
-  ['Оформление', 'Самозанятость или ИП. Нет самозанятости — поможем оформить за 10 минут'],
+  ['Оформление', 'Самозанятость или ИП. Нет самозанятости — поможем оформить, это делается в приложении «Мой налог»'],
   ['Отчёт', 'Скрин статистики через 3 дня после выхода, и всё'],
 ]
 
@@ -57,7 +57,9 @@ function Logo({ name }: { name: string }) {
 }
 
 export function OfferPage() {
-  const { token = '' } = useParams()
+  const params = useParams()
+  const [sp] = useSearchParams()
+  const token = params.token ?? sp.get('t') ?? ''
   const [d, setD] = useState<Data | null>(null)
   const [state, setState] = useState<'loading' | 'ok' | 'missing'>('loading')
   const [contact, setContact] = useState('')
@@ -85,7 +87,9 @@ export function OfferPage() {
     setErr('')
     const { data, error } = await supabase.rpc('reply_offer', { p_token: token, p_contact: contact, p_text: text })
     setBusy(false)
-    if (error || (data as { error?: string })?.error) return setErr('Не получилось отправить. Попробуй ещё раз через минуту')
+    const code = (data as { error?: string })?.error
+    if (code === 'too_often') return setErr('Отклик уже у нас. Отправить ещё раз можно через минуту')
+    if (error || code) return setErr('Не получилось отправить. Попробуй ещё раз через минуту')
     setSent(true)
   }
 
@@ -135,7 +139,7 @@ export function OfferPage() {
             {d.nick}, давай делать рекламу вместе
           </h1>
           <p className="mt-5 max-w-xl text-[15px] leading-6 text-white/70 sm:text-[17px] sm:leading-7">
-            Мы {agency}, агентство рекламы у блогеров. Приводим бренды, которым подходит твоя аудитория, и забираем всю рутину: договор, маркировку, оплату. Тебе остаётся {w.make}.
+            Мы {agency}, агентство рекламы у блогеров. Приводим бренды, которым подходит твоя аудитория, и забираем рутину: переговоры, маркировку и документы. Тебе остаётся {w.make}.
           </p>
           <div className="mt-8 flex flex-wrap gap-2">
             <button onClick={toForm} className="h-12 rounded-full bg-lime px-6 text-[15px] font-medium text-ink transition-transform duration-150 hover:bg-lime/90 active:scale-[0.98]">
@@ -193,8 +197,8 @@ export function OfferPage() {
         <ol className="mt-6 grid gap-3 sm:grid-cols-3">
           {[
             ['Откликаешься', 'Оставляешь контакт внизу этой страницы. Это ни к чему не обязывает'],
-            [`Пишет ${manager}`, 'В течение дня. Обсуждаем цену, форматы и темы, которые тебе интересны'],
-            ['Первый бренд', `Присылаем рекламодателя с готовым ТЗ. Ты делаешь ${w.one}, мы платим`],
+            [`Пишет ${manager}`, 'В течение рабочего дня. Обсуждаем цену, форматы и темы, которые тебе интересны'],
+            ['Первый бренд', `Присылаем рекламодателя с готовым ТЗ. Ты делаешь ${w.one}, бренд платит по договору`],
           ].map(([t, x], i) => (
             <li key={t} className="rounded-card bg-surface p-6">
               <span className="num flex size-8 items-center justify-center rounded-full bg-ink text-[13px] text-white">{i + 1}</span>

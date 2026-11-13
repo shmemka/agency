@@ -9,7 +9,7 @@ import type { Task, TaskComment, TaskFile } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Avatar, Button, Drawer, IconButton, Select, Spinner, Textarea, cx } from './ui'
 import { DateInput } from './DateInput'
-import { confirmDialog } from './dialogs'
+import { confirmDialog, confirmDiscard } from './dialogs'
 
 export const TASK_BUCKET = 'task-files'
 
@@ -164,11 +164,21 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
     loadFiles()
   }
 
+  // перед закрытием дописываем название и описание, а недописанный комментарий не теряем молча
+  const guard = async () => {
+    await saveTitle()
+    await saveDesc()
+    return !text.trim() || (await confirmDiscard())
+  }
+  const closeSafe = async () => {
+    if (await guard()) onClose()
+  }
+
   const done = Boolean(task.done_at)
   const sectionId = task.section_id && sections.some((s) => s.id === task.section_id) ? task.section_id : (sections[0]?.id ?? '')
 
   return (
-    <Drawer onClose={onClose} label={`Задача: ${task.title}`}>
+    <Drawer onClose={onClose} beforeClose={guard} label={`Задача: ${task.title}`}>
       <div
         className="relative flex flex-1 flex-col gap-3 p-3 md:p-4"
         onDragOver={(e) => {
@@ -210,7 +220,7 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
                 <Trash2 className="size-4" strokeWidth={1.5} />
               </IconButton>
             )}
-            <IconButton label="Закрыть" onClick={onClose} className="hidden size-8 md:inline-flex">
+            <IconButton label="Закрыть" onClick={closeSafe} className="hidden size-8 md:inline-flex">
               <X className="size-4" strokeWidth={1.5} />
             </IconButton>
           </div>

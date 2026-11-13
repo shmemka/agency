@@ -123,7 +123,8 @@ function BellButton() {
 
 export function Layout() {
   const { profile, signOut, isAdmin, team } = useAuth()
-  const { tasks } = useData()
+  const { tasks, settings } = useData()
+  const agency = settings?.agency_name?.trim() || AGENCY
   const { openId, open } = useIntegrationPanel()
   const loc = useLocation()
   const [more, setMore] = useState(false)
@@ -139,7 +140,7 @@ export function Layout() {
       <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col p-4 md:flex">
         <div className="flex items-center gap-2.5 px-2 pt-1 pb-6">
           <Mark />
-          <span className="flex-1 text-[15px] leading-5 font-medium">{AGENCY}</span>
+          <span className="flex-1 text-[15px] leading-5 font-medium">{agency}</span>
           <BellButton />
         </div>
         <nav className="flex-1 space-y-0.5" aria-label="Разделы">
@@ -162,7 +163,7 @@ export function Layout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="no-print sticky top-0 z-30 flex h-14 items-center gap-2.5 bg-canvas/90 px-4 backdrop-blur md:hidden">
           <Mark />
-          <span className="flex-1 text-[15px] font-medium">{current?.label ?? AGENCY}</span>
+          <span className="flex-1 text-[15px] font-medium">{current?.label ?? (loc.pathname.startsWith('/profile') ? 'Мой профиль' : loc.pathname.startsWith('/settings') ? 'Настройки' : agency)}</span>
           <BellButton />
         </header>
         <main className="mx-auto w-full max-w-[1480px] flex-1 px-4 pt-2 pb-28 md:px-6 md:pt-8 md:pb-10">

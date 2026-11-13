@@ -14,7 +14,7 @@ import { BloggerFields, NewIntegrationModal, cleanBlogger, type BloggerDraft } f
 import { DocumentsPanel } from './DocumentsPanel'
 import { Feed } from './Feed'
 import { OfferCard, tgUsername } from './OfferCard'
-import { confirmDialog, promptDialog } from './dialogs'
+import { confirmDialog, confirmDiscard, promptDialog } from './dialogs'
 
 type Tab = 'work' | 'data' | 'docs'
 
@@ -59,6 +59,10 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
   const dirty = d !== null && JSON.stringify(cleanBlogger(d)) !== JSON.stringify(cleanBlogger(b))
   const c = cpm(b.price, b.avg_reach)
   const tg = tgUsername(b.contact)
+  const guard = async () => !dirty || (await confirmDiscard())
+  const closeSafe = async () => {
+    if (await guard()) onClose()
+  }
 
   async function save() {
     if (!d?.nick?.trim()) return toast('Ник не может быть пустым')
@@ -80,7 +84,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
   }
 
   return (
-    <Drawer onClose={onClose} label={`Карточка ${b.nick}`}>
+    <Drawer onClose={onClose} beforeClose={guard} label={`Карточка ${b.nick}`}>
       <div className="flex flex-col gap-3 p-3 md:p-4">
         <Card>
           <div className="flex items-start gap-2">
@@ -99,7 +103,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
               </IconButton>
             )}
             <span className="hidden md:block">
-              <IconButton label="Закрыть" onClick={onClose}>
+              <IconButton label="Закрыть" onClick={closeSafe}>
                 <X className="size-[18px]" strokeWidth={1.5} />
               </IconButton>
             </span>
