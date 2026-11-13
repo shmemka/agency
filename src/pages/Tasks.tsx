@@ -218,6 +218,8 @@ export function Tasks() {
   const [counts, setCounts] = useState<Counts>({})
   const [local, setLocal] = useState<Record<string, Partial<Task>>>({})
   const [drag, setDrag] = useState<string | null>(null)
+  const [dragCol, setDragCol] = useState<string | null>(null)
+  const [colOver, setColOver] = useState<number | null>(null)
   const [over, setOver] = useState<{ s: string; i: number } | null>(null)
   const [adding, setAdding] = useState<string | null>(null)
   // исполнитель и срок новой задачи: по умолчанию — вы и без срока, сохраняются для следующей задачи подряд
@@ -297,14 +299,36 @@ export function Tasks() {
     await reload('task_sections')
   }
 
-  async function moveSection(s: TaskSection, dir: -1 | 1) {
-    const i = sections.findIndex((x) => x.id === s.id)
-    const other = sections[i + dir]
-    if (!other) return
-    await Promise.all([
-      supabase.from('task_sections').update({ position: other.position }).eq('id', s.id),
-      supabase.from('task_sections').update({ position: s.position }).eq('id', other.id),
-    ])
+  // колонки переставляются перетаскиванием за шапку: место считаем по середине соседних колонок
+  function colDragOver(e: React.DragEvent<HTMLDivElement>) {
+    if (!dragCol) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    const cols = [...e.currentTarget.querySelectorAll<HTMLElement>('[data-col]')]
+    let i = cols.length
+    for (let k = 0; k < cols.length; k++) {
+      const r = cols[k].getBoundingClientRect()
+      if (e.clientX < r.left + r.width / 2) {
+        i = k
+        break
+      }
+    }
+    if (colOver !== i) setColOver(i)
+  }
+
+  async function colDrop() {
+    const s = sections.find((x) => x.id === dragCol)
+    const at = colOver
+    setDragCol(null)
+    setColOver(null)
+    if (!s || at === null) return
+    const from = sections.indexOf(s)
+    const rest = sections.filter((x) => x.id !== s.id)
+    const i = at > from ? at - 1 : at
+    if (i === from) return
+    const position = between(rest[i - 1]?.position, rest[i]?.position)
+    const { error } = await supabase.from('task_sections').update({ position }).eq('id', s.id)
+    if (error) toast(error.message)
     await reload('task_sections')
   }
 
@@ -387,7 +411,15 @@ export function Tasks() {
         </div>
       ) : (
         <div className="-mx-4 overflow-x-auto px-4 pb-4 md:-mx-6 md:px-6">
-          <div className="flex snap-x snap-mandatory items-start gap-3 md:snap-none">
+          <div
+            className="flex snap-x snap-mandatory items-start gap-3 md:snap-none"
+            onDragOver={colDragOver}
+            onDrop={(e) => {
+              if (!dragCol) return
+              e.preventDefault()
+              colDrop()
+            }}
+          >
             {sections.map((s, si) => {
               const list = byCol(s.id)
               const shown = list.filter((t) => t.id !== drag)
@@ -395,15 +427,37 @@ export function Tasks() {
                 // заголовок и карточки на одной подложке; бросить карточку можно в любое место колонки
                 <div
                   key={s.id}
+                  data-col={s.id}
                   onDragOver={(e) => dragOver(e, s.id)}
                   onDrop={(e) => {
                     e.preventDefault()
                     drop(s.id)
                   }}
-                  className={cx('w-[85vw] max-w-[300px] shrink-0 snap-start rounded-card p-2 transition-colors duration-150 md:w-[300px]', over?.s === s.id ? 'bg-lime/25' : 'bg-ink/[0.035]')}
+                  className={cx(
+                    'relative w-[85vw] max-w-[300px] shrink-0 snap-start rounded-card p-2 transition-[background-color,opacity] duration-150 md:w-[300px]',
+                    over?.s === s.id ? 'bg-lime/25' : 'bg-ink/[0.035]',
+                    dragCol === s.id && 'opacity-40',
+                  )}
                 >
-                  {/* заголовок колонки */}
-                  <div className="flex h-10 items-center gap-2 pl-3">
+                  {/* куда встанет перетаскиваемая колонка */}
+                  {dragCol && colOver === si && dragCol !== s.id && <span aria-hidden className="absolute inset-y-2 -left-2 w-1 rounded-full bg-ink/70" />}
+                  {dragCol && colOver === sections.length && si === sections.length - 1 && <span aria-hidden className="absolute inset-y-2 -right-2 w-1 rounded-full bg-ink/70" />}
+                  {/* заголовок колонки: за него колонку можно перетащить */}
+                  <div
+                    className={cx('flex h-10 items-center gap-2 pl-3', renaming !== s.id && 'cursor-grab active:cursor-grabbing')}
+                    draggable={renaming !== s.id}
+                    onDragStart={(e) => {
+                      if (drag) return
+                      e.stopPropagation()
+                      e.dataTransfer.setData('text/plain', s.id)
+                      e.dataTransfer.effectAllowed = 'move'
+                      setDragCol(s.id)
+                    }}
+                    onDragEnd={() => {
+                      setDragCol(null)
+                      setColOver(null)
+                    }}
+                  >
                     {renaming === s.id ? (
                       // поле стоит ровно на месте названия: тот же шрифт и отступ, белая капсула вместо рамки
                       <div className="-ml-3 min-w-0 flex-1">
@@ -434,14 +488,10 @@ export function Tasks() {
                           title={`Колонка «${s.name}»`}
                           options={[
                             { id: 'rename', label: 'Переименовать' },
-                            ...(si > 0 ? [{ id: 'left', label: 'Сдвинуть влево' }] : []),
-                            ...(si < sections.length - 1 ? [{ id: 'right', label: 'Сдвинуть вправо' }] : []),
                             ...(sections.length > 1 ? [{ id: 'delete', label: 'Удалить колонку' }] : []),
                           ]}
                           onChange={(v) => {
                             if (v === 'rename') setRenaming(s.id)
-                            if (v === 'left') moveSection(s, -1)
-                            if (v === 'right') moveSection(s, 1)
                             if (v === 'delete') deleteSection(s)
                           }}
                           trigger={
