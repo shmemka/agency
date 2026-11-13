@@ -189,7 +189,9 @@ export function TaskList({ tasks, scope, showDone, empty, noForm }: { tasks: Tas
                   {t.done_at && <Check className="size-3.5" strokeWidth={2} />}
                 </button>
                 <div className="min-w-0 flex-1">
-                  <div className={cx(t.done_at && 'text-faint line-through')}>{t.title}</div>
+                  <Link to={`/tasks/${t.id}`} className={cx('block hover:underline', t.done_at && 'text-faint line-through')}>
+                    {t.title}
+                  </Link>
                   <div className="flex flex-wrap gap-x-3 text-xs text-muted">
                     {due && !t.done_at && <span className={cx(due.tone === 'bad' && 'text-bad', due.tone === 'warn' && 'text-warn')}>{due.text}</span>}
                     {b && (

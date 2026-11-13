@@ -50,11 +50,14 @@ body {
   }
 }
 
-input,
-select,
-textarea,
-button {
-  font: inherit;
+/* в base-слое: иначе размер шрифта из классов Tailwind на полях и кнопках не срабатывает */
+@layer base {
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+  }
 }
 
 /* Системные элементы в фирменном стиле. В base-слое, чтобы классы Tailwind их перебивали */

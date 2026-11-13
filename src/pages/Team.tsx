@@ -1,3 +1,4 @@
+import { Lock } from 'lucide-react'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
@@ -6,7 +7,7 @@ import { isActive } from '../lib/rules'
 import { date } from '../lib/format'
 import type { Profile } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Button, Card, Chip, Field, Modal, PageHeader, Select, Table } from '../components/ui'
+import { Avatar, Button, Card, Field, Modal, PageHeader, Select, Table } from '../components/ui'
 
 export function Team() {
   const { team, profile, isAdmin, reloadTeam } = useAuth()
@@ -97,7 +98,10 @@ export function Team() {
                     <option value="admin">Учредитель</option>
                   </Select>
                 ) : (
-                  <Chip tone={p.role === 'admin' ? 'dark' : undefined}>{p.role === 'admin' ? 'Учредитель' : 'Специалист'}</Chip>
+                  <span className="flex h-10 w-40 items-center gap-2 rounded-2xl bg-soft pr-3 pl-4 text-sm" title={self ? 'Свою роль поменять нельзя' : 'Роль меняют учредители'}>
+                    <span className="min-w-0 flex-1 truncate">{p.role === 'admin' ? 'Учредитель' : 'Специалист'}</span>
+                    <Lock className="size-4 shrink-0 text-faint" strokeWidth={1.5} />
+                  </span>
                 )}
               </td>
               <td className="num text-right">{isAdmin || self ? count(p.id) : '—'}</td>

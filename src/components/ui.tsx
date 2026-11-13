@@ -403,12 +403,14 @@ export function Menu<T extends string>({
   onChange,
   trigger,
   title,
+  chevron = true,
 }: {
   value: T
   options: { id: T; label: string; dot?: string; group?: string }[]
   onChange: (v: T) => void
   trigger: ReactNode
   title: string
+  chevron?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const btn = useRef<HTMLButtonElement>(null)
@@ -468,7 +470,7 @@ export function Menu<T extends string>({
         }}
       >
         {trigger}
-        <ChevronDown className="size-3.5 text-faint opacity-60 group-hover:opacity-100" strokeWidth={1.5} />
+        {chevron && <ChevronDown className="size-3.5 text-faint opacity-60 group-hover:opacity-100" strokeWidth={1.5} />}
       </button>
       {open &&
         createPortal(

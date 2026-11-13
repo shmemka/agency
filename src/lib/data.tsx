@@ -4,10 +4,10 @@ import { useAuth } from '../auth/AuthProvider'
 import { statusInfo, type Status } from './constants'
 import { transitionWarnings, type DocLite } from './rules'
 import { toast } from './toast'
-import type { Blogger, Campaign, Client, Integration, Notice, Settings, ShareLink, Task } from './types'
+import type { Blogger, Campaign, Client, Integration, Notice, Settings, ShareLink, Task, TaskSection } from './types'
 import { confirmDialog } from '../components/dialogs'
 
-type TableName = 'bloggers' | 'integrations' | 'campaigns' | 'clients' | 'tasks' | 'notifications' | 'documents' | 'campaign_members' | 'share_links' | 'campaign_money' | 'settings'
+type TableName = 'bloggers' | 'integrations' | 'campaigns' | 'clients' | 'tasks' | 'task_sections' | 'notifications' | 'documents' | 'campaign_members' | 'share_links' | 'campaign_money' | 'settings'
 
 interface DataState {
   bloggers: Blogger[]
@@ -15,6 +15,7 @@ interface DataState {
   campaigns: Campaign[]
   clients: Client[]
   tasks: Task[]
+  sections: TaskSection[]
   notices: Notice[]
   docs: DocLite[]
   members: { campaign_id: string; profile_id: string }[]
@@ -46,6 +47,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     campaigns: [] as Campaign[],
     clients: [] as Client[],
     tasks: [] as Task[],
+    sections: [] as TaskSection[],
     notices: [] as Notice[],
     docs: [] as DocLite[],
     members: [] as { campaign_id: string; profile_id: string }[],
@@ -71,6 +73,11 @@ export function DataProvider({ children }: { children: ReactNode }) {
           return { clients: await q<Client>('clients', 'name', true) }
         case 'tasks':
           return { tasks: await q<Task>('tasks', 'created_at') }
+        case 'task_sections': {
+          // до миграции 008 таблицы нет: доска покажет подсказку, остальной сайт работает
+          const { data } = await supabase.from('task_sections').select('*').order('position')
+          return { sections: (data ?? []) as TaskSection[] }
+        }
         case 'notifications':
           return { notices: ((await supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(40)).data ?? []) as Notice[] }
         case 'documents':
@@ -105,7 +112,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
-    reload('bloggers', 'integrations', 'campaigns', 'clients', 'tasks', 'notifications', 'documents', 'campaign_members', 'share_links', 'campaign_money', 'settings').then(() => setLoading(false))
+    reload('bloggers', 'integrations', 'campaigns', 'clients', 'tasks', 'task_sections', 'notifications', 'documents', 'campaign_members', 'share_links', 'campaign_money', 'settings').then(() => setLoading(false))
   }, [reload])
 
   // живые обновления: изменения коллег и клиента приходят сами
@@ -115,7 +122,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       timers.current[t] = window.setTimeout(() => reload(t), 500)
     }
     let ch = supabase.channel('crm-live')
-    for (const t of ['bloggers', 'integrations', 'campaigns', 'tasks', 'notifications', 'documents'] as TableName[]) {
+    for (const t of ['bloggers', 'integrations', 'campaigns', 'tasks', 'task_sections', 'notifications', 'documents'] as TableName[]) {
       ch = ch.on('postgres_changes', { event: '*', schema: 'public', table: t }, later(t))
     }
     ch = ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity' }, () => setPulse((p) => p + 1))

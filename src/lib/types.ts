@@ -141,13 +141,42 @@ export interface Activity {
 export interface Task {
   id: string
   title: string
-  assignee_id: string
+  assignee_id: string | null
+  section_id: string | null
+  position: number
+  description: string | null
   due_date: string | null
   due_time: string | null
   blogger_id: string | null
   integration_id: string | null
   campaign_id: string | null
   done_at: string | null
+  created_by: string | null
+  created_at: string
+}
+
+export interface TaskSection {
+  id: string
+  name: string
+  position: number
+  created_at: string
+}
+
+export interface TaskComment {
+  id: string
+  task_id: string
+  author_id: string | null
+  body: string
+  created_at: string
+}
+
+export interface TaskFile {
+  id: string
+  task_id: string
+  name: string
+  storage_path: string
+  size: number | null
+  mime: string | null
   created_by: string | null
   created_at: string
 }

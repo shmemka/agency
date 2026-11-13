@@ -46,6 +46,7 @@ function Gate() {
           <Route path="campaigns" element={<Campaigns />} />
           <Route path="campaigns/:id" element={<CampaignPage />} />
           <Route path="tasks" element={<Tasks />} />
+          <Route path="tasks/:id" element={<Tasks />} />
           <Route path="calendar" element={<Calendar />} />
           <Route path="documents" element={<Documents />} />
           {isAdmin && <Route path="finance" element={<Finance />} />}
