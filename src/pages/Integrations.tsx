@@ -100,7 +100,7 @@ export function Integrations() {
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <div className="relative min-w-52 flex-1 sm:max-w-xs">
           <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-faint" strokeWidth={1.5} />
-          <Input className="bg-surface pl-10" placeholder="Ник, промокод, erid" value={q} onChange={(e) => set('q', e.target.value)} aria-label="Поиск" />
+          <Input className="rounded-full! bg-surface pl-10" placeholder="Ник, промокод, erid" value={q} onChange={(e) => set('q', e.target.value)} aria-label="Поиск" />
         </div>
         <Select value={cid} onChange={(e) => set('campaign', e.target.value)} tone="surface" className="w-56" aria-label="Кампания">
           <option value="">Все кампании</option>

@@ -240,3 +240,12 @@ input[type='search']::-webkit-search-decoration {
     break-inside: avoid;
   }
 }
+
+/* Белая вторичная кнопка без обводки. На белой карточке, в окне или панели она стала бы невидимой,
+   поэтому там она серая. Вне слоёв: должна перебить bg-surface самой кнопки */
+:is(.bg-surface, [role='dialog']) [data-variant='secondary'] {
+  background-color: var(--color-soft);
+}
+:is(.bg-surface, [role='dialog']) [data-variant='secondary']:hover:not(:disabled) {
+  background-color: color-mix(in oklab, var(--color-ink) 8%, transparent);
+}

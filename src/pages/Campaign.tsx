@@ -80,7 +80,7 @@ export function CampaignPage() {
         }
         actions={
           <>
-            <Link to={`/calendar?campaign=${c.id}`} className="inline-flex h-10 items-center gap-2 rounded-full bg-surface px-4 ring-1 ring-line hover:bg-soft">
+            <Link to={`/calendar?campaign=${c.id}`} className="inline-flex h-10 items-center gap-2 rounded-full bg-surface px-4 text-sm font-medium hover:bg-white/70">
               <CalendarDays className="size-4" strokeWidth={1.5} />
               Календарь
             </Link>

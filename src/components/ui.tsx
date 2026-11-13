@@ -29,7 +29,8 @@ export function Button({
         'inline-flex shrink-0 items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40',
         size === 'sm' ? 'h-8 px-3 text-[13px]' : 'h-10 px-4 text-sm',
         variant === 'primary' && 'bg-ink text-white hover:bg-ink/85',
-        variant === 'secondary' && 'bg-surface text-ink ring-1 ring-line hover:bg-soft',
+        // белая кнопка без обводки; внутри белых карточек и окон она серая (см. index.css)
+        variant === 'secondary' && 'bg-surface text-ink hover:bg-white/70',
         variant === 'ghost' && 'text-muted hover:bg-ink/5 hover:text-ink',
         variant === 'danger' && 'text-bad hover:bg-bad/10',
         className,
@@ -270,7 +271,9 @@ export function Select({
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={onKey}
         className={cx(
-          'flex h-10 w-full items-center gap-2 rounded-2xl pr-3 pl-4 text-left text-sm transition-[background-color,box-shadow] duration-150 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-10 w-full items-center gap-2 pr-3 pl-4 text-left text-sm transition-[background-color,box-shadow] duration-150 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
+          // фильтры на фоне страницы и в тёмной панели — капсулы; поля внутри карточек — со скруглением 16
+          tone === 'field' ? 'rounded-2xl' : 'rounded-full',
           tone === 'field' && 'bg-soft text-ink hover:bg-ink/[0.06] focus-visible:ring-ink/25',
           tone === 'surface' && 'bg-surface text-ink hover:bg-white/70 focus-visible:ring-ink/25',
           tone === 'dark' && 'bg-white/15 text-white hover:bg-white/25 focus-visible:ring-white/50',
