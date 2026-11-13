@@ -70,6 +70,9 @@ function InlineInput({ initial = '', placeholder, onSave, onCancel, multiline, k
   )
 }
 
+/** Срок заходит на аватар исполнителя (белое кольцо отделяет их) и отъезжает при наведении на пару */
+const PAIR = 'rounded-full ring-2 ring-surface -ml-2.5 transition-[margin] duration-200 ease-out group-hover/pair:ml-1.5 group-focus-within/pair:ml-1.5'
+
 const MONTH = ['янв', 'фев', 'мар', 'апр', 'май', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек']
 /** Сколько дней до срока считается «далеко»: дальше кольцо полное */
 const RING_DAYS = 14
@@ -103,9 +106,10 @@ function AssigneePicker({ value, onChange }: { value: string | null; onChange: (
  * Срок: пустой — пунктир с календарём; выбран — число и месяц.
  * Кольцо вокруг тает к дедлайну: за 14+ дней полное, в день срока исчезает, просрочено — красное
  */
-function DuePicker({ value, onChange, done }: { value: string | null; onChange: (v: string | null) => void; done?: boolean }) {
+function DuePicker({ value, onChange, done, className }: { value: string | null; onChange: (v: string | null) => void; done?: boolean; className?: string }) {
   return (
     <DateInput
+      className={className}
       value={value}
       onChange={onChange}
       aria-label="Срок"
@@ -113,7 +117,7 @@ function DuePicker({ value, onChange, done }: { value: string | null; onChange: 
       trigger={(sel) => {
         if (!sel || !value)
           return (
-            <span className="flex size-8 items-center justify-center rounded-full border border-dashed border-ink/25 text-faint transition-colors hover:border-ink/40 hover:text-muted">
+            <span className="flex size-8 items-center justify-center rounded-full border border-dashed border-ink/25 bg-surface text-faint transition-colors hover:border-ink/40 hover:text-muted">
               <CalendarDays className="size-4" strokeWidth={1.5} />
             </span>
           )
@@ -123,7 +127,7 @@ function DuePicker({ value, onChange, done }: { value: string | null; onChange: 
         const r = 14.5
         const len = 2 * Math.PI * r
         return (
-          <span className={cx('relative flex size-8 items-center justify-center', tone)} title={done ? 'Выполнена' : left < 0 ? `Просрочено на ${-left} дн.` : left === 0 ? 'Срок сегодня' : `До срока ${left} дн.`}>
+          <span className={cx('relative flex size-8 items-center justify-center rounded-full bg-surface', tone)} title={done ? 'Выполнена' : left < 0 ? `Просрочено на ${-left} дн.` : left === 0 ? 'Срок сегодня' : `До срока ${left} дн.`}>
             <svg viewBox="0 0 32 32" className="absolute inset-0 size-8 -rotate-90" aria-hidden>
               <circle cx="16" cy="16" r={r} fill="none" stroke="currentColor" strokeOpacity={0.15} strokeWidth="1.5" />
               {part > 0 && <circle cx="16" cy="16" r={r} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray={`${len * part} ${len}`} />}
@@ -175,9 +179,10 @@ function TaskCard({ t, counts, dragging, onOpen, onToggle, onPatch, onDragStart,
       </div>
       <div className="mt-3 flex items-center gap-2 text-xs text-muted">
         {/* выбор исполнителя и срока прямо на карточке; клики не открывают задачу */}
-        <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} draggable={false} onDragStart={(e) => e.preventDefault()}>
+        {/* исполнитель и срок наслаиваются, при наведении плавно раздвигаются */}
+        <div className="group/pair flex items-center" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} draggable={false} onDragStart={(e) => e.preventDefault()}>
           <AssigneePicker value={t.assignee_id} onChange={(v) => onPatch({ assignee_id: v })} />
-          <DuePicker value={t.due_date} done={done} onChange={(v) => onPatch({ due_date: v })} />
+          <DuePicker value={t.due_date} done={done} onChange={(v) => onPatch({ due_date: v })} className={PAIR} />
         </div>
         {b && <span className="ml-1 min-w-0 truncate">{b.nick}</span>}
         <span className="flex-1" />
@@ -479,7 +484,7 @@ export function Tasks() {
                           <span className="mt-px size-[22px] shrink-0 rounded-full ring-1 ring-ink/15" />
                           <InlineInput inputRef={composer} keepOpen placeholder="Что нужно сделать?" onSave={(v) => addTask(s.id, v)} onCancel={closeComposer} multiline className="leading-6" />
                         </div>
-                        <div className="mt-3 flex items-center gap-1.5">
+                        <div className="group/pair mt-3 flex items-center">
                           <AssigneePicker
                             value={draft.assignee}
                             onChange={(v) => {
@@ -488,6 +493,7 @@ export function Tasks() {
                             }}
                           />
                           <DuePicker
+                            className={PAIR}
                             value={draft.due}
                             onChange={(v) => {
                               setDraft((d) => ({ ...d, due: v }))
