@@ -159,6 +159,18 @@ export interface Task {
   created_at: string
 }
 
+export interface BloggerList {
+  id: string
+  name: string
+  position: number
+  created_at: string
+}
+
+export interface BloggerListItem {
+  list_id: string
+  blogger_id: string
+}
+
 export interface TaskSection {
   id: string
   name: string
