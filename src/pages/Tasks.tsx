@@ -494,7 +494,6 @@ export function Tasks() {
                               setTimeout(() => composer.current?.focus())
                             }}
                           />
-                          <span className="ml-auto text-xs text-faint">Enter — добавить</span>
                         </div>
                       </div>
                     ) : (

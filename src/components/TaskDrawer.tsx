@@ -405,7 +405,6 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
               <ArrowUp className="size-[18px]" strokeWidth={1.75} />
             </IconButton>
           </div>
-          <p className="mt-2 text-xs text-faint">Enter — отправить, Shift+Enter — новая строка</p>
         </section>
 
         <p className="px-2 pb-2 text-xs text-faint">

@@ -58,7 +58,6 @@ export function Feed({ bloggerId, integrationId }: { bloggerId: string; integrat
         aria-label="Комментарий"
       />
       <div className="mt-2 flex items-center justify-end gap-3">
-        <span className="text-xs text-faint max-sm:hidden">Enter — отправить, Shift+Enter — новая строка</span>
         <Button size="sm" variant="primary" loading={busy} disabled={!text.trim()} onClick={send}>
           Добавить комментарий
         </Button>
