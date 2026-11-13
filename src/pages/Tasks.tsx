@@ -186,16 +186,21 @@ function TaskCard({ t, counts, dragging, onOpen, onToggle, onPatch, onDragStart,
         </div>
         {b && <span className="ml-1 min-w-0 truncate">{b.nick}</span>}
         <span className="flex-1" />
-        {!!counts?.f && (
-          <span className="flex items-center gap-1" title="Вложения">
-            <Paperclip className="size-3.5" strokeWidth={1.5} />
-            <span className="num">{counts.f}</span>
-          </span>
-        )}
-        {!!counts?.c && (
-          <span className="flex items-center gap-1" title="Комментарии">
-            <MessageCircle className="size-3.5" strokeWidth={1.5} />
-            <span className="num">{counts.c}</span>
+        {/* счётчики прижаты к низу: до нижнего края столько же, сколько до правого (16 px) */}
+        {(!!counts?.f || !!counts?.c) && (
+          <span className="flex items-center gap-2 self-end leading-4">
+            {!!counts?.f && (
+              <span className="flex items-center gap-1" title="Вложения">
+                <Paperclip className="size-3.5" strokeWidth={1.5} />
+                <span className="num">{counts.f}</span>
+              </span>
+            )}
+            {!!counts?.c && (
+              <span className="flex items-center gap-1" title="Комментарии">
+                <MessageCircle className="size-3.5" strokeWidth={1.5} />
+                <span className="num">{counts.c}</span>
+              </span>
+            )}
           </span>
         )}
       </div>
