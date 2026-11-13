@@ -80,7 +80,7 @@ function TaskCard({ t, counts, dragging, onOpen, onToggle, onDragStart, onDragEn
         if (e.key === 'Enter' && e.target === e.currentTarget) onOpen()
       }}
       className={cx(
-        'group cursor-pointer rounded-[20px] bg-surface p-4 ring-1 ring-line transition-[box-shadow,opacity] duration-150 select-none hover:ring-ink/15 hover:shadow-[0_4px_14px_rgba(21,23,28,0.06)]',
+        'group cursor-pointer rounded-[20px] bg-surface p-4 transition-[box-shadow,opacity] duration-150 select-none hover:shadow-[0_4px_14px_rgba(21,23,28,0.08)]',
         dragging && 'opacity-40',
       )}
     >
@@ -290,9 +290,18 @@ export function Tasks() {
               const list = byCol(s.id)
               const shown = list.filter((t) => t.id !== drag)
               return (
-                <div key={s.id} className="w-[85vw] max-w-[300px] shrink-0 snap-start md:w-[300px]">
+                // заголовок и карточки на одной подложке; бросить карточку можно в любое место колонки
+                <div
+                  key={s.id}
+                  onDragOver={(e) => dragOver(e, s.id)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    drop(s.id)
+                  }}
+                  className={cx('w-[85vw] max-w-[300px] shrink-0 snap-start rounded-card p-2 transition-colors duration-150 md:w-[300px]', over?.s === s.id ? 'bg-lime/25' : 'bg-ink/[0.035]')}
+                >
                   {/* заголовок колонки */}
-                  <div className="flex h-11 items-center gap-2 pr-1 pl-3">
+                  <div className="flex h-10 items-center gap-2 pl-3">
                     {renaming === s.id ? (
                       <div className="flex-1 rounded-xl bg-surface px-2 py-1.5 text-[15px] ring-1 ring-ink/15">
                         <InlineInput
@@ -342,14 +351,7 @@ export function Tasks() {
                   </div>
 
                   {/* карточки */}
-                  <div
-                    onDragOver={(e) => dragOver(e, s.id)}
-                    onDrop={(e) => {
-                      e.preventDefault()
-                      drop(s.id)
-                    }}
-                    className={cx('flex min-h-20 flex-col gap-2 rounded-card p-2 transition-colors duration-150', over?.s === s.id ? 'bg-lime/25' : 'bg-ink/[0.035]')}
-                  >
+                  <div className="mt-1 flex min-h-12 flex-col gap-2">
                     {list.map((t) => {
                       const idx = shown.indexOf(t)
                       return (
@@ -377,7 +379,7 @@ export function Tasks() {
                     {over?.s === s.id && over.i === shown.length && <div className="h-1 rounded-full bg-ink/70" />}
 
                     {adding === s.id ? (
-                      <div className="rounded-[20px] bg-surface p-4 ring-1 ring-ink/15">
+                      <div className="rounded-[20px] bg-surface p-4">
                         <InlineInput keepOpen placeholder="Что нужно сделать?" onSave={(v) => addTask(s.id, v)} onCancel={() => setAdding(null)} multiline />
                         <p className="mt-2 text-xs text-faint">Enter — добавить и написать следующую, Esc — закрыть</p>
                       </div>
