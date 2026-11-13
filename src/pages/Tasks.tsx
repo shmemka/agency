@@ -222,11 +222,11 @@ export function Tasks() {
   const [colOver, setColOver] = useState<number | null>(null)
   const [over, setOver] = useState<{ s: string; i: number } | null>(null)
   const [adding, setAdding] = useState<string | null>(null)
-  // исполнитель и срок новой задачи: по умолчанию — вы и без срока, сохраняются для следующей задачи подряд
+  // исполнитель и срок новой задачи: по умолчанию пусто, выбор сохраняется для следующей задачи подряд
   const [draft, setDraft] = useState<{ assignee: string | null; due: string | null }>({ assignee: null, due: null })
   const composer = useRef<HTMLTextAreaElement>(null)
   const openComposer = (sid: string) => {
-    setDraft({ assignee: profile?.id ?? null, due: null })
+    setDraft({ assignee: null, due: null })
     setAdding(sid)
   }
   const closeComposer = () => setAdding(null)
@@ -451,6 +451,12 @@ export function Tasks() {
                       e.stopPropagation()
                       e.dataTransfer.setData('text/plain', s.id)
                       e.dataTransfer.effectAllowed = 'move'
+                      // под курсором едет вся колонка целиком, а не только шапка
+                      const col = e.currentTarget.parentElement
+                      if (col) {
+                        const r = col.getBoundingClientRect()
+                        e.dataTransfer.setDragImage(col, e.clientX - r.left, e.clientY - r.top)
+                      }
                       setDragCol(s.id)
                     }}
                     onDragEnd={() => {

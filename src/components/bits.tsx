@@ -118,7 +118,8 @@ export function TaskList({ tasks, scope, showDone, empty, noForm }: { tasks: Tas
   const { profile, team, isAdmin, personName, personAvatar } = useAuth()
   const { reload, blogger } = useData()
   const [title, setTitle] = useState('')
-  const [assignee, setAssignee] = useState(profile?.id ?? '')
+  // по умолчанию задача без исполнителя
+  const [assignee, setAssignee] = useState('')
   const [due, setDue] = useState('')
   const [busy, setBusy] = useState(false)
   const people = team.filter((t) => t.is_active && (isAdmin || t.id === profile?.id || t.role === 'admin'))
@@ -127,7 +128,7 @@ export function TaskList({ tasks, scope, showDone, empty, noForm }: { tasks: Tas
   async function add() {
     if (!title.trim() || busy) return
     setBusy(true)
-    const { error } = await supabase.from('tasks').insert({ title: title.trim(), assignee_id: assignee || profile?.id, due_date: due || null, ...scope })
+    const { error } = await supabase.from('tasks').insert({ title: title.trim(), assignee_id: assignee || null, due_date: due || null, ...scope })
     setBusy(false)
     if (error) return toast(`Задача не сохранилась: ${error.message}`)
     setTitle('')
@@ -156,8 +157,9 @@ export function TaskList({ tasks, scope, showDone, empty, noForm }: { tasks: Tas
           e.preventDefault()
           add()
         }} aria-label="Новая задача" />
-        {people.length > 1 && (
-          <Select className="min-w-0 flex-1 sm:w-32 sm:flex-none" value={assignee} onChange={(e) => setAssignee(e.target.value)} aria-label="Исполнитель">
+        {people.length > 0 && (
+          <Select className="min-w-0 flex-1 sm:w-36 sm:flex-none" value={assignee} onChange={(e) => setAssignee(e.target.value)} aria-label="Исполнитель">
+            <option value="">Без исполнителя</option>
             {people.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.id === profile?.id ? 'Мне' : p.full_name || p.email}
