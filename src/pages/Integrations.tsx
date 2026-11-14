@@ -9,13 +9,14 @@ import { checklist, isActive, isLive, ordDeadline } from '../lib/rules'
 import { count, cpm, date, money, todayISO } from '../lib/format'
 import type { Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Chip, Empty, Input, PageHeader, Segmented, Select, Spinner, StatusBadge, StatusSelect, Table, cx } from '../components/ui'
+import { Button, Chip, Empty, Input, PageHeader, Segmented, Select, SkelTable, StatusBadge, StatusSelect, Table, cx, useEntrance } from '../components/ui'
 import { BloggerName, useIntegrationPanel } from '../components/bits'
 import { NewIntegrationModal } from '../components/BloggerForm'
 import { confirmDialog } from '../components/dialogs'
 
 export function Integrations() {
   const { integrations, blogger, campaign, campaigns, docs, settings, loading, moveIntegration, reload } = useData()
+  const entering = useEntrance(!loading)
   const { profile } = useAuth()
   const { open } = useIntegrationPanel()
   const [params, setParams] = useSearchParams()
@@ -140,15 +141,14 @@ export function Integrations() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Spinner />
-        </div>
+        <SkelTable rows={10} cols={[2.4, 1.6, 1.2, 1, 1, 1]} />
       ) : rows.length === 0 ? (
         <Empty title={all.length ? 'Под фильтры ничего не подходит' : 'Интеграций пока нет'}>{all.length ? 'Измените фильтры или поиск' : 'Интеграция появляется, когда вы начинаете переговоры с блогером или клиент одобряет его в подборке'}</Empty>
       ) : (
         <>
-          <div className="hidden md:block">
+          <div className="appear hidden md:block">
             <Table
+              enter={entering}
               min={840}
               head={
                 <tr>
@@ -204,7 +204,7 @@ export function Integrations() {
               </tr>
             </Table>
           </div>
-          <ul className="space-y-2 md:hidden">
+          <ul className={cx('appear space-y-2 md:hidden', entering && 'stagger')}>
             {rows.slice(0, limit).map((i) => (
               <li key={i.id}>
                 <div role="button" tabIndex={0} onClick={() => open(i.id)} className="rounded-inner bg-surface p-4">

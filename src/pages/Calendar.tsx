@@ -6,7 +6,7 @@ import { useData } from '../lib/data'
 import { phaseInfo, statusInfo } from '../lib/constants'
 import { isLive, ordDeadline, taskOwner } from '../lib/rules'
 import { todayISO } from '../lib/format'
-import { Button, Card, IconButton, PageHeader, Select, cx } from '../components/ui'
+import { Button, Card, IconButton, Loading, PageHeader, Select, Skel, cx } from '../components/ui'
 import { useIntegrationPanel } from '../components/bits'
 
 interface Ev {
@@ -21,7 +21,7 @@ interface Ev {
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 export function Calendar() {
-  const { integrations, tasks, campaigns, settings, blogger } = useData()
+  const { integrations, tasks, campaigns, settings, blogger, loading } = useData()
   const { profile, isAdmin, team } = useAuth()
   const { open } = useIntegrationPanel()
   const navigate = useNavigate()
@@ -136,15 +136,19 @@ export function Calendar() {
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-7">
-          {days.slice(0, weeks * 7).map((d) => {
+        {/* месяц сменился — сетка плавно проявляется заново */}
+        <div key={monthKey} className="appear grid grid-cols-7">
+          {days.slice(0, weeks * 7).map((d, n) => {
             const k = iso(d)
             const evs = byDay.get(k) ?? []
             const out = d.getMonth() !== cursor.getMonth()
             return (
               <div key={k} className={cx('min-h-28 border-t border-l border-line p-1.5 first:border-l-0 [&:nth-child(7n+1)]:border-l-0', out && 'bg-soft/60')}>
                 <div className={cx('mb-1 flex size-6 items-center justify-center rounded-full text-xs', k === today ? 'bg-ink text-white' : out ? 'text-faint' : 'text-muted')}>{d.getDate()}</div>
-                {(expanded === k ? evs : evs.slice(0, 3)).map((e) => item(e))}
+                {loading
+                  ? // события ещё грузятся: плашки в части дней, чтобы сетка не казалась пустой
+                    (n * 7) % 5 < 2 && <Skel className="mx-1.5 mt-1.5 h-3" style={{ width: `${55 + ((n * 13) % 35)}%` }} />
+                  : (expanded === k ? evs : evs.slice(0, 3)).map((e) => item(e))}
                 {evs.length > 3 && (
                   <button onClick={() => setExpanded(expanded === k ? null : k)} className="w-full rounded-full px-1.5 text-left text-xs text-muted hover:bg-soft hover:text-ink">
                     {expanded === k ? 'свернуть' : `ещё ${evs.length - 3}`}
@@ -156,8 +160,19 @@ export function Calendar() {
         </div>
       </div>
 
-      <div className="space-y-2 md:hidden">
-        {listDays.length === 0 && <Card className="text-muted">В этом месяце событий нет</Card>}
+      <div key={monthKey} className="appear space-y-2 md:hidden">
+        {loading && (
+          <Loading className="space-y-2">
+            {[0, 1, 2].map((r) => (
+              <div key={r} className="rounded-card bg-surface p-4">
+                <Skel className="h-3 w-28" />
+                <Skel className="mt-4 h-3.5 w-3/4" />
+                <Skel className="mt-3 h-3.5 w-1/2" />
+              </div>
+            ))}
+          </Loading>
+        )}
+        {!loading && listDays.length === 0 && <Card className="text-muted">В этом месяце событий нет</Card>}
         {listDays.map((d) => (
           <Card key={d} className="p-4">
             <div className={cx('mb-1 text-[13px]', d === today ? 'text-ink' : 'text-muted')}>

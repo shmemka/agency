@@ -1,6 +1,6 @@
-import { Children, isValidElement, useEffect, useRef, useState, type ButtonHTMLAttributes, type ComponentProps, type HTMLAttributes, type ReactNode, useCallback } from 'react'
+import { Children, createContext, isValidElement, useContext, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ComponentProps, type CSSProperties, type HTMLAttributes, type ReactNode, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, ChevronLeft, Loader2, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, Copy, Loader2, X } from 'lucide-react'
 import { BLOGGER_STATUSES, PHASES, STATUSES, STATUS_ORDER, bloggerStatusInfo, nextStatus, phaseInfo, statusInfo, type BloggerStatus, type Status } from '../lib/constants'
 import { onToast } from '../lib/toast'
 
@@ -9,6 +9,160 @@ export function cx(...a: (string | false | null | undefined)[]) {
 }
 
 export const isPhone = () => window.matchMedia('(max-width: 767px)').matches
+export const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/**
+ * Держит элемент на экране ещё `ms` после закрытия, чтобы он успел плавно уйти.
+ * leaving — уже закрыт и доигрывает уход (на него вешается класс .leaving).
+ */
+export function usePresence(open: boolean, ms = 160) {
+  const [shown, setShown] = useState(open)
+  useEffect(() => {
+    if (open) return setShown(true)
+    if (!shown) return
+    if (reducedMotion()) return setShown(false)
+    const t = setTimeout(() => setShown(false), ms)
+    return () => clearTimeout(t)
+  }, [open, shown, ms])
+  return { mounted: open || shown, leaving: !open && shown }
+}
+
+/**
+ * true, пока список ещё не показан, и первые ms после показа (ready = данные загрузились).
+ * Строки, появившиеся вместе со списком, въезжают по очереди; добавленные потом — сразу, без задержки
+ */
+export function useEntrance(ready = true, ms = 700) {
+  const [on, setOn] = useState(true)
+  useEffect(() => {
+    if (!ready) return
+    const t = setTimeout(() => setOn(false), ms)
+    return () => clearTimeout(t)
+  }, [ready, ms])
+  return on
+}
+
+/** Скопировать текст в буфер. copied — true полторы секунды после успеха: кнопка показывает галочку */
+export function useCopy() {
+  const [copied, setCopied] = useState(false)
+  const timer = useRef<number | undefined>(undefined)
+  const copy = useCallback(async (text: string) => {
+    await navigator.clipboard.writeText(text)
+    setCopied(true)
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => setCopied(false), 1600)
+  }, [])
+  useEffect(() => () => window.clearTimeout(timer.current), [])
+  return { copied, copy }
+}
+
+/** Иконка копирования, которая после нажатия на миг становится галочкой */
+export function CopyIcon({ copied }: { copied: boolean }) {
+  return (
+    <span className="relative inline-flex size-3.5">
+      <Copy className={cx('absolute inset-0 size-3.5 transition-[opacity,transform] duration-200', copied ? 'scale-50 opacity-0' : 'opacity-100')} strokeWidth={1.5} />
+      <Check className={cx('absolute inset-0 size-3.5 transition-[opacity,transform] duration-200', copied ? 'opacity-100' : 'scale-50 opacity-0')} strokeWidth={2} />
+    </span>
+  )
+}
+
+/* ---------- скелетоны: серые плашки той же формы, что и будущие данные ---------- */
+
+/** Одна плашка. Высоту и ширину задают классами: h-4 w-32 */
+export function Skel({ className, style }: { className?: string; style?: CSSProperties }) {
+  // своё скругление (rounded-card у больших блоков) важнее круглого по умолчанию
+  return <span aria-hidden className={cx('skel block', !/\brounded-/.test(className ?? '') && 'rounded-full', className)} style={style} />
+}
+
+/** Обёртка для скелетона: для читалки экрана «Загружаем», на глаз появляется с задержкой, чтобы не мелькать */
+export function Loading({ children, className, label = 'Загружаем' }: { children: ReactNode; className?: string; label?: string }) {
+  return (
+    <div role="status" aria-busy="true" aria-label={label} className={cx('skel-wrap', className)}>
+      {children}
+    </div>
+  )
+}
+
+// ширины «текста» в строках: разные, чтобы скелетон не выглядел решёткой
+const W = ['62%', '48%', '71%', '55%', '66%', '44%', '58%', '69%', '51%', '63%']
+
+/** Таблица-заглушка: те же белые строки-плашки, что у Table */
+export function SkelTable({ rows = 8, cols = [3, 1, 1, 1, 1] }: { rows?: number; cols?: number[] }) {
+  return (
+    <Loading>
+      <div className="hidden md:block">
+        <table className="rows w-full [&_td]:px-2.5 [&_td]:py-3.5 [&_td:first-child]:pl-5 [&_td:last-child]:pr-5">
+          <tbody>
+            {Array.from({ length: rows }, (_, r) => (
+              <tr key={r}>
+                {cols.map((c, i) => (
+                  <td key={i} style={{ width: `${(c / cols.reduce((a, b) => a + b, 0)) * 100}%` }}>
+                    {i === 0 ? (
+                      <div className="flex items-center gap-3">
+                        <Skel className="size-7 shrink-0" />
+                        <Skel className="h-3.5" style={{ width: W[r % W.length] }} />
+                      </div>
+                    ) : (
+                      <Skel className="h-3" style={{ width: W[(r + i * 3) % W.length] }} />
+                    )}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="space-y-0.5 md:hidden">
+        {Array.from({ length: Math.min(rows, 6) }, (_, r) => (
+          <div key={r} className={cx('flex items-center gap-3 bg-surface px-4 py-3.5', r === 0 && 'rounded-t-[20px]', r === Math.min(rows, 6) - 1 && 'rounded-b-[20px]')}>
+            <Skel className="size-9 shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skel className="h-3.5" style={{ width: W[r % W.length] }} />
+              <Skel className="h-3 w-1/3" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </Loading>
+  )
+}
+
+/** Панель блогера, интеграции или задачи, пока карточка грузится по прямой ссылке */
+export function SkelDrawer() {
+  return (
+    <Loading className="flex flex-col gap-3 p-3 md:p-4">
+      <div className="rounded-card bg-surface p-6">
+        <Skel className="h-6 w-48" />
+        <Skel className="mt-3 h-3.5 w-64" />
+        <div className="mt-6 flex gap-2">
+          <Skel className="h-8 w-28" />
+          <Skel className="h-8 w-24" />
+        </div>
+      </div>
+      <div className="rounded-card bg-surface p-6">
+        {[0, 1, 2, 3].map((r) => (
+          <div key={r} className="flex items-center justify-between gap-6 py-3">
+            <Skel className="h-3 w-24" />
+            <Skel className="h-3.5" style={{ width: W[r + 3] }} />
+          </div>
+        ))}
+      </div>
+    </Loading>
+  )
+}
+
+/** Строки списка в карточке: как пункты «Требует внимания» или «Ближайшие выходы» */
+export function SkelList({ rows = 3, className }: { rows?: number; className?: string }) {
+  return (
+    <Loading className={className}>
+      {Array.from({ length: rows }, (_, r) => (
+        <div key={r} className="flex min-h-12 items-center gap-3 border-t border-line py-2 first:border-t-0">
+          <Skel className="size-2.5 shrink-0" />
+          <Skel className="h-3.5" style={{ width: W[(r + 2) % W.length] }} />
+        </div>
+      ))}
+    </Loading>
+  )
+}
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 export function Button({
@@ -50,7 +204,7 @@ export function IconButton({ label, className, children, ...rest }: ButtonHTMLAt
       aria-label={label}
       title={label}
       {...rest}
-      className={cx('inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted transition-colors duration-150 hover:bg-ink/5 hover:text-ink', className)}
+      className={cx('inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted transition-[background-color,color,transform] duration-150 hover:bg-ink/5 hover:text-ink active:scale-[0.92]', className)}
     >
       {children}
     </button>
@@ -298,7 +452,7 @@ export function Select({
               role="listbox"
               aria-label={ariaLabel}
               onKeyDown={onKey}
-              className={cx('fade fixed z-[70] flex flex-col overflow-hidden', POPOVER)}
+              className={cx('pop fixed z-[70] flex flex-col overflow-hidden', POPOVER)}
               style={{ top: pos.top, bottom: pos.bottom, left: pos.left, width: 'max-content', minWidth: pos.width, maxWidth: maxW, maxHeight: pos.maxH }}
             >
               {items}
@@ -358,7 +512,7 @@ export function PageHeader({ title, sub, actions }: { title: string; sub?: React
 
 export function Empty({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
   return (
-    <div className="rounded-card bg-surface px-6 py-12 text-center">
+    <div className="appear rounded-card bg-surface px-6 py-12 text-center">
       <p className="text-base">{title}</p>
       {children && <p className="mx-auto mt-1 max-w-md text-muted">{children}</p>}
       {action && <div className="mt-5 flex justify-center gap-2">{action}</div>}
@@ -486,7 +640,7 @@ export function Menu<T extends string>({
               </div>
             </div>
           ) : (
-            <div role="listbox" className={cx('fade fixed z-[70] w-56', POPOVER)} style={pos} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+            <div role="listbox" className={cx('pop fixed z-[70] w-56', POPOVER)} style={pos} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
               {list}
             </div>
           ),
@@ -584,15 +738,44 @@ export function StatusRail({ value, onChange }: { value: Status; onChange: (s: S
 
 /** Переключатель-пилюля: активное — чёрное */
 export function Segmented<T extends string>({ value, options, onChange, className }: { value: T; options: { id: T; label: ReactNode }[]; onChange: (v: T) => void; className?: string }) {
+  // тёмная подложка переезжает под выбранный вариант, а не перескакивает
+  const box = useRef<HTMLDivElement>(null)
+  const [pill, setPill] = useState<{ x: number; w: number; animate: boolean } | null>(null)
+  useLayoutEffect(() => {
+    const el = box.current?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (!el) return setPill(null)
+    setPill((p) => ({ x: el.offsetLeft, w: el.offsetWidth, animate: !!p }))
+  }, [value, options.length])
+  useEffect(() => {
+    // ширина вариантов меняется вместе со шрифтом и счётчиками внутри
+    const el = box.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(() => {
+      const a = el.querySelector<HTMLElement>('[aria-selected="true"]')
+      if (a) setPill((p) => (p && p.x === a.offsetLeft && p.w === a.offsetWidth ? p : { x: a.offsetLeft, w: a.offsetWidth, animate: false }))
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
   return (
-    <div className={cx('inline-flex max-w-full gap-1 overflow-x-auto rounded-full bg-surface p-1', className)} role="tablist">
+    <div ref={box} className={cx('relative inline-flex max-w-full gap-1 overflow-x-auto rounded-full bg-surface p-1', className)} role="tablist">
+      {pill && (
+        <span
+          aria-hidden
+          className={cx('absolute top-1 left-0 h-8 rounded-full bg-ink', pill.animate && 'transition-[transform,width] duration-250 ease-[var(--ease-out)]')}
+          style={{ transform: `translateX(${pill.x}px)`, width: pill.w }}
+        />
+      )}
       {options.map((o) => (
         <button
           key={o.id}
           role="tab"
           aria-selected={value === o.id}
           onClick={() => onChange(o.id)}
-          className={cx('inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] whitespace-nowrap transition-colors duration-150', value === o.id ? 'bg-ink text-white' : 'text-muted hover:text-ink')}
+          className={cx(
+            'relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] whitespace-nowrap transition-colors duration-200',
+            value === o.id ? cx('text-white', !pill && 'bg-ink') : 'text-muted hover:text-ink',
+          )}
         >
           {o.label}
         </button>
@@ -606,7 +789,7 @@ export function Progress({ value, max, over, className }: { value: number; max: 
   const p = max > 0 ? Math.min(100, (value / max) * 100) : 0
   return (
     <div className={cx('hatch h-4 overflow-hidden rounded-full', className)} role="progressbar" aria-valuenow={Math.round(p)} aria-valuemin={0} aria-valuemax={100}>
-      <div className={cx('h-full rounded-full', over ? 'bg-bad' : 'bar-lime')} style={{ width: `${p}%` }} />
+      <div className={cx('grow h-full rounded-full transition-[width] duration-500 ease-[var(--ease-out)]', over ? 'bg-bad' : 'bar-lime')} style={{ width: `${p}%` }} />
     </div>
   )
 }
@@ -630,44 +813,76 @@ export function submitOnEnter(e: React.KeyboardEvent, scope: HTMLElement | null,
 
 export function Modal({ open, onClose, title, children, footer, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const footerRef = useRef<HTMLDivElement>(null)
+  // пока окно уходит, показываем его последнее содержимое: данные формы к этому времени уже сброшены
+  const { mounted, leaving } = usePresence(open, 150)
+  const last = useRef({ title, children, footer })
+  if (open) last.current = { title, children, footer }
+  const v = open ? { title, children, footer } : last.current
   useEffect(() => {
     if (!open) return
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
   }, [open, onClose])
-  if (!open) return null
+  if (!mounted) return null
   return createPortal(
-    <div className="fade fixed inset-0 z-[60] flex items-end justify-center bg-ink/30 md:items-start md:overflow-y-auto md:p-6 md:pt-[8vh]" onMouseDown={onClose}>
+    <div
+      className={cx('fade fixed inset-0 z-[60] flex items-end justify-center bg-ink/30 md:items-start md:overflow-y-auto md:p-6 md:pt-[8vh]', leaving && 'leaving pointer-events-none')}
+      onMouseDown={leaving ? undefined : onClose}
+    >
       <div
         role="dialog"
-        aria-modal="true"
-        aria-label={title}
+        aria-modal={leaving ? undefined : 'true'}
+        aria-label={v.title}
         className={cx('sheet safe-bottom flex max-h-[92vh] w-full flex-col rounded-t-[28px] bg-surface md:max-h-none md:rounded-card', wide ? 'md:max-w-3xl' : 'md:max-w-lg')}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => submitOnEnter(e, footerRef.current, 'button[data-variant="primary"], button[data-save]')}
       >
         <div className="flex items-center justify-between py-3 pr-3 pl-6">
-          <h2 className="text-lg">{title}</h2>
+          <h2 className="text-lg">{v.title}</h2>
           <IconButton label="Закрыть" onClick={onClose}>
             <X className="size-[18px]" strokeWidth={1.5} />
           </IconButton>
         </div>
-        <div className="overflow-y-auto px-6 pb-6 md:overflow-visible">{children}</div>
-        {footer && <div ref={footerRef} className="flex flex-wrap justify-end gap-2 border-t border-line px-6 py-4">{footer}</div>}
+        <div className="overflow-y-auto px-6 pb-6 md:overflow-visible">{v.children}</div>
+        {v.footer && <div ref={footerRef} className="flex flex-wrap justify-end gap-2 border-t border-line px-6 py-4">{v.footer}</div>}
       </div>
     </div>,
     document.body,
   )
 }
 
+const DrawerCtx = createContext<{ close: () => void; dismiss: () => void } | null>(null)
+/**
+ * Закрыть панель изнутри с анимацией ухода.
+ * close — спросит про несохранённые правки; dismiss — без вопроса (например, после удаления)
+ */
+export const useDrawer = () => useContext(DrawerCtx)
+
+/** Крестик в шапке панели: закрывает её так же, как фон, Esc и «Назад» */
+export function DrawerClose({ className, iconClass = 'size-[18px]' }: { className?: string; iconClass?: string }) {
+  const d = useDrawer()
+  return (
+    <IconButton label="Закрыть" onClick={() => d?.close()} className={className}>
+      <X className={iconClass} strokeWidth={1.5} />
+    </IconButton>
+  )
+}
+
 /** Боковая панель; на телефоне — экран целиком с кнопкой «Назад» */
 export function Drawer({ onClose, children, label, beforeClose }: { onClose: () => void; children: ReactNode; label: string; beforeClose?: () => Promise<boolean> | boolean }) {
+  const [leaving, setLeaving] = useState(false)
+  // панель уезжает вправо, и только потом её убирают со страницы
+  const dismiss = useCallback(() => {
+    if (reducedMotion()) return onClose()
+    setLeaving(true)
+    setTimeout(onClose, 170)
+  }, [onClose])
   // beforeClose спрашивает, можно ли закрыть: например, когда есть несохранённые правки
   const close = useCallback(async () => {
     if (beforeClose && !(await beforeClose())) return
-    onClose()
-  }, [beforeClose, onClose])
+    dismiss()
+  }, [beforeClose, dismiss])
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && !document.querySelector('[role=dialog][aria-modal=true]')) close()
@@ -676,16 +891,18 @@ export function Drawer({ onClose, children, label, beforeClose }: { onClose: () 
     return () => window.removeEventListener('keydown', k)
   }, [close])
   return createPortal(
-    <div className="fixed inset-0 z-50">
-      <div className="fade absolute inset-0 hidden bg-ink/25 md:block" onClick={close} />
-      <aside role="complementary" aria-label={label} onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')} className="slide absolute inset-0 flex flex-col overflow-y-auto bg-canvas md:inset-y-3 md:right-3 md:left-auto md:w-[720px] md:rounded-card md:shadow-[0_8px_24px_rgba(21,23,28,0.1)]">
-        <button onClick={close} className="flex h-12 shrink-0 items-center gap-1 px-3 text-muted md:hidden">
-          <ChevronLeft className="size-5" strokeWidth={1.5} />
-          Назад
-        </button>
-        {children}
-      </aside>
-    </div>,
+    <DrawerCtx.Provider value={{ close, dismiss }}>
+      <div className={cx('fixed inset-0 z-50', leaving && 'leaving pointer-events-none')}>
+        <div className="fade absolute inset-0 hidden bg-ink/25 md:block" onClick={close} />
+        <aside role="complementary" aria-label={label} onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')} className="slide absolute inset-0 flex flex-col overflow-y-auto bg-canvas md:inset-y-3 md:right-3 md:left-auto md:w-[720px] md:rounded-card md:shadow-[0_8px_24px_rgba(21,23,28,0.1)]">
+          <button onClick={close} className="flex h-12 shrink-0 items-center gap-1 px-3 text-muted md:hidden">
+            <ChevronLeft className="size-5" strokeWidth={1.5} />
+            Назад
+          </button>
+          {children}
+        </aside>
+      </div>
+    </DrawerCtx.Provider>,
     document.body,
   )
 }
@@ -718,24 +935,36 @@ export function Avatar({ name, src, className }: { name: string; src?: string | 
 }
 
 export function ToastHost() {
-  const [msg, setMsg] = useState<string | null>(null)
-  useEffect(() => onToast(setMsg), [])
+  const [msg, setMsg] = useState<{ text: string; n: number } | null>(null)
+  const [open, setOpen] = useState(false)
+  useEffect(
+    () =>
+      onToast((text) => {
+        setMsg((m) => ({ text, n: (m?.n ?? 0) + 1 }))
+        setOpen(true)
+      }),
+    [],
+  )
   useEffect(() => {
-    if (!msg) return
-    const t = setTimeout(() => setMsg(null), 3200)
+    if (!open) return
+    const t = setTimeout(() => setOpen(false), 3200)
     return () => clearTimeout(t)
-  }, [msg])
-  if (!msg) return null
+  }, [open, msg?.n])
+  const { mounted, leaving } = usePresence(open, 160)
+  if (!mounted || !msg) return null
   return createPortal(
-    <div role="status" className="rise fixed bottom-24 left-1/2 z-[80] max-w-[90vw] -translate-x-1/2 rounded-full bg-ink px-5 py-3 text-sm text-white md:bottom-6">
-      {msg}
+    <div role="status" className="fixed bottom-24 left-1/2 z-[80] max-w-[90vw] -translate-x-1/2 md:bottom-6">
+      {/* новое сообщение заново въезжает, даже если старое ещё на экране */}
+      <div key={msg.n} className={cx('rise rounded-full bg-ink px-5 py-3 text-sm text-white shadow-[0_8px_24px_rgba(21,23,28,0.18)]', leaving && 'leaving')}>
+        {msg.text}
+      </div>
     </div>,
     document.body,
   )
 }
 
 /** Таблица в карточке: общий вид для всех списков */
-export function Table({ head, children, min }: { head: ReactNode; children: ReactNode; min?: number }) {
+export function Table({ head, children, min, enter }: { head: ReactNode; children: ReactNode; min?: number; enter?: boolean }) {
   return (
     <div className="overflow-x-auto">
       <table
@@ -743,7 +972,7 @@ export function Table({ head, children, min }: { head: ReactNode; children: Reac
         style={{ minWidth: min }}
       >
         <thead className="text-faint">{head}</thead>
-        <tbody>{children}</tbody>
+        <tbody className={enter ? 'stagger' : undefined}>{children}</tbody>
       </table>
     </div>
   )

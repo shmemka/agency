@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Bell, CalendarDays, Check, ChevronsUpDown, Clapperboard, Ellipsis, Plus, FileText, LayoutGrid, ListTodo, LogOut, Megaphone, Settings, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -10,7 +10,7 @@ import { promptDialog } from './dialogs'
 import { preloadRichEditor } from './RichEditor'
 import { attention, taskOwner, type Attention } from '../lib/rules'
 import { dateTime } from '../lib/format'
-import { Avatar, IconButton, ITEM, ITEM_DESKTOP, Modal, POPOVER, cx } from './ui'
+import { Avatar, IconButton, ITEM, ITEM_DESKTOP, Loading, Modal, POPOVER, Skel, cx } from './ui'
 import { useIntegrationPanel } from './bits'
 import { IntegrationPanel } from './IntegrationPanel'
 
@@ -150,7 +150,12 @@ function BellButton() {
     <>
       <IconButton label={n ? `Уведомления: ${n}` : 'Уведомления'} onClick={() => setOpen(true)} className="relative bg-surface">
         <Bell className="size-[18px]" strokeWidth={1.5} />
-        {n > 0 && <span className="num absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink px-1 text-[11px] text-white">{n}</span>}
+        {/* новое уведомление — счётчик подпрыгивает */}
+        {n > 0 && (
+          <span key={n} className="bump num absolute -top-0.5 -right-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-ink px-1 text-[11px] text-white">
+            {n}
+          </span>
+        )}
       </IconButton>
       <Modal open={open} onClose={() => setOpen(false)} title="Уведомления">
         {items.length === 0 && notices.length === 0 && <p className="text-muted">Пока тихо. Здесь появятся сроки, решения клиентов и новые задачи</p>}
@@ -224,6 +229,15 @@ export function Layout() {
   const myTasks = tasks.filter((t) => !t.done_at && taskOwner(t) === profile?.id).length
   const pending = isAdmin ? team.filter((t) => !t.is_active && !t.deactivated_at).length : 0
   const badge = (to: string) => (to === '/tasks' ? myTasks : to === '/team' ? pending : 0)
+  const seg = loc.pathname.split('/').filter(Boolean)
+  const pageKey = seg[0] === 'campaigns' && seg[1] ? `campaigns/${seg[1]}` : (seg[0] ?? '')
+
+  const navBox = useRef<HTMLElement>(null)
+  const [pill, setPill] = useState<{ y: number; animate: boolean } | null>(null)
+  useLayoutEffect(() => {
+    const a = navBox.current?.querySelector<HTMLElement>('a[aria-current="page"]')
+    setPill((p) => (a ? { y: a.offsetTop, animate: !!p } : null))
+  }, [loc.pathname, nav.length])
 
   return (
     <div className="flex min-h-full">
@@ -233,17 +247,23 @@ export function Layout() {
           <WorkspaceMenu name={agency} />
           <BellButton />
         </div>
-        <nav className="flex-1 space-y-0.5" aria-label="Разделы">
+        <nav ref={navBox} className="relative flex-1 space-y-0.5" aria-label="Разделы">
+          {/* белая подложка переезжает к выбранному разделу */}
+          {pill && <span aria-hidden className={cx('absolute inset-x-0 top-0 h-9 rounded-full bg-surface', pill.animate && 'transition-transform duration-300 ease-[var(--ease-out)]')} style={{ transform: `translateY(${pill.y}px)` }} />}
           {nav.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
               end={n.end}
-              className={({ isActive }) => cx('flex h-9 items-center gap-2.5 rounded-full px-3 transition-colors duration-150', isActive ? 'bg-surface text-ink' : 'text-muted hover:bg-ink/5 hover:text-ink')}
+              className={({ isActive }) => cx('relative flex h-9 items-center gap-2.5 rounded-full px-3 transition-colors duration-150', isActive ? cx('text-ink', !pill && 'bg-surface') : 'text-muted hover:bg-ink/5 hover:text-ink')}
             >
               <n.icon className="size-[18px]" strokeWidth={1.5} />
               <span className="flex-1">{n.label}</span>
-              {badge(n.to) > 0 && <span className="num text-xs text-faint">{badge(n.to)}</span>}
+              {badge(n.to) > 0 && (
+                <span key={badge(n.to)} className="appear num text-xs text-faint">
+                  {badge(n.to)}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
@@ -257,7 +277,10 @@ export function Layout() {
           <BellButton />
         </header>
         <main className="mx-auto w-full max-w-[1480px] flex-1 px-4 pt-2 pb-28 md:px-6 md:pt-8 md:pb-10">
-          <Outlet />
+          {/* новая страница чуть всплывает; карточки блогера и задачи открываются поверх и страницу не перерисовывают */}
+          <div key={pageKey} className="page-in">
+            <Outlet />
+          </div>
         </main>
       </div>
 
@@ -265,12 +288,12 @@ export function Layout() {
         {nav
           .filter((n) => n.phone)
           .map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cx('flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px]', isActive ? 'text-ink' : 'text-faint')}>
+            <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cx('flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] transition-[color,transform] duration-150 active:scale-95', isActive ? 'text-ink' : 'text-faint')}>
               <n.icon className="size-5" strokeWidth={1.5} />
               {n.label}
             </NavLink>
           ))}
-        <button onClick={() => setMore(true)} className={cx('flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px]', current && !current.phone ? 'text-ink' : 'text-faint')}>
+        <button onClick={() => setMore(true)} className={cx('flex h-14 flex-1 flex-col transition-[color,transform] duration-150 active:scale-95 items-center justify-center gap-0.5 text-[11px]', current && !current.phone ? 'text-ink' : 'text-faint')}>
           <Ellipsis className="size-5" strokeWidth={1.5} />
           Ещё
         </button>
@@ -410,5 +433,31 @@ function UserCard({ name, avatar, role, onSignOut }: { name: string; avatar?: st
         </IconButton>
       </div>
     </div>
+  )
+}
+
+/** Каркас кабинета, пока проверяем вход: боковое меню и место под страницу */
+export function ShellSkeleton() {
+  return (
+    <Loading className="flex min-h-full" label="Открываем кабинет">
+      <aside className="hidden h-screen w-60 shrink-0 flex-col p-4 md:flex">
+        <div className="flex items-center gap-1.5 px-2 pt-1 pb-6">
+          <Mark />
+          <Skel className="ml-1 h-3.5 w-24" />
+        </div>
+        <div className="space-y-0.5">
+          {[64, 72, 88, 76, 60, 80, 84, 68].map((w, i) => (
+            <div key={i} className="flex h-9 items-center gap-2.5 px-3">
+              <Skel className="size-[18px] rounded-md" />
+              <Skel className="h-3" style={{ width: w }} />
+            </div>
+          ))}
+        </div>
+      </aside>
+      <div className="flex-1 px-4 pt-16 md:px-6 md:pt-8">
+        <Skel className="h-8 w-56" />
+        <Skel className="mt-3 h-3.5 w-72 max-w-full" />
+      </div>
+    </Loading>
   )
 }

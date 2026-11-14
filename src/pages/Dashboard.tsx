@@ -5,7 +5,7 @@ import { useData } from '../lib/data'
 import { PHASES, statusInfo } from '../lib/constants'
 import { isActive, isLive, ordDeadline, taskOwner } from '../lib/rules'
 import { count, date, money, plural, todayISO } from '../lib/format'
-import { Card, PageHeader, StatusBadge, cx } from '../components/ui'
+import { Card, PageHeader, Skel, SkelList, StatusBadge, cx } from '../components/ui'
 import { BloggerName, TaskList, useIntegrationPanel } from '../components/bits'
 import { useAttention } from '../components/Layout'
 
@@ -51,21 +51,29 @@ export function Dashboard() {
               Все интеграции
             </Link>
           </div>
-          <div className="num mt-2 text-[44px] leading-[48px] tracking-tight">
-            {active.length} <span className="text-base tracking-normal text-muted">{plural(active.length, 'интеграция', 'интеграции', 'интеграций')}</span>
-          </div>
+          {loading ? (
+            <Skel className="mt-3 mb-1 h-10 w-52" />
+          ) : (
+            <div className="appear num mt-2 text-[44px] leading-[48px] tracking-tight">
+              {active.length} <span className="text-base tracking-normal text-muted">{plural(active.length, 'интеграция', 'интеграции', 'интеграций')}</span>
+            </div>
+          )}
           {/* яркий момент экрана: путь интеграций от поиска до выхода */}
           <div className="mt-6 flex gap-1" role="img" aria-label="Интеграции по этапам">
             {flow.map((p, idx) => {
               const n = byPhase(p.id).length
               return (
                 <Link key={p.id} to={`/integrations?tab=active&phase=${p.id}`} className="group min-w-12 sm:min-w-24" style={{ flex: `${Math.max(n / total, 0.08)} 1 0` }}>
-                  <div className={cx('h-10 rounded-full transition-opacity duration-150 group-hover:opacity-80', n === 0 ? 'hatch' : idx >= livePhase - 1 ? 'bar-lime' : 'bg-ink')} style={n > 0 && idx < livePhase - 1 ? { opacity: 0.25 + idx * 0.25 } : undefined} />
+                  {loading ? (
+                    <Skel className="h-10 w-full" />
+                  ) : (
+                    <div className={cx('grow h-10 rounded-full transition-opacity duration-150 group-hover:opacity-80', n === 0 ? 'hatch' : idx >= livePhase - 1 ? 'bar-lime' : 'bg-ink')} style={{ animationDelay: `${idx * 50}ms`, ...(n > 0 && idx < livePhase - 1 ? { opacity: 0.25 + idx * 0.25 } : undefined) }} />
+                  )}
                   <div className="mt-2 truncate text-[11px] text-muted sm:text-xs">
                     <span className="sm:hidden">{SHORT[p.id] ?? p.label}</span>
                     <span className="max-sm:hidden">{p.label}</span>
                   </div>
-                  <div className="num text-base">{n}</div>
+                  {loading ? <Skel className="mt-1.5 h-4 w-5" /> : <div className="num text-base">{n}</div>}
                 </Link>
               )
             })}
@@ -75,24 +83,42 @@ export function Dashboard() {
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
           <Card>
             <div className="text-[13px] text-muted">Выходы в {new Date().toLocaleDateString('ru-RU', { month: 'long' }).replace(/[ьй]$/, 'е').replace(/т$/, 'те')}</div>
-            <div className="num mt-1 text-[28px] leading-8">
-              {out.length} <span className="text-base text-muted">из {thisMonth.length}</span>
-            </div>
-            <div className="num mt-1 text-xs text-muted">охват {count(out.reduce((a, i) => a + (i.fact_reach ?? 0), 0))}</div>
+            {loading ? (
+              <Big />
+            ) : (
+              <div className="appear">
+                <div className="num mt-1 text-[28px] leading-8">
+                  {out.length} <span className="text-base text-muted">из {thisMonth.length}</span>
+                </div>
+                <div className="num mt-1 text-xs text-muted">охват {count(out.reduce((a, i) => a + (i.fact_reach ?? 0), 0))}</div>
+              </div>
+            )}
           </Card>
           {isAdmin ? (
             <Card>
               <div className="text-[13px] text-muted">Комиссия по текущим кампаниям</div>
-              <div className="num mt-1 text-[28px] leading-8">{money(commission)}</div>
-              <div className="mt-1 text-xs text-muted">
-                {running.length} {plural(running.length, 'кампания', 'кампании', 'кампаний')}, по одобренным интеграциям
-              </div>
+              {loading ? (
+                <Big />
+              ) : (
+                <div className="appear">
+                  <div className="num mt-1 text-[28px] leading-8">{money(commission)}</div>
+                  <div className="mt-1 text-xs text-muted">
+                    {running.length} {plural(running.length, 'кампания', 'кампании', 'кампаний')}, по одобренным интеграциям
+                  </div>
+                </div>
+              )}
             </Card>
           ) : (
             <Card>
               <div className="text-[13px] text-muted">Ваши блогеры</div>
-              <div className="num mt-1 text-[28px] leading-8">{bloggers.length}</div>
-              <div className="mt-1 text-xs text-muted">в работе {new Set(active.map((i) => i.blogger_id)).size}</div>
+              {loading ? (
+                <Big />
+              ) : (
+                <div className="appear">
+                  <div className="num mt-1 text-[28px] leading-8">{bloggers.length}</div>
+                  <div className="mt-1 text-xs text-muted">в работе {new Set(active.map((i) => i.blogger_id)).size}</div>
+                </div>
+              )}
             </Card>
           )}
         </div>
@@ -106,15 +132,17 @@ export function Dashboard() {
               Все задачи
             </Link>
           </div>
-          <TaskList tasks={myTasks} empty="На сегодня задач нет" />
+          {loading ? <SkelList rows={3} /> : <TaskList tasks={myTasks} empty="На сегодня задач нет" />}
         </Card>
 
         <Card>
           <h2 className="mb-2 text-base">Требует внимания</h2>
-          {items.length === 0 ? (
-            <p className="text-muted">{loading ? 'Загружаем' : 'Никто не молчит, сроки не горят'}</p>
+          {loading ? (
+            <SkelList rows={3} />
+          ) : items.length === 0 ? (
+            <p className="appear text-muted">Никто не молчит, сроки не горят</p>
           ) : (
-            <ul>
+            <ul className="appear">
               {items.slice(0, 7).map((a) => (
                 <li key={a.key}>
                   {a.link.startsWith('?i=') ? (
@@ -142,10 +170,12 @@ export function Dashboard() {
               Календарь
             </Link>
           </div>
-          {upcoming.length === 0 ? (
-            <p className="text-muted">Дат выхода пока нет. Поставьте дату в интеграции, и она появится здесь</p>
+          {loading ? (
+            <SkelList rows={3} />
+          ) : upcoming.length === 0 ? (
+            <p className="appear text-muted">Дат выхода пока нет. Поставьте дату в интеграции, и она появится здесь</p>
           ) : (
-            <ul>
+            <ul className="appear">
               {upcoming.map((i) => (
                 <li key={i.id}>
                   <button onClick={() => open(i.id)} className="flex min-h-12 w-full items-center gap-3 border-t border-line py-2 text-left hover:bg-soft">
@@ -171,10 +201,12 @@ export function Dashboard() {
               </Link>
             )}
           </div>
-          {ord.length === 0 ? (
-            <p className="text-muted">По всем вышедшим интеграциям статистика передана</p>
+          {loading ? (
+            <SkelList rows={3} />
+          ) : ord.length === 0 ? (
+            <p className="appear text-muted">По всем вышедшим интеграциям статистика передана</p>
           ) : (
-            <ul>
+            <ul className="appear">
               {ord.slice(0, 6).map(({ i, dl }) => (
                 <li key={i.id}>
                   <button onClick={() => open(i.id)} className="flex min-h-12 w-full items-center gap-3 border-t border-line py-2 text-left hover:bg-soft">
@@ -191,5 +223,15 @@ export function Dashboard() {
         </Card>
       </div>
     </>
+  )
+}
+
+/** Крупная цифра карточки, пока считаем */
+function Big() {
+  return (
+    <div className="mt-2">
+      <Skel className="h-7 w-24" />
+      <Skel className="mt-2 h-3 w-32" />
+    </div>
   )
 }

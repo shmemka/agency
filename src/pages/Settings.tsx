@@ -5,7 +5,7 @@ import { useData } from '../lib/data'
 import { parseNumber } from '../lib/format'
 import type { Settings as SettingsRow } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Card, Field, Input, PageHeader, cx, submitOnEnter } from '../components/ui'
+import { Button, Card, Field, Input, Loading, PageHeader, Skel, cx, submitOnEnter } from '../components/ui'
 
 export function Settings() {
   const { settings } = useData()
@@ -13,7 +13,20 @@ export function Settings() {
   return (
     <>
       <PageHeader title="Настройки" sub={isAdmin ? 'Общие для всего кабинета агентства' : 'Настройки агентства меняют учредители'} />
-      {isAdmin && settings && <SettingsCard s={settings} />}
+      {isAdmin && (settings ? (
+        <SettingsCard s={settings} />
+      ) : (
+        <Loading className="max-w-2xl rounded-card bg-surface p-6">
+          <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2">
+            {[0, 1, 2, 3, 4].map((r) => (
+              <div key={r} className={r === 0 ? 'sm:col-span-2' : undefined}>
+                <Skel className="h-3 w-32" />
+                <Skel className="mt-2.5 h-10 w-full rounded-2xl" />
+              </div>
+            ))}
+          </div>
+        </Loading>
+      ))}
     </>
   )
 }

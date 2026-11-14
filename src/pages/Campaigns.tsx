@@ -7,11 +7,12 @@ import { campaignStatusLabel } from '../lib/constants'
 import { isLive } from '../lib/rules'
 import { date, plural } from '../lib/format'
 import type { Campaign, Client } from '../lib/types'
-import { Button, Chip, Empty, PageHeader, Progress, Table } from '../components/ui'
+import { Button, Chip, Empty, Loading, PageHeader, Progress, Skel, Table, cx, useEntrance } from '../components/ui'
 import { CampaignModal, ClientModal } from '../components/CampaignForm'
 
 export function Campaigns() {
-  const { campaigns, clients, integrations } = useData()
+  const { campaigns, clients, integrations, loading } = useData()
+  const entering = useEntrance(!loading)
   const { isAdmin, personName } = useAuth()
   const nav = useNavigate()
   const [editC, setEditC] = useState<Partial<Campaign> | null>(null)
@@ -37,17 +38,36 @@ export function Campaigns() {
           )
         }
       />
-      {campaigns.length === 0 ? (
+      {loading ? (
+        <Loading className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+          {[0, 1, 2, 3].map((r) => (
+            <div key={r} className="rounded-card bg-surface p-5 sm:p-6">
+              <div className="flex items-start gap-3">
+                <div className="flex-1">
+                  <Skel className="h-3 w-24" />
+                  <Skel className="mt-2.5 h-4.5" style={{ width: ['58%', '44%', '66%', '50%'][r] }} />
+                </div>
+                <Skel className="h-7 w-20" />
+              </div>
+              <Skel className="mt-5 h-4 w-full" />
+              <div className="mt-3 flex gap-4">
+                <Skel className="h-3 w-24" />
+                <Skel className="h-3 w-20" />
+              </div>
+            </div>
+          ))}
+        </Loading>
+      ) : campaigns.length === 0 ? (
         <Empty title="Кампаний пока нет">{isAdmin ? 'Кампания собирает подборку блогеров под заказ клиента, его согласование и отчёт' : 'Учредитель добавит вас в кампанию, и она появится здесь'}</Empty>
       ) : (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <div className={cx('grid grid-cols-1 gap-3 lg:grid-cols-2', entering && 'stagger')}>
           {campaigns.map((c) => {
             const mine = integrations.filter((i) => i.campaign_id === c.id && i.status !== 'declined')
             const approved = mine.filter((i) => i.client_decision === 'approved')
             const live = approved.filter(isLive).length
             const waiting = mine.filter((i) => i.client_decision === 'pending').length
             return (
-              <Link key={c.id} to={`/campaigns/${c.id}`} className="min-w-0 rounded-card bg-surface p-5 transition-colors duration-150 hover:bg-white/60 sm:p-6">
+              <Link key={c.id} to={`/campaigns/${c.id}`} className="min-w-0 rounded-card bg-surface p-5 transition-[background-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(21,23,28,0.07)] active:translate-y-0 sm:p-6">
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="text-[13px] text-muted">{clients.find((x) => x.id === c.client_id)?.name ?? 'Клиент не указан'}</div>

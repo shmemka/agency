@@ -10,7 +10,7 @@ import { isLive } from '../lib/rules'
 import { count, cpm, date, downloadXlsx, money, parseNumber, plural } from '../lib/format'
 import type { Blogger, Campaign, Decision, Income, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Card, Chip, Empty, Field, IconButton, Input, Menu, Modal, PageHeader, Progress, Segmented, Select, Spinner, StatusBadge, StatusSelect, Table, Toggle, cx, submitOnEnter } from '../components/ui'
+import { Button, Card, Chip, Empty, Field, IconButton, Input, Loading, Menu, Modal, PageHeader, Progress, Segmented, Select, Skel, SkelTable, StatusBadge, StatusSelect, Table, Toggle, cx, submitOnEnter } from '../components/ui'
 import { AudienceBar, BloggerName, useIntegrationPanel } from '../components/bits'
 import { CampaignModal, ShareBox } from '../components/CampaignForm'
 import { DocumentsPanel } from '../components/DocumentsPanel'
@@ -39,7 +39,21 @@ export function CampaignPage() {
     setSp(p, { replace: true })
   }
 
-  if (!c) return loading ? <Spinner className="mx-auto mt-20" /> : <Empty title="Кампания не найдена">Возможно, её удалили или у вас нет к ней доступа</Empty>
+  if (!c)
+    return loading ? (
+      <Loading>
+        <Skel className="mb-4 h-3 w-24" />
+        <Skel className="h-8 w-72 max-w-full" />
+        <div className="mt-3 mb-8 flex gap-3">
+          <Skel className="h-6 w-20" />
+          <Skel className="h-6 w-32" />
+        </div>
+        <Skel className="mb-4 h-10 w-80 max-w-full" />
+        <SkelTable rows={6} cols={[3, 1.4, 1, 1, 1]} />
+      </Loading>
+    ) : (
+      <Empty title="Кампания не найдена">Возможно, её удалили или у вас нет к ней доступа</Empty>
+    )
   const canEdit = isAdmin || c.owner_id === profile?.id
 
   async function remove() {

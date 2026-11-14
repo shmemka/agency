@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUp, Check, FileText, Image as ImageIcon, Paperclip, Trash2, X } from 'lucide-react'
+import { ArrowUp, Check, FileText, Image as ImageIcon, Paperclip, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { dateTime } from '../lib/format'
 import type { Task, TaskComment, TaskFile } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Button, Drawer, IconButton, Select, Spinner, cx } from './ui'
+import { Avatar, Button, Drawer, DrawerClose, IconButton, Select, Spinner, cx } from './ui'
 import { RichEditor } from './RichEditor'
 import { RichText } from './RichText'
 import { DateInput } from './DateInput'
@@ -172,9 +172,6 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
     await saveDesc()
     return !text.trim() || (await confirmDiscard())
   }
-  const closeSafe = async () => {
-    if (await guard()) onClose()
-  }
 
   const done = Boolean(task.done_at)
   const sectionId = task.section_id && sections.some((s) => s.id === task.section_id) ? task.section_id : (sections[0]?.id ?? '')
@@ -222,9 +219,7 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
                 <Trash2 className="size-4" strokeWidth={1.5} />
               </IconButton>
             )}
-            <IconButton label="Закрыть" onClick={closeSafe} className="hidden size-8 md:inline-flex">
-              <X className="size-4" strokeWidth={1.5} />
-            </IconButton>
+            <DrawerClose className="hidden size-8 md:inline-flex" iconClass="size-4" />
           </div>
 
           <textarea

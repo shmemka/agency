@@ -5,8 +5,8 @@ import './index.css'
 import { isConfigured } from './lib/supabase'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
 import { DataProvider } from './lib/data'
-import { Layout } from './components/Layout'
-import { Spinner, ToastHost } from './components/ui'
+import { Layout, ShellSkeleton } from './components/Layout'
+import { ToastHost } from './components/ui'
 import { DialogHost } from './components/dialogs'
 import { TooltipHost } from './components/Tooltip'
 import { Login, NewPassword, NotConfigured, Offline } from './pages/Login'
@@ -39,12 +39,8 @@ function JoinRoute() {
 function Gate() {
   const { session, profile, profileError, loading, isAdmin, recovery, endRecovery, workspace } = useAuth()
   const [invite, setInvite] = useState(readInvite)
-  if (loading)
-    return (
-      <div className="flex h-full items-center justify-center">
-        <Spinner />
-      </div>
-    )
+  // пока проверяем вход, показываем каркас кабинета, а не крутилку: страница не «прыгает», когда всё загрузится
+  if (loading) return session ? <ShellSkeleton /> : null
   if (!session) return <Login />
   if (recovery) return <NewPassword onDone={endRecovery} />
   if (!profile && profileError) return <Offline reason={profileError} />

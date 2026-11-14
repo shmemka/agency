@@ -6,7 +6,7 @@ import { useData } from '../lib/data'
 import { DOC_KINDS } from '../lib/constants'
 import type { Doc } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Card, Empty, Input, PageHeader, Select, Spinner } from '../components/ui'
+import { Card, Empty, Input, PageHeader, Select, SkelList } from '../components/ui'
 import { DocRow } from '../components/DocumentsPanel'
 
 export function Documents() {
@@ -50,13 +50,13 @@ export function Documents() {
         </Select>
       </div>
       {docs === null ? (
-        <div className="flex justify-center py-20">
-          <Spinner />
-        </div>
+        <Card className="py-2">
+          <SkelList rows={8} />
+        </Card>
       ) : rows.length === 0 ? (
         <Empty title={docs.length ? 'Ничего не нашли' : 'Документов пока нет'}>{docs.length ? 'Измените поиск или тип' : 'Откройте интеграцию и загрузите договор или чек на вкладке «Документы»'}</Empty>
       ) : (
-        <Card className="py-2">
+        <Card className="appear py-2">
           <ul>
             {rows.slice(0, 300).map((d) => {
               const b = blogger(d.blogger_id)

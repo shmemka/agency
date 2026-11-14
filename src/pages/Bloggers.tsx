@@ -9,7 +9,7 @@ import { isActive } from '../lib/rules'
 import { count, cpm, money, plural } from '../lib/format'
 import type { Blogger } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, BloggerStatusBadge, BloggerStatusSelect, Button, Empty, Input, Menu, PageHeader, Select, Spinner, StatusSelect, Table, cx } from '../components/ui'
+import { Avatar, BloggerStatusBadge, BloggerStatusSelect, Button, Empty, Input, Menu, PageHeader, Select, Skel, SkelTable, StatusSelect, Table, cx, useEntrance } from '../components/ui'
 import { confirmDialog, promptDialog } from '../components/dialogs'
 import { AudienceBar, BloggerName, statsStale } from '../components/bits'
 import { BloggerDrawer, useBloggerStatus } from '../components/BloggerDrawer'
@@ -20,6 +20,7 @@ type SortKey = 'nick' | 'followers' | 'avg_reach' | 'price' | 'cpm' | 'updated_a
 
 export function Bloggers() {
   const { bloggers, integrations, campaign, lists, listItems, loading, error, moveIntegration, reload } = useData()
+  const entering = useEntrance(!loading)
   const { team, personName, personAvatar, profile, isAdmin } = useAuth()
   const { id } = useParams()
   const nav = useNavigate()
@@ -214,7 +215,7 @@ export function Bloggers() {
     <>
       <PageHeader
         title="Блогеры"
-        sub={isAdmin ? `${bloggers.length} в базе, ${activeBy.size} в работе` : `Ваши блогеры: ${bloggers.length}, в работе ${activeBy.size}`}
+        sub={loading ? <Skel className="my-[3px] h-3.5 w-40" /> : isAdmin ? `${bloggers.length} в базе, ${activeBy.size} в работе` : `Ваши блогеры: ${bloggers.length}, в работе ${activeBy.size}`}
         actions={
           <>
             <Button onClick={() => setImporting(true)}>
@@ -289,7 +290,7 @@ export function Bloggers() {
               className={cx('inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] whitespace-nowrap transition-colors duration-150', list === t.id || (!current && !t.id) ? 'bg-ink text-white' : 'text-muted hover:text-ink')}
             >
               {t.name}
-              <span className={cx('num', list === t.id || (!current && !t.id) ? 'text-white/60' : 'text-faint')}>{t.n}</span>
+              {!loading && <span className={cx('appear num', list === t.id || (!current && !t.id) ? 'text-white/60' : 'text-faint')}>{t.n}</span>}
             </button>
           ))}
           {isAdmin && (
@@ -325,9 +326,7 @@ export function Bloggers() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Spinner />
-        </div>
+        <SkelTable rows={10} cols={[3, 1.4, 1, 1, 1.2, 1]} />
       ) : error ? (
         <Empty title="Блогеры не загрузились">{error}</Empty>
       ) : bloggers.length === 0 ? (
@@ -350,8 +349,9 @@ export function Bloggers() {
         <Empty title="Никого не нашли">Измените поиск или фильтры</Empty>
       ) : (
         <>
-          <div className="hidden md:block">
+          <div className="appear hidden md:block">
             <Table
+              enter={entering}
               min={860}
               head={
                 <tr>
@@ -425,7 +425,7 @@ export function Bloggers() {
               })}
             </Table>
           </div>
-          <ul className="space-y-2 md:hidden">
+          <ul className={cx('appear space-y-2 md:hidden', entering && 'stagger')}>
             {rows.slice(0, limit).map((b) => (
               <li key={b.id}>
                 <div role="button" tabIndex={0} onClick={() => open(b)} className={cx('rounded-inner bg-surface p-4', picked.has(b.id) && 'ring-2 ring-ink/20')}>

@@ -6,7 +6,7 @@ import { platformInfo } from '../lib/constants'
 import { count, cpm, date, downloadXlsx, money, plural } from '../lib/format'
 import type { AgeSplit, Platform } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Card, PlatformTag, Spinner, cx } from '../components/ui'
+import { Button, Card, Loading, PlatformTag, Skel, cx } from '../components/ui'
 import { AudienceBar } from '../components/bits'
 import { ImageViewer } from '../components/DocumentsPanel'
 
@@ -105,9 +105,24 @@ export function Share() {
 
   if (state === 'loading')
     return (
-      <div className="flex h-full items-center justify-center">
-        <Spinner />
-      </div>
+      <Frame d={null} title="">
+        <Loading>
+          <Skel className="h-3.5 w-40" />
+          <Skel className="mt-3 h-8 w-80 max-w-full" />
+          <div className="mt-8 space-y-0.5">
+            {[0, 1, 2, 3, 4].map((r) => (
+              <div key={r} className={cx('flex items-center gap-4 bg-surface p-5', r === 0 && 'rounded-t-[20px]', r === 4 && 'rounded-b-[20px]')}>
+                <Skel className="size-10 shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skel className="h-3.5" style={{ width: ['38%', '46%', '32%', '42%', '36%'][r] }} />
+                  <Skel className="h-3 w-24" />
+                </div>
+                <Skel className="hidden h-8 w-32 sm:block" />
+              </div>
+            ))}
+          </div>
+        </Loading>
+      </Frame>
     )
   if (state !== 'ok' || !d)
     return (

@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import type { Task, TaskSection } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Card, Menu, PageHeader, Segmented, Toggle, cx } from '../components/ui'
+import { Avatar, Card, Loading, Menu, PageHeader, Segmented, Skel, Toggle, cx, useEntrance } from '../components/ui'
 import { TaskList } from '../components/bits'
 import { TaskDrawer } from '../components/TaskDrawer'
 import { confirmDialog } from '../components/dialogs'
@@ -148,6 +148,8 @@ function TaskCard({ t, counts, dragging, onOpen, onToggle, onPatch, onDragStart,
   const { blogger } = useData()
   const b = blogger(t.blogger_id)
   const done = Boolean(t.done_at)
+  // кружок «подпрыгивает», когда задачу отметили: видно, что нажатие сработало
+  const [flash, setFlash] = useState(false)
   return (
     <div
       data-task={t.id}
@@ -161,7 +163,8 @@ function TaskCard({ t, counts, dragging, onOpen, onToggle, onPatch, onDragStart,
         if (e.key === 'Enter' && e.target === e.currentTarget) onOpen()
       }}
       className={cx(
-        'group cursor-pointer rounded-[20px] bg-surface p-4 transition-[box-shadow,opacity] duration-150 select-none hover:shadow-[0_4px_14px_rgba(21,23,28,0.08)]',
+        // fade: карточка, перенесённая в другую колонку или только что созданная, мягко проявляется на новом месте
+        'fade group cursor-pointer rounded-[20px] bg-surface p-4 transition-[box-shadow,opacity,transform] duration-150 select-none hover:shadow-[0_4px_14px_rgba(21,23,28,0.08)] active:scale-[0.99]',
         dragging && 'opacity-40',
       )}
     >
@@ -169,14 +172,16 @@ function TaskCard({ t, counts, dragging, onOpen, onToggle, onPatch, onDragStart,
         <button
           onClick={(e) => {
             e.stopPropagation()
+            setFlash(true)
+            setTimeout(() => setFlash(false), 340)
             onToggle()
           }}
           aria-label={done ? 'Вернуть в работу' : 'Отметить выполненной'}
-          className={cx('mt-px flex size-[22px] shrink-0 items-center justify-center rounded-full ring-1 transition-colors duration-150', done ? 'bg-leaf text-ink ring-leaf' : 'text-transparent ring-ink/25 hover:bg-lime/50 hover:text-ink/50')}
+          className={cx('mt-px flex size-[22px] shrink-0 items-center justify-center rounded-full ring-1 transition-colors duration-150 active:scale-90', done ? 'bg-leaf text-ink ring-leaf' : 'text-transparent ring-ink/25 hover:bg-lime/50 hover:text-ink/50', flash && 'bump')}
         >
           <Check className="size-3.5" strokeWidth={2} />
         </button>
-        <p className={cx('min-w-0 flex-1 leading-6 break-words', done && 'text-faint line-through')}>{t.title}</p>
+        <p className={cx('min-w-0 flex-1 leading-6 break-words transition-colors duration-200', done && 'text-faint line-through')}>{t.title}</p>
       </div>
       <div className="mt-3 flex items-center gap-2 text-xs text-muted">
         {/* выбор исполнителя и срока прямо на карточке; клики не открывают задачу */}
@@ -211,6 +216,7 @@ function TaskCard({ t, counts, dragging, onOpen, onToggle, onPatch, onDragStart,
 
 export function Tasks() {
   const { tasks, sections, reload, loading } = useData()
+  const entering = useEntrance(!loading)
   const { profile, isAdmin } = useAuth()
   const { id } = useParams()
   const navigate = useNavigate()
@@ -418,7 +424,7 @@ export function Tasks() {
     <>
       <PageHeader
         title="Задачи"
-        sub={open ? `Открыто: ${open}` : 'Открытых задач нет'}
+        sub={loading ? <Skel className="my-[3px] h-3.5 w-28" /> : open ? `Открыто: ${open}` : 'Открытых задач нет'}
         actions={
           <>
             <Toggle checked={hideDone} onChange={setHideDone} label="Скрыть выполненные" />
@@ -431,7 +437,9 @@ export function Tasks() {
         }
       />
 
-      {sections.length === 0 ? (
+      {loading ? (
+        <BoardSkeleton />
+      ) : sections.length === 0 ? (
         <div className="max-w-3xl space-y-3">
           <Card>
             <h2 className="text-base">Доска задач почти готова</h2>
@@ -442,7 +450,7 @@ export function Tasks() {
           </Card>
         </div>
       ) : (
-        <div className="-mx-4 overflow-x-auto px-4 pb-4 md:-mx-6 md:px-6">
+        <div className="appear -mx-4 overflow-x-auto px-4 pb-4 md:-mx-6 md:px-6">
           <div
             className="flex snap-x snap-mandatory items-start gap-3 md:snap-none"
             onDragOver={colDragOver}
@@ -549,7 +557,7 @@ export function Tasks() {
                   </div>
 
                   {/* карточки */}
-                  <div className="mt-1 flex min-h-12 flex-col gap-2">
+                  <div className={cx('mt-1 flex min-h-12 flex-col gap-2', entering && 'stagger')}>
                     {list.map((t) => {
                       const idx = shown.indexOf(t)
                       return (
@@ -633,5 +641,41 @@ export function Tasks() {
 
       {current && <TaskDrawer key={current.id} task={current} onClose={() => navigate(`/tasks${search}`)} />}
     </>
+  )
+}
+
+/** Доска, пока задачи грузятся: те же колонки и карточки, без текста */
+function BoardSkeleton() {
+  const cols = [3, 2, 1]
+  return (
+    <Loading className="-mx-4 overflow-hidden px-4 pb-4 md:-mx-6 md:px-6">
+      <div className="flex items-start gap-3">
+        {cols.map((n, c) => (
+          <div key={c} className="w-[85vw] max-w-[300px] shrink-0 rounded-card bg-ink/[0.035] p-2 md:w-[300px]">
+            <div className="flex h-10 items-center gap-2 px-3">
+              <Skel className="h-3.5 w-20" />
+              <Skel className="h-3 w-4" />
+            </div>
+            <div className="mt-1 flex flex-col gap-2">
+              {Array.from({ length: n }, (_, r) => (
+                <div key={r} className="rounded-[20px] bg-surface p-4">
+                  <div className="flex items-start gap-2.5">
+                    <Skel className="size-[22px] shrink-0" />
+                    <div className="flex-1 space-y-2 pt-1">
+                      <Skel className="h-3.5" style={{ width: ['82%', '64%', '74%'][(r + c) % 3] }} />
+                      {(r + c) % 2 === 0 && <Skel className="h-3.5 w-2/5" />}
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-2">
+                    <Skel className="size-6" />
+                    <Skel className="h-3 w-16" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Loading>
   )
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { Check, Copy, ExternalLink, Plus, Trash2 } from 'lucide-react'
+import { Check, ExternalLink, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -8,7 +8,7 @@ import { AGE_GROUPS, platformInfo } from '../lib/constants'
 import { date, daysBetween, plural, todayISO } from '../lib/format'
 import type { AgeSplit, Blogger, Task } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Button, IconButton, Input, PlatformTag, Select, cx } from './ui'
+import { Avatar, Button, CopyIcon, IconButton, Input, PlatformTag, Select, cx, useCopy } from './ui'
 import { confirmDialog, promptDialog } from './dialogs'
 import { DateInput } from './DateInput'
 
@@ -81,6 +81,7 @@ export function AudienceBar({ female, age, className }: { female: number | null;
 }
 
 export function CopyLink({ url }: { url: string }) {
+  const { copied, copy } = useCopy()
   return (
     <div className="flex items-center gap-2 rounded-2xl bg-soft py-1 pr-1 pl-4">
       <span className="min-w-0 flex-1 truncate text-[13px]">{url}</span>
@@ -89,15 +90,14 @@ export function CopyLink({ url }: { url: string }) {
         variant="primary"
         onClick={async () => {
           try {
-            await navigator.clipboard.writeText(url)
-            toast('Ссылка скопирована')
+            await copy(url)
           } catch {
             await promptDialog({ title: 'Скопируйте ссылку', body: 'Браузер не дал скопировать автоматически. Ссылка уже выделена', value: url, readOnly: true })
           }
         }}
       >
-        <Copy className="size-3.5" strokeWidth={1.5} />
-        Скопировать
+        <CopyIcon copied={copied} />
+        {copied ? 'Скопировано' : 'Скопировать'}
       </Button>
     </div>
   )

@@ -1,4 +1,4 @@
-import { Copy, Lock, RefreshCw } from 'lucide-react'
+import { Lock, RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
@@ -9,7 +9,7 @@ import type { Profile } from '../lib/types'
 import { toast } from '../lib/toast'
 import { inviteUrl } from '../lib/invite'
 import { confirmDialog, promptDialog } from '../components/dialogs'
-import { Avatar, Button, Card, Field, Modal, PageHeader, Select, Table } from '../components/ui'
+import { Avatar, Button, Card, CopyIcon, Field, Modal, PageHeader, Select, Table, useCopy } from '../components/ui'
 
 export function Team() {
   const { team, profile, isAdmin, reloadTeam, workspace } = useAuth()
@@ -200,18 +200,10 @@ export function Team() {
   )
 }
 
-async function copy(text: string, done: string) {
-  try {
-    await navigator.clipboard.writeText(text)
-    toast(done)
-  } catch {
-    await promptDialog({ title: 'Скопируйте ссылку', body: 'Браузер не дал скопировать автоматически. Ссылка уже выделена', value: text, readOnly: true })
-  }
-}
-
 /** Ссылка-приглашение в кабинет: по ней человек регистрируется и сразу попадает в команду */
 function InviteCard() {
   const [token, setToken] = useState<string | null | undefined>(undefined)
+  const { copied, copy } = useCopy()
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -247,9 +239,20 @@ function InviteCard() {
         <span className="min-w-0 flex-1 truncate py-2 text-[13px]">{url || 'Загружаем…'}</span>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button size="sm" variant="primary" disabled={!url} onClick={() => copy(url, 'Ссылка скопирована')}>
-          <Copy className="size-3.5" strokeWidth={1.5} />
-          Скопировать ссылку
+        <Button
+          size="sm"
+          variant="primary"
+          disabled={!url}
+          onClick={async () => {
+            try {
+              await copy(url)
+            } catch {
+              await promptDialog({ title: 'Скопируйте ссылку', body: 'Браузер не дал скопировать автоматически. Ссылка уже выделена', value: url, readOnly: true })
+            }
+          }}
+        >
+          <CopyIcon copied={copied} />
+          {copied ? 'Скопировано' : 'Скопировать ссылку'}
         </Button>
         <Button size="sm" loading={busy} disabled={!url} onClick={reset}>
           {!busy && <RefreshCw className="size-3.5" strokeWidth={1.5} />}

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Trash2, X } from 'lucide-react'
+import { Check, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -9,7 +9,7 @@ import { checklist, isLive, ordDeadline } from '../lib/rules'
 import { count, cpm, date, daysBetween, money, parseNumber, todayISO } from '../lib/format'
 import type { Decision, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Card, Drawer, Field, IconButton, Input, Segmented, Select, Spinner, StatusRail, Toggle, cx } from './ui'
+import { Button, Card, Drawer, DrawerClose, Field, IconButton, Input, Segmented, Select, SkelDrawer, StatusRail, Toggle, cx } from './ui'
 import { RichEditor } from './RichEditor'
 import { BloggerName, TaskList } from './bits'
 import { DocumentsPanel } from './DocumentsPanel'
@@ -43,7 +43,7 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
   if (!i) {
     return (
       <Drawer onClose={onClose} label="Интеграция">
-        <div className="flex flex-1 items-center justify-center p-6 text-muted">{loading ? <Spinner /> : 'Интеграция не найдена или у вас нет к ней доступа'}</div>
+        {loading ? <SkelDrawer /> : <div className="flex flex-1 items-center justify-center p-6 text-muted">Интеграция не найдена или у вас нет к ней доступа</div>}
       </Drawer>
     )
   }
@@ -86,9 +86,6 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
   }
 
   const guard = async () => !dirty || (await confirmDiscard())
-  const closeSafe = async () => {
-    if (await guard()) onClose()
-  }
 
   const g = cpm(v.price_client ?? v.price, v.guaranteed_reach)
   const f = cpm(v.price_client ?? v.price, v.fact_reach)
@@ -119,9 +116,7 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
               </IconButton>
             )}
             <span className="hidden md:block">
-              <IconButton label="Закрыть" onClick={closeSafe}>
-                <X className="size-[18px]" strokeWidth={1.5} />
-              </IconButton>
+              <DrawerClose />
             </span>
           </div>
           <dl className="num mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">

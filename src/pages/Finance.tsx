@@ -7,7 +7,7 @@ import { useData } from '../lib/data'
 import { date, downloadXlsx, money, parseNumber, plural, todayISO } from '../lib/format'
 import type { Expense, Income } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Card, Chip, Empty, Field, IconButton, Input, Modal, PageHeader, Progress, Segmented, Select, StatusBadge, Table, Toggle, cx } from '../components/ui'
+import { Button, Card, Chip, Empty, Field, IconButton, Input, Modal, PageHeader, Progress, Segmented, Select, Skel, SkelList, SkelTable, StatusBadge, Table, Toggle, cx } from '../components/ui'
 import { BloggerName, useIntegrationPanel } from '../components/bits'
 import { confirmDialog } from '../components/dialogs'
 import { DateInput } from '../components/DateInput'
@@ -25,7 +25,7 @@ function periodRange(p: Period) {
 }
 
 export function Finance() {
-  const { settings, campaigns, clients, integrations, docs, blogger, campaign } = useData()
+  const { settings, campaigns, clients, integrations, docs, blogger, campaign, loading } = useData()
   const { team, personName } = useAuth()
   const { open } = useIntegrationPanel()
   const [sp, setSp] = useSearchParams()
@@ -33,6 +33,9 @@ export function Finance() {
   const [period, setPeriod] = useState<Period>('month')
   const [incomes, setIncomes] = useState<Income[]>([])
   const [expenses, setExpenses] = useState<Expense[]>([])
+  // поступления и расходы грузятся отдельно от остальных данных; до этого — скелетон, а не «пока нет»
+  const [ready, setReady] = useState(false)
+  const busy = loading || !ready
   const [editI, setEditI] = useState<Partial<Income> | null>(null)
   const [editE, setEditE] = useState<Partial<Expense> | null>(null)
   const [onlyNoReceipt, setOnlyNoReceipt] = useState(false)
@@ -43,6 +46,7 @@ export function Finance() {
     const [a, b] = await Promise.all([supabase.from('incomes').select('*').order('paid_on', { ascending: false }), supabase.from('expenses').select('*').order('paid_on', { ascending: false })])
     setIncomes((a.data as Income[]) ?? [])
     setExpenses((b.data as Expense[]) ?? [])
+    setReady(true)
   }, [])
   useEffect(() => {
     load()
@@ -150,8 +154,17 @@ export function Finance() {
             ].map(([k, v, n]) => (
               <Card key={k}>
                 <div className="text-[13px] text-muted">{k}</div>
-                <div className="num mt-1 text-[28px] leading-8">{v}</div>
-                <div className="mt-1 text-xs text-muted">{n}</div>
+                {busy ? (
+                  <>
+                    <Skel className="mt-2.5 h-6 w-28" />
+                    <Skel className="mt-2.5 h-3 w-24" />
+                  </>
+                ) : (
+                  <div className="appear">
+                    <div className="num mt-1 text-[28px] leading-8">{v}</div>
+                    <div className="mt-1 text-xs text-muted">{n}</div>
+                  </div>
+                )}
               </Card>
             ))}
           </div>
@@ -160,7 +173,8 @@ export function Finance() {
               <h2 className="text-base">Доход учредителей за {new Date().getFullYear()} год</h2>
               <p className="mt-1 text-[13px] text-muted">Лимит самозанятого: {money(limit)} в год. За его пределами доход облагается уже НДФЛ</p>
               <ul className="mt-4 space-y-5">
-                {founders.map((f) => {
+                {busy && <SkelList rows={2} />}
+                {!busy && founders.map((f) => {
                   const mine = incomes.filter((i) => i.receiver_id === f.id && i.paid_on >= year)
                   const got = mine.reduce((a, i) => a + i.amount, 0)
                   const share = got / limit
@@ -185,7 +199,9 @@ export function Finance() {
             </Card>
             <Card>
               <h2 className="text-base">Комиссия по кампаниям</h2>
-              {commission.length === 0 ? (
+              {busy ? (
+                <SkelList rows={2} className="mt-2" />
+              ) : commission.length === 0 ? (
                 <p className="mt-3 text-muted">Появится, когда клиент одобрит первых блогеров в подборке</p>
               ) : (
                 <ul className="mt-2">
@@ -208,7 +224,9 @@ export function Finance() {
       )}
 
       {tab === 'incomes' &&
-        (incomes.length === 0 ? (
+        (busy ? (
+          <SkelTable rows={6} cols={[1, 1, 2, 1.4, 1, 1]} />
+        ) : incomes.length === 0 ? (
           <Empty title="Поступлений пока нет">Вносите сюда комиссию и предоплаты клиентов. По ним считается налог и лимит самозанятого</Empty>
         ) : (
           <Table
@@ -250,7 +268,9 @@ export function Finance() {
           <div className="mb-3">
             <Toggle checked={onlyNoReceipt} onChange={setOnlyNoReceipt} label={`Оплачено, но нет чека: ${payouts.filter((p) => p.i.status !== 'waiting_payment' && !p.receipt).length}`} />
           </div>
-          {payoutRows.length === 0 ? (
+          {loading ? (
+            <SkelTable rows={6} cols={[2, 1, 1.4, 1, 1, 1]} />
+          ) : payoutRows.length === 0 ? (
             <Empty title={onlyNoReceipt ? 'По всем оплатам чеки на месте' : 'Выплат пока нет'}>Список собирается сам из интеграций на этапе «На оплате» и дальше</Empty>
           ) : (
             <Table
@@ -286,7 +306,9 @@ export function Finance() {
       )}
 
       {tab === 'expenses' &&
-        (expenses.length === 0 ? (
+        (busy ? (
+          <SkelTable rows={6} cols={[1, 1, 1.4, 1.2, 2]} />
+        ) : expenses.length === 0 ? (
           <Empty title="Расходов пока нет">Банк, сервисы, реклама агентства</Empty>
         ) : (
           <Table

@@ -69,17 +69,23 @@ input[type='checkbox']:not(.sr-only) {
   height: 18px;
   margin: 0;
   border-radius: 6px;
-  background: var(--color-surface) center / 12px no-repeat;
+  background: var(--color-surface) center / 0 no-repeat;
   box-shadow: inset 0 0 0 1.5px rgb(21 23 28 / 0.25);
   cursor: pointer;
   transition:
     background-color 120ms,
-    box-shadow 120ms;
+    background-size 180ms var(--ease-out),
+    box-shadow 120ms,
+    transform 120ms;
 }
 input[type='checkbox']:not(.sr-only):hover {
   box-shadow: inset 0 0 0 1.5px rgb(21 23 28 / 0.5);
 }
+input[type='checkbox']:not(.sr-only):active:not(:disabled) {
+  transform: scale(0.9);
+}
 input[type='checkbox']:not(.sr-only):checked {
+  background-size: 12px;
   background-color: var(--color-ink);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23fff' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 6.2 5 8.5l4.5-5'/%3E%3C/svg%3E");
   box-shadow: none;
@@ -179,9 +185,19 @@ input[type='search']::-webkit-search-decoration {
   background-image: linear-gradient(90deg, var(--color-lime), var(--color-leaf));
 }
 
+/* ---------- движение ----------
+ * Правило: анимация показывает, что изменилось, и не задерживает работу.
+ * Появление 160–320 мс, исчезновение быстрее появления. При «уменьшить движение» всё выключается.
+ */
 @keyframes rise {
   from {
     transform: translateY(8px);
+    opacity: 0;
+  }
+}
+@keyframes rise-s {
+  from {
+    transform: translateY(4px);
     opacity: 0;
   }
 }
@@ -191,15 +207,53 @@ input[type='search']::-webkit-search-decoration {
     opacity: 0;
   }
 }
+@keyframes slide-out {
+  to {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+}
 @keyframes sheet {
   from {
     transform: translateY(24px);
     opacity: 0;
   }
 }
+@keyframes sheet-out {
+  to {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+}
 @keyframes fade {
   from {
     opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes pop {
+  from {
+    transform: translateY(-4px) scale(0.98);
+    opacity: 0;
+  }
+}
+@keyframes bump {
+  40% {
+    transform: scale(1.18);
+  }
+}
+@keyframes grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
   }
 }
 .rise {
@@ -214,13 +268,98 @@ input[type='search']::-webkit-search-decoration {
 .fade {
   animation: fade 0.18s var(--ease-out);
 }
+/* выпадающие списки и меню: чуть съезжают от кнопки */
+.pop {
+  animation: pop 0.16s var(--ease-out);
+  transform-origin: top;
+}
+/* уход: окно, панель, подсказка */
+.leaving.fade,
+.leaving .fade {
+  animation: fade-out 0.14s ease-in forwards;
+}
+.leaving .sheet {
+  animation: sheet-out 0.14s ease-in forwards;
+}
+.leaving .slide {
+  animation: slide-out 0.16s ease-in forwards;
+}
+.leaving.rise {
+  animation: fade-out 0.16s ease-in forwards;
+}
+/* смена страницы */
+.page-in {
+  animation: rise-s 0.26s var(--ease-out);
+}
+/* данные пришли вместо скелетона */
+.appear {
+  animation: fade 0.24s var(--ease-out);
+}
+/* счётчик изменился */
+.bump {
+  animation: bump 0.32s var(--ease-out);
+}
+/* полосы прогресса растут слева */
+.grow {
+  animation: grow 0.6s var(--ease-out);
+  transform-origin: left;
+}
+/* первые строки списка появляются по очереди, дальше — сразу */
+.stagger > * {
+  animation: rise-s 0.3s var(--ease-out) backwards;
+}
+.stagger > :nth-child(2) { animation-delay: 25ms; }
+.stagger > :nth-child(3) { animation-delay: 50ms; }
+.stagger > :nth-child(4) { animation-delay: 75ms; }
+.stagger > :nth-child(5) { animation-delay: 100ms; }
+.stagger > :nth-child(6) { animation-delay: 125ms; }
+.stagger > :nth-child(7) { animation-delay: 150ms; }
+.stagger > :nth-child(8) { animation-delay: 175ms; }
+.stagger > :nth-child(n + 9) { animation-delay: 200ms; }
+
+/* скелетон: серая плашка с бегущим бликом. Сам появляется с задержкой,
+   чтобы при быстрой загрузке не мелькать */
+.skel {
+  position: relative;
+  overflow: hidden;
+  background: rgb(21 23 28 / 0.06);
+}
+.skel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.6), transparent);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+.skel-wrap {
+  animation: fade 0.3s ease-out 0.15s both;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .rise,
   .slide,
   .sheet,
-  .fade {
-    animation: none;
+  .fade,
+  .pop,
+  .page-in,
+  .appear,
+  .bump,
+  .grow,
+  .stagger > *,
+  .skel-wrap,
+  .skel::after {
+    animation: none !important;
+  }
+  .leaving,
+  .leaving * {
+    animation: none !important;
+    opacity: 0;
+  }
+  *,
+  ::before,
+  ::after {
+    transition-duration: 0.01ms !important;
   }
 }
 

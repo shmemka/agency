@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowUpRight, Plus, Send, Trash2, X } from 'lucide-react'
+import { ArrowUpRight, Plus, Send, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -8,7 +8,7 @@ import { isActive } from '../lib/rules'
 import { count, cpm, date, money } from '../lib/format'
 import type { Blogger } from '../lib/types'
 import { toast } from '../lib/toast'
-import { BloggerStatusSelect, Button, Card, Chip, Drawer, IconButton, Segmented, Spinner, StatusBadge, StatusRail } from './ui'
+import { BloggerStatusSelect, Button, Card, Chip, Drawer, DrawerClose, IconButton, Segmented, SkelDrawer, StatusBadge, StatusRail } from './ui'
 import { RichText } from './RichText'
 import { AudienceBar, BloggerName, TaskList, statsStale, useIntegrationPanel } from './bits'
 import { BloggerFields, NewIntegrationModal, cleanBlogger, type BloggerDraft } from './BloggerForm'
@@ -48,7 +48,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
   if (!b) {
     return (
       <Drawer onClose={onClose} label="Карточка блогера">
-        <div className="flex flex-1 items-center justify-center p-6 text-center text-muted">{loading ? <Spinner /> : 'Блогер не найден или у вас нет к нему доступа'}</div>
+        {loading ? <SkelDrawer /> : <div className="flex flex-1 items-center justify-center p-6 text-center text-muted">Блогер не найден или у вас нет к нему доступа</div>}
       </Drawer>
     )
   }
@@ -61,16 +61,13 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
   const c = cpm(b.price, b.avg_reach)
   const tg = tgUsername(b.contact)
   const guard = async () => !dirty || (await confirmDiscard())
-  const closeSafe = async () => {
-    if (await guard()) onClose()
-  }
 
   async function save() {
     if (!d?.nick?.trim()) return toast('Ник не может быть пустым')
     setBusy(true)
     const err = await patchBlogger(b!.id, cleanBlogger(d))
     setBusy(false)
-    if (err) return toast(err.includes('bloggers_platform_nick') ? 'Блогер с таким ником уже есть' : err)
+    if (err) return toast(err.includes('platform_nick') ? 'Блогер с таким ником уже есть' : err)
     setD(null)
     toast('Изменения сохранены')
   }
@@ -104,9 +101,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
               </IconButton>
             )}
             <span className="hidden md:block">
-              <IconButton label="Закрыть" onClick={closeSafe}>
-                <X className="size-[18px]" strokeWidth={1.5} />
-              </IconButton>
+              <DrawerClose />
             </span>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
