@@ -13,7 +13,6 @@ import { Avatar, BloggerStatusBadge, BloggerStatusSelect, Button, Empty, Input, 
 import { confirmDialog, promptDialog } from '../components/dialogs'
 import { AudienceBar, BloggerName, statsStale } from '../components/bits'
 import { BloggerDrawer, useBloggerStatus } from '../components/BloggerDrawer'
-import { SendOfferButton } from '../components/OfferCard'
 import { BloggerFormModal } from '../components/BloggerForm'
 import { ImportModal } from '../components/ImportModal'
 
@@ -397,7 +396,6 @@ export function Bloggers() {
                         <span className="min-w-0 flex-1">
                           <BloggerName b={b} />
                         </span>
-                        <SendOfferButton b={b} className="-my-1 opacity-0 group-hover:opacity-100 focus-visible:opacity-100" />
                       </div>
                     </td>
                     <td onClick={(e) => e.stopPropagation()}>

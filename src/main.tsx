@@ -21,7 +21,7 @@ import { Documents } from './pages/Documents'
 import { Finance } from './pages/Finance'
 import { Team } from './pages/Team'
 import { Share } from './pages/Share'
-import { OfferPage } from './pages/Offer'
+import { OfferGone } from './pages/Login'
 import { Profile } from './pages/Profile'
 import { Settings } from './pages/Settings'
 
@@ -69,9 +69,9 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           {/* страницы для клиента: без входа, по ссылке */}
           <Route path="/s/:token" element={<Share />} />
-          <Route path="/o/:token" element={<OfferPage />} />
+          <Route path="/o/:token" element={<OfferGone />} />
           <Route path="/s" element={<Share />} />
-          <Route path="/o" element={<OfferPage />} />
+          <Route path="/o" element={<OfferGone />} />
           <Route
             path="*"
             element={

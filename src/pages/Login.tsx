@@ -155,6 +155,16 @@ export function Pending() {
   )
 }
 
+/** Старые ссылки на персональные предложения блогерам: страниц больше нет */
+export function OfferGone() {
+  return (
+    <Shell>
+      <h1 className="text-2xl tracking-tight">Ссылка больше не действует</h1>
+      <p className="mt-2 text-muted">Если вы блогер и получили эту ссылку, просто ответьте менеджеру в том чате, где он вам написал</p>
+    </Shell>
+  )
+}
+
 /** Профиль не загрузился: связь, VPN или сама база. Доступ при этом может быть — не пугаем экраном для новичков */
 export function Offline({ reason }: { reason: string }) {
   return (

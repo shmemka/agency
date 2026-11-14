@@ -14,7 +14,7 @@ import { AudienceBar, BloggerName, TaskList, statsStale, useIntegrationPanel } f
 import { BloggerFields, NewIntegrationModal, cleanBlogger, type BloggerDraft } from './BloggerForm'
 import { DocumentsPanel } from './DocumentsPanel'
 import { Feed } from './Feed'
-import { OfferCard, tgUsername } from './OfferCard'
+import { tgUsername } from '../lib/contact'
 import { confirmDialog, confirmDiscard, promptDialog } from './dialogs'
 
 type Tab = 'work' | 'data' | 'docs'
@@ -145,7 +145,6 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
 
         {tab === 'work' && (
           <>
-            {b.status !== 'blacklist' && b.status !== 'worked' && <OfferCard key={b.id} b={b} />}
             <Card>
               <div className="mb-3 flex items-center justify-between gap-2">
                 <h3 className="text-base">В работе</h3>
