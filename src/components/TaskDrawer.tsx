@@ -7,7 +7,9 @@ import { useData } from '../lib/data'
 import { dateTime } from '../lib/format'
 import type { Task, TaskComment, TaskFile } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Button, Drawer, IconButton, Select, Spinner, Textarea, cx, sendOnEnter } from './ui'
+import { Avatar, Button, Drawer, IconButton, Select, Spinner, cx } from './ui'
+import { RichEditor } from './RichEditor'
+import { RichText } from './RichText'
 import { DateInput } from './DateInput'
 import { confirmDialog, confirmDiscard } from './dialogs'
 
@@ -292,15 +294,7 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
 
           <div className="mt-6">
             <span className="text-[13px] text-muted">Описание</span>
-            <Textarea
-              data-field="desc"
-              className="mt-1"
-              value={desc}
-              onChange={(e) => setDesc(e.target.value)}
-              onBlur={saveDesc}
-              placeholder="Что нужно сделать, ссылки, детали"
-              aria-label="Описание"
-            />
+            <RichEditor field="desc" className="mt-1 min-h-28" value={desc} onChange={setDesc} onBlur={saveDesc} placeholder="Что нужно сделать, ссылки, детали" label="Описание" />
           </div>
         </section>
 
@@ -380,7 +374,7 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
                         </button>
                       )}
                     </div>
-                    <p className="mt-0.5 leading-5 break-words whitespace-pre-line">{c.body}</p>
+                    <RichText value={c.body} className="mt-0.5 leading-5" />
                   </div>
                 </li>
               ))}
@@ -388,16 +382,7 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
           )}
           <div ref={listEnd} className="flex items-end gap-2">
             <Avatar name={profile?.full_name || profile?.email || ''} src={profile?.avatar_url} className="mb-1 size-8 text-[11px] max-sm:hidden" />
-            <Textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (sendOnEnter(e)) send()
-              }}
-              placeholder="Написать комментарий"
-              aria-label="Комментарий"
-              className="min-h-11! flex-1 py-2.5"
-            />
+            <RichEditor value={text} onChange={setText} onSubmit={send} compact placeholder="Написать комментарий" label="Комментарий" className="min-h-11 min-w-0 flex-1" />
             <IconButton label="Отправить комментарий" onClick={send} disabled={!text.trim() || sending} className="mb-0.5 bg-ink text-white hover:bg-ink/85 hover:text-white disabled:opacity-30">
               <ArrowUp className="size-[18px]" strokeWidth={1.75} />
             </IconButton>

@@ -321,13 +321,14 @@ export function FieldGroup({ title, children, className }: { title: string; chil
   )
 }
 
-export function Field({ label, hint, children, className }: { label: string; hint?: ReactNode; children: ReactNode; className?: string }) {
+/** as="div" — для полей с собственными кнопками (текст с форматированием): <label> переадресовал бы клик первой кнопке */
+export function Field({ label, hint, children, className, as: Tag = 'label' }: { label: string; hint?: ReactNode; children: ReactNode; className?: string; as?: 'label' | 'div' }) {
   return (
-    <label className={cx('block', className)}>
+    <Tag className={cx('block', className)}>
       <span className="mb-1 block text-[13px] text-muted">{label}</span>
       {children}
       {hint && <span className="mt-1 block text-xs text-faint">{hint}</span>}
-    </label>
+    </Tag>
   )
 }
 

@@ -5,7 +5,8 @@ import { useData } from '../lib/data'
 import { campaignStatusLabel } from '../lib/constants'
 import type { Campaign, Client, ShareLink } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Field, Input, Modal, Select, Textarea, cx } from './ui'
+import { Button, Field, Input, Modal, Select, cx } from './ui'
+import { RichEditor } from './RichEditor'
 import { CopyLink } from './bits'
 import { confirmDialog } from './dialogs'
 import { DateInput } from './DateInput'
@@ -137,8 +138,8 @@ export function CampaignModal({ value, onClose, onSaved }: { value: Partial<Camp
             {people.filter((t) => t.id !== d.owner_id && t.role !== 'admin').length === 0 && <span className="text-muted">Учредители видят все кампании. Специалистов можно добавить, когда они появятся в команде</span>}
           </div>
         </div>
-        <Field label="Бриф" className="sm:col-span-2">
-          <Textarea rows={3} value={d.brief ?? ''} onChange={(e) => set('brief', e.target.value)} placeholder="Продукт, аудитория, ключевые сообщения, ограничения" />
+        <Field as="div" label="Бриф" className="sm:col-span-2">
+          <RichEditor value={d.brief} onChange={(v) => set('brief', v)} placeholder="Продукт, аудитория, ключевые сообщения, ограничения" label="Бриф" className="min-h-24" />
         </Field>
       </div>
     </Modal>
@@ -198,8 +199,8 @@ export function ClientModal({ value, onClose }: { value: Partial<Client> | null;
         <Field label="Ниша">
           <Input value={d.niche ?? ''} onChange={(e) => set('niche', e.target.value)} placeholder="образование, кафе" />
         </Field>
-        <Field label="Заметки" className="sm:col-span-2">
-          <Textarea rows={3} value={d.notes ?? ''} onChange={(e) => set('notes', e.target.value)} />
+        <Field as="div" label="Заметки" className="sm:col-span-2">
+          <RichEditor value={d.notes} onChange={(v) => set('notes', v)} label="Заметки" className="min-h-24" />
         </Field>
       </div>
     </Modal>

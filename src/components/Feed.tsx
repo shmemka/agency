@@ -7,7 +7,9 @@ import { BLOGGER_STATUSES, STATUSES } from '../lib/constants'
 import { dateTime } from '../lib/format'
 import type { Activity } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Button, Spinner, Textarea, sendOnEnter } from './ui'
+import { Avatar, Button, Spinner } from './ui'
+import { RichEditor } from './RichEditor'
+import { RichText } from './RichText'
 import { confirmDialog } from './dialogs'
 
 const label = (s: string | null) => STATUSES.find((x) => x.id === s)?.label ?? BLOGGER_STATUSES.find((x) => x.id === s)?.label ?? s ?? ''
@@ -43,16 +45,7 @@ export function Feed({ bloggerId, integrationId }: { bloggerId: string; integrat
 
   return (
     <div>
-      <Textarea
-        rows={2}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        onKeyDown={(e) => {
-          if (sendOnEnter(e)) send()
-        }}
-        placeholder="Что произошло: написали, ответил, прислал реквизиты"
-        aria-label="Комментарий"
-      />
+      <RichEditor value={text} onChange={setText} onSubmit={send} compact placeholder="Что произошло: написали, ответил, прислал реквизиты" label="Комментарий" className="min-h-16" />
       <div className="mt-2 flex items-center justify-end gap-3">
         <Button size="sm" variant="primary" loading={busy} disabled={!text.trim()} onClick={send}>
           Добавить комментарий
@@ -89,7 +82,7 @@ export function Feed({ bloggerId, integrationId }: { bloggerId: string; integrat
                       </button>
                     )}
                   </div>
-                  {a.kind === 'comment' && <p className="mt-0.5 whitespace-pre-line">{a.body}</p>}
+                  {a.kind === 'comment' && <RichText value={a.body} className="mt-0.5" />}
                   {a.kind === 'status' && (
                     <p className="mt-0.5 text-muted">
                       {label(a.from_status)} → <span className="text-ink">{label(a.to_status)}</span>

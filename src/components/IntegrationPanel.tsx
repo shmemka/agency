@@ -9,7 +9,8 @@ import { checklist, isLive, ordDeadline } from '../lib/rules'
 import { count, cpm, date, daysBetween, money, parseNumber, todayISO } from '../lib/format'
 import type { Decision, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Card, Drawer, Field, IconButton, Input, Segmented, Select, Spinner, StatusRail, Textarea, Toggle, cx } from './ui'
+import { Button, Card, Drawer, Field, IconButton, Input, Segmented, Select, Spinner, StatusRail, Toggle, cx } from './ui'
+import { RichEditor } from './RichEditor'
 import { BloggerName, TaskList } from './bits'
 import { DocumentsPanel } from './DocumentsPanel'
 import { Feed } from './Feed'
@@ -298,8 +299,8 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
                     ))}
                 </Select>
               </Field>
-              <Field label="Заметки" className="sm:col-span-2">
-                <Textarea rows={3} value={v.notes ?? ''} onChange={(e) => set('notes', e.target.value)} />
+              <Field as="div" label="Заметки" className="sm:col-span-2">
+                <RichEditor value={v.notes} onChange={(x) => set('notes', x)} label="Заметки" className="min-h-24" />
               </Field>
             </div>
             {dirty && (

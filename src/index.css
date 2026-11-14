@@ -249,3 +249,78 @@ input[type='search']::-webkit-search-decoration {
 :is(.bg-surface, [role='dialog']) [data-variant='secondary']:hover:not(:disabled) {
   background-color: color-mix(in oklab, var(--color-ink) 8%, transparent);
 }
+
+/* ---------- текст с форматированием: комментарии, описания, заметки ---------- */
+.rich p {
+  margin: 0;
+}
+.rich p + p,
+.rich p + ul,
+.rich p + ol,
+.rich ul + p,
+.rich ol + p {
+  margin-top: 6px;
+}
+.rich ul,
+.rich ol {
+  margin: 0;
+  padding-left: 1.25em;
+}
+.rich ul {
+  list-style: disc;
+}
+.rich ol {
+  list-style: decimal;
+}
+.rich li + li {
+  margin-top: 2px;
+}
+.rich li > p + p {
+  margin-top: 0;
+}
+.rich li::marker {
+  color: var(--color-faint);
+}
+.rich strong {
+  font-weight: 600;
+}
+.rich a {
+  text-decoration: underline;
+  text-decoration-color: rgb(21 23 28 / 0.3);
+  text-underline-offset: 2px;
+}
+.rich a:hover {
+  text-decoration-color: currentColor;
+}
+.rich mark,
+[data-swatch] {
+  --hl: #fff0a3;
+  background: var(--hl);
+}
+.rich mark {
+  color: inherit;
+  border-radius: 4px;
+  padding: 1px 2px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.rich mark[data-color='lime'],
+[data-swatch='lime'] {
+  --hl: #e2f5a8;
+}
+.rich mark[data-color='pink'],
+[data-swatch='pink'] {
+  --hl: #ffd5d9;
+}
+.rich mark[data-color='blue'],
+[data-swatch='blue'] {
+  --hl: #d4e5ff;
+}
+/* подсказка в пустом поле редактора */
+.rich p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--color-faint);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

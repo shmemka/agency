@@ -9,6 +9,7 @@ import { count, cpm, date, money } from '../lib/format'
 import type { Blogger } from '../lib/types'
 import { toast } from '../lib/toast'
 import { BloggerStatusSelect, Button, Card, Chip, Drawer, IconButton, Segmented, Spinner, StatusBadge, StatusRail } from './ui'
+import { RichText } from './RichText'
 import { AudienceBar, BloggerName, TaskList, statsStale, useIntegrationPanel } from './bits'
 import { BloggerFields, NewIntegrationModal, cleanBlogger, type BloggerDraft } from './BloggerForm'
 import { DocumentsPanel } from './DocumentsPanel'
@@ -197,7 +198,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
             </Card>
             <Card>
               <h3 className="mb-3 text-base">Комментарии и история</h3>
-              {b.notes && <p className="mb-3 rounded-2xl bg-soft px-4 py-3 whitespace-pre-line text-muted">{b.notes}</p>}
+              {b.notes && <RichText value={b.notes} className="mb-3 rounded-2xl bg-soft px-4 py-3 text-muted" />}
               <Feed bloggerId={b.id} />
             </Card>
           </>

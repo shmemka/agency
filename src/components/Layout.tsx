@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { AGENCY } from '../lib/constants'
 import { rememberAgency } from '../lib/agency'
+import { preloadRichEditor } from './RichEditor'
 import { attention, taskOwner, type Attention } from '../lib/rules'
 import { dateTime } from '../lib/format'
 import { Avatar, IconButton, ITEM, ITEM_DESKTOP, Modal, POPOVER, cx } from './ui'
@@ -127,6 +128,7 @@ export function Layout() {
   const { tasks, settings } = useData()
   const agency = settings?.agency_name?.trim() || AGENCY
   // название агентства — во вкладке браузера и на странице входа (запоминаем для следующего раза)
+  useEffect(() => preloadRichEditor(), [])
   useEffect(() => {
     document.title = agency
     rememberAgency(agency)

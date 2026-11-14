@@ -8,7 +8,8 @@ import { nickFromUrl, parseNumber, platformFromUrl } from '../lib/format'
 import { removeAvatar, uploadAvatar } from '../lib/avatars'
 import type { Blogger, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Button, Field, FieldGroup, Input, Modal, Select, Textarea, cx } from './ui'
+import { Avatar, Button, Field, FieldGroup, Input, Modal, Select, cx } from './ui'
+import { RichEditor } from './RichEditor'
 
 export type BloggerDraft = Partial<Blogger>
 
@@ -275,8 +276,8 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
             )}
           </FieldGroup>
 
-          <Field label="Заметки">
-            <Textarea rows={3} value={d.notes ?? ''} onChange={(e) => set('notes', e.target.value)} />
+          <Field as="div" label="Заметки">
+            <RichEditor value={d.notes} onChange={(v) => set('notes', v)} label="Заметки" className="min-h-24" />
           </Field>
         </div>
       )}
