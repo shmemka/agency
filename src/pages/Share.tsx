@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { Check, Download, ExternalLink, Printer, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { AGENCY, platformInfo } from '../lib/constants'
+import { platformInfo } from '../lib/constants'
 import { count, cpm, date, downloadXlsx, money, plural } from '../lib/format'
 import type { AgeSplit, Platform } from '../lib/types'
 import { toast } from '../lib/toast'
@@ -59,7 +59,7 @@ function Frame({ d, title, children, actions }: { d: Base | null; title: string;
         <span className="flex size-8 items-center justify-center rounded-full bg-ink">
           <span className="bar-lime size-2.5 rounded-full" />
         </span>
-        <span className="flex-1 text-[15px] font-medium">{d?.agency ?? AGENCY}</span>
+        <span className="flex-1 text-[15px] font-medium">{d?.agency ?? ''}</span>
         <span className="no-print flex gap-2">{actions}</span>
       </header>
       {d && (

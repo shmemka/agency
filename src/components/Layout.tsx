@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, CalendarDays, Clapperboard, Ellipsis, FileText, LayoutGrid, ListTodo, LogOut, Megaphone, Settings, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
+import { Bell, CalendarDays, Check, ChevronsUpDown, Clapperboard, Ellipsis, Plus, FileText, LayoutGrid, ListTodo, LogOut, Megaphone, Settings, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
-import { AGENCY } from '../lib/constants'
-import { rememberAgency } from '../lib/agency'
+import { APP } from '../lib/constants'
+import { toast } from '../lib/toast'
+import { promptDialog } from './dialogs'
 import { preloadRichEditor } from './RichEditor'
 import { attention, taskOwner, type Attention } from '../lib/rules'
 import { dateTime } from '../lib/format'
@@ -39,6 +40,88 @@ function Mark() {
     <span className="relative inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-ink" aria-hidden>
       <span className="bar-lime size-2.5 rounded-full" />
     </span>
+  )
+}
+
+async function newWorkspace(create: (name: string) => Promise<string | null>) {
+  const name = await promptDialog({
+    title: 'Новый кабинет',
+    body: 'Отдельное агентство со своими блогерами, кампаниями и командой. Вы будете в нём учредителем',
+    label: 'Название агентства',
+    ok: 'Создать',
+    required: true,
+  })
+  if (!name?.trim()) return
+  const err = await create(name.trim())
+  if (err) toast(err)
+}
+
+/** Название кабинета в сайдбаре: по клику — мои кабинеты и «Создать кабинет», как в Notion */
+function WorkspaceMenu({ name }: { name: string }) {
+  const { workspaces, workspace, switchWorkspace, createWorkspace } = useAuth()
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const out = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false)
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
+    window.addEventListener('mousedown', out)
+    window.addEventListener('keydown', key)
+    return () => {
+      window.removeEventListener('mousedown', out)
+      window.removeEventListener('keydown', key)
+    }
+  }, [open])
+
+  return (
+    <div ref={box} className="relative min-w-0 flex-1">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+        className={cx('group flex w-full min-w-0 items-center gap-1 rounded-xl py-1 pr-1 pl-1 text-left hover:bg-ink/5', open && 'bg-ink/5')}
+        title="Кабинеты"
+      >
+        <span className="min-w-0 flex-1 truncate text-[15px] leading-5 font-medium">{name}</span>
+        {/* стрелка — только при наведении: в узком сайдбаре место нужно названию */}
+        <ChevronsUpDown className={cx('size-3.5 shrink-0 text-faint group-hover:block group-focus-visible:block', open ? 'block' : 'hidden')} strokeWidth={1.5} />
+      </button>
+      {open && (
+        <div role="menu" aria-label="Кабинеты" className={cx('fade absolute top-full left-0 z-40 mt-1.5 w-64', POPOVER)}>
+          {workspaces.map((w) => (
+            <button
+              key={w.id}
+              role="menuitem"
+              className={cx(ITEM, ITEM_DESKTOP, 'gap-2.5 hover:bg-soft', !w.is_active && 'text-muted')}
+              onClick={async () => {
+                setOpen(false)
+                if (w.id === workspace?.id) return
+                const err = await switchWorkspace(w.id)
+                if (err) toast(err)
+              }}
+            >
+              <span className="min-w-0 flex-1 truncate">{w.name}</span>
+              {!w.is_active && <span className="shrink-0 text-xs text-faint">{w.deactivated_at ? 'закрыт' : 'ждёт доступа'}</span>}
+              {w.id === workspace?.id && <Check className="size-4 shrink-0" strokeWidth={1.5} />}
+            </button>
+          ))}
+          <div className="mx-2.5 my-1 h-px bg-line" />
+          <button
+            role="menuitem"
+            className={cx(ITEM, ITEM_DESKTOP, 'gap-2.5 text-muted hover:bg-soft hover:text-ink')}
+            onClick={() => {
+              setOpen(false)
+              newWorkspace(createWorkspace)
+            }}
+          >
+            <Plus className="size-4 shrink-0" strokeWidth={1.5} />
+            Создать кабинет
+          </button>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -124,14 +207,13 @@ function BellButton() {
 }
 
 export function Layout() {
-  const { profile, signOut, isAdmin, team } = useAuth()
-  const { tasks, settings } = useData()
-  const agency = settings?.agency_name?.trim() || AGENCY
-  // название агентства — во вкладке браузера и на странице входа (запоминаем для следующего раза)
+  const { profile, signOut, isAdmin, team, workspace, workspaces, switchWorkspace, createWorkspace } = useAuth()
+  const { tasks } = useData()
+  const agency = workspace?.name ?? APP
+  // во вкладке браузера — агентство и сайт
   useEffect(() => preloadRichEditor(), [])
   useEffect(() => {
-    document.title = agency
-    rememberAgency(agency)
+    document.title = `${agency} — ${APP}`
   }, [agency])
   const { openId, open } = useIntegrationPanel()
   const loc = useLocation()
@@ -140,15 +222,15 @@ export function Layout() {
   const current = nav.find((n) => (n.end ? loc.pathname === n.to : loc.pathname.startsWith(n.to)))
   const name = profile?.full_name || profile?.email || ''
   const myTasks = tasks.filter((t) => !t.done_at && taskOwner(t) === profile?.id).length
-  const pending = isAdmin ? team.filter((t) => !t.is_active).length : 0
+  const pending = isAdmin ? team.filter((t) => !t.is_active && !t.deactivated_at).length : 0
   const badge = (to: string) => (to === '/tasks' ? myTasks : to === '/team' ? pending : 0)
 
   return (
     <div className="flex min-h-full">
       <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col p-4 md:flex">
-        <div className="flex items-center gap-2.5 px-2 pt-1 pb-6">
+        <div className="flex items-center gap-1.5 px-2 pt-1 pb-6">
           <Mark />
-          <span className="flex-1 text-[15px] leading-5 font-medium">{agency}</span>
+          <WorkspaceMenu name={agency} />
           <BellButton />
         </div>
         <nav className="flex-1 space-y-0.5" aria-label="Разделы">
@@ -196,6 +278,32 @@ export function Layout() {
 
       <Modal open={more} onClose={() => setMore(false)} title={name}>
         <div className="-mx-3">
+          {workspaces.map((w) => (
+            <button
+              key={w.id}
+              onClick={async () => {
+                if (w.id === workspace?.id) return setMore(false)
+                const err = await switchWorkspace(w.id)
+                if (err) toast(err)
+              }}
+              className={cx('flex h-12 w-full items-center gap-3 rounded-2xl px-3 text-left text-[15px] hover:bg-soft', !w.is_active && 'text-muted')}
+            >
+              <span className="flex size-5 items-center justify-center">{w.id === workspace?.id && <Check className="size-5" strokeWidth={1.5} />}</span>
+              <span className="min-w-0 flex-1 truncate">{w.name}</span>
+              {!w.is_active && <span className="text-[13px] text-faint">{w.deactivated_at ? 'закрыт' : 'ждёт доступа'}</span>}
+            </button>
+          ))}
+          <button
+            onClick={() => {
+              setMore(false)
+              newWorkspace(createWorkspace)
+            }}
+            className="flex h-12 w-full items-center gap-3 rounded-2xl px-3 text-[15px] text-muted hover:bg-soft"
+          >
+            <Plus className="size-5" strokeWidth={1.5} />
+            Создать кабинет
+          </button>
+          <div className="mx-3 my-2 h-px bg-line" />
           {nav
             .filter((n) => !n.phone)
             .map((n) => (

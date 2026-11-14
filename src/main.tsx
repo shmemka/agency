@@ -1,6 +1,6 @@
-import { StrictMode } from 'react'
+import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
 import './index.css'
 import { isConfigured } from './lib/supabase'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
@@ -9,7 +9,9 @@ import { Layout } from './components/Layout'
 import { Spinner, ToastHost } from './components/ui'
 import { DialogHost } from './components/dialogs'
 import { TooltipHost } from './components/Tooltip'
-import { Login, NewPassword, NotConfigured, Offline, Pending } from './pages/Login'
+import { Login, NewPassword, NotConfigured, Offline } from './pages/Login'
+import { JoinInvite, Onboarding, WsPending } from './pages/Workspaces'
+import { readInvite, saveInvite } from './lib/invite'
 import { Dashboard } from './pages/Dashboard'
 import { Bloggers } from './pages/Bloggers'
 import { Integrations } from './pages/Integrations'
@@ -25,8 +27,18 @@ import { OfferGone } from './pages/Login'
 import { Profile } from './pages/Profile'
 import { Settings } from './pages/Settings'
 
+/** /join/?t=… — запоминаем приглашение и идём на главную: там вход, регистрация или сразу кнопка «Присоединиться» */
+function JoinRoute() {
+  const [params] = useSearchParams()
+  const t = params.get('t')
+  // до перехода: главная сразу прочитает приглашение
+  if (t) saveInvite(t)
+  return <Navigate to="/" replace />
+}
+
 function Gate() {
-  const { session, profile, profileError, loading, isAdmin, recovery, endRecovery } = useAuth()
+  const { session, profile, profileError, loading, isAdmin, recovery, endRecovery, workspace } = useAuth()
+  const [invite, setInvite] = useState(readInvite)
   if (loading)
     return (
       <div className="flex h-full items-center justify-center">
@@ -36,7 +48,10 @@ function Gate() {
   if (!session) return <Login />
   if (recovery) return <NewPassword onDone={endRecovery} />
   if (!profile && profileError) return <Offline reason={profileError} />
-  if (!profile?.is_active) return <Pending />
+  if (!profile) return <Offline reason={profileError ?? 'Профиль не найден'} />
+  if (invite) return <JoinInvite token={invite} onSkip={() => setInvite(null)} />
+  if (!workspace) return <Onboarding />
+  if (!profile.is_active) return <WsPending />
   return (
     <DataProvider>
       <Routes>
@@ -72,6 +87,7 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/o/:token" element={<OfferGone />} />
           <Route path="/s" element={<Share />} />
           <Route path="/o" element={<OfferGone />} />
+          <Route path="/join" element={<JoinRoute />} />
           <Route
             path="*"
             element={

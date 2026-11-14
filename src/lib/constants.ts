@@ -1,6 +1,7 @@
 import type { CampaignStatus, DocKind, LegalStatus, Platform } from './types'
 
-export const AGENCY = 'No Name Agency'
+/** Название сайта. Название агентства — у каждого кабинета своё */
+export const APP = 'Сверка'
 
 /** Этапы воронки — живут в интеграции */
 export type Status =

@@ -1,5 +1,5 @@
-import { Lock } from 'lucide-react'
-import { useState } from 'react'
+import { Copy, Lock, RefreshCw } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -7,10 +7,12 @@ import { isActive } from '../lib/rules'
 import { date } from '../lib/format'
 import type { Profile } from '../lib/types'
 import { toast } from '../lib/toast'
+import { inviteUrl } from '../lib/invite'
+import { confirmDialog, promptDialog } from '../components/dialogs'
 import { Avatar, Button, Card, Field, Modal, PageHeader, Select, Table } from '../components/ui'
 
 export function Team() {
-  const { team, profile, isAdmin, reloadTeam } = useAuth()
+  const { team, profile, isAdmin, reloadTeam, workspace } = useAuth()
   const { bloggers, integrations, reload } = useData()
   const [closing, setClosing] = useState<Profile | null>(null)
   const [heir, setHeir] = useState('')
@@ -21,7 +23,8 @@ export function Team() {
   const count = (pid: string) => bloggers.filter((b) => b.owner_id === pid).length
 
   async function update(p: Profile, patch: Partial<Profile>) {
-    const { error } = await supabase.from('profiles').update(patch).eq('id', p.id)
+    // роль и доступ — у участника кабинета, а не у человека: в другом кабинете у него могут быть свои
+    const { error } = await supabase.from('workspace_members').update(patch).eq('workspace_id', workspace!.id).eq('profile_id', p.id)
     if (error) return toast(error.message)
     await reloadTeam()
     toast('Сохранено')
@@ -49,6 +52,8 @@ export function Team() {
   return (
     <>
       <PageHeader title="Команда" sub={isAdmin ? 'Учредители видят всё. Специалисты видят своих блогеров и свои кампании' : 'Вы видите своих блогеров и кампании, в которые вас добавили'} />
+
+      {isAdmin && <InviteCard />}
 
       {isAdmin && pending.length > 0 && (
         <Card className="mb-3">
@@ -158,7 +163,7 @@ export function Team() {
         </Card>
       )}
 
-      <p className="mt-4 px-1 text-[13px] text-muted">{isAdmin ? 'Чтобы добавить человека, отправьте ему адрес сайта. Он зарегистрируется, а вы откроете доступ здесь' : 'Новых людей подключают учредители'}</p>
+      <p className="mt-4 px-1 text-[13px] text-muted">{isAdmin ? 'Закрытый доступ не удаляет человека из «Сверки»: он остаётся в своих других кабинетах' : 'Новых людей приглашают учредители'}</p>
 
       <Modal
         open={!!closing}
@@ -192,5 +197,65 @@ export function Team() {
         )}
       </Modal>
     </>
+  )
+}
+
+async function copy(text: string, done: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    toast(done)
+  } catch {
+    await promptDialog({ title: 'Скопируйте ссылку', body: 'Браузер не дал скопировать автоматически. Ссылка уже выделена', value: text, readOnly: true })
+  }
+}
+
+/** Ссылка-приглашение в кабинет: по ней человек регистрируется и сразу попадает в команду */
+function InviteCard() {
+  const [token, setToken] = useState<string | null | undefined>(undefined)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    supabase
+      .from('workspace_invites')
+      .select('token')
+      .maybeSingle()
+      .then(({ data }) => setToken(data?.token ?? null))
+  }, [])
+
+  async function reset() {
+    const ok = await confirmDialog({
+      title: 'Сделать новую ссылку?',
+      body: 'Старая перестанет работать. Те, кто уже вошёл по ней, останутся в команде',
+      ok: 'Сделать новую',
+    })
+    if (!ok) return
+    setBusy(true)
+    const { data, error } = await supabase.rpc('reset_invite')
+    setBusy(false)
+    if (error) return toast(error.message)
+    setToken(data as string)
+    toast('Новая ссылка готова, старая больше не работает')
+  }
+
+  if (token === null) return null
+  const url = token ? inviteUrl(token) : ''
+  return (
+    <Card className="mb-3">
+      <h2 className="text-base">Пригласить в команду</h2>
+      <p className="mt-1 mb-4 text-muted">Отправьте ссылку коллеге. Он зарегистрируется и сразу попадёт в кабинет специалистом. Роль можно поменять ниже</p>
+      <div className="flex items-center gap-2 rounded-2xl bg-soft py-1 pr-1 pl-4">
+        <span className="min-w-0 flex-1 truncate py-2 text-[13px]">{url || 'Загружаем…'}</span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button size="sm" variant="primary" disabled={!url} onClick={() => copy(url, 'Ссылка скопирована')}>
+          <Copy className="size-3.5" strokeWidth={1.5} />
+          Скопировать ссылку
+        </Button>
+        <Button size="sm" loading={busy} disabled={!url} onClick={reset}>
+          {!busy && <RefreshCw className="size-3.5" strokeWidth={1.5} />}
+          Сделать новую
+        </Button>
+      </div>
+    </Card>
   )
 }

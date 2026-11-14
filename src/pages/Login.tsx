@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { siteUrl, supabase } from '../lib/supabase'
-import { PHASES } from '../lib/constants'
-import { useAgencyName } from '../lib/agency'
+import { APP, PHASES } from '../lib/constants'
+import { inviteUrl, readInvite } from '../lib/invite'
 import { Button, Field, Input, cx } from '../components/ui'
 
 const ERRORS: Record<string, string> = {
@@ -10,8 +10,10 @@ const ERRORS: Record<string, string> = {
   'User already registered': 'Эта почта уже зарегистрирована. Войдите',
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
-  const agency = useAgencyName()
+export function Shell({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    document.title = APP
+  }, [])
   return (
     <div className="flex min-h-full items-center justify-center p-4">
       <div className="rise grid w-full max-w-4xl overflow-hidden rounded-card bg-surface md:grid-cols-2">
@@ -20,10 +22,10 @@ function Shell({ children }: { children: React.ReactNode }) {
             <span className="flex size-8 items-center justify-center rounded-full bg-ink">
               <span className="bar-lime size-2.5 rounded-full" />
             </span>
-            <span className="text-[15px] font-medium">{agency}</span>
+            <span className="text-[15px] font-medium">{APP}</span>
           </div>
           <div>
-            <p className="text-[32px] leading-9 tracking-tight">Блогеры, договоры и выходы в одном кабинете</p>
+            <p className="text-[32px] leading-9 tracking-tight">Блогеры, договоры и выходы агентства в одном кабинете</p>
             <div className="mt-8 flex gap-1" aria-hidden>
               {PHASES.slice(0, 5).map((p, i) => (
                 <div key={p.id} className="flex-1">
@@ -40,8 +42,25 @@ function Shell({ children }: { children: React.ReactNode }) {
   )
 }
 
+/** Название кабинета по ссылке-приглашению, пока человек ещё не вошёл */
+export function useInviteName(token: string | null) {
+  const [name, setName] = useState<string | null | undefined>(token ? undefined : null)
+  useEffect(() => {
+    if (!token) return
+    let alive = true
+    supabase.rpc('invite_info', { p_token: token }).then(({ data }) => alive && setName((data as { name?: string } | null)?.name ?? null))
+    return () => {
+      alive = false
+    }
+  }, [token])
+  return name
+}
+
 export function Login() {
-  const [mode, setMode] = useState<'in' | 'up'>('in')
+  const invite = readInvite()
+  const inviteName = useInviteName(invite)
+  // по приглашению чаще приходят новые люди: сразу показываем регистрацию
+  const [mode, setMode] = useState<'in' | 'up'>(invite ? 'up' : 'in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -67,7 +86,7 @@ export function Login() {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
       if (error) setError(ERRORS[error.message] ?? error.message)
     } else {
-      const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: { data: { full_name: name }, emailRedirectTo: siteUrl() } })
+      const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: { data: { full_name: name }, emailRedirectTo: invite ? inviteUrl(invite) : siteUrl() } })
       if (error) setError(ERRORS[error.message] ?? error.message)
       else if (!data.session) setInfo('Отправили письмо для подтверждения почты. После подтверждения войдите здесь')
     }
@@ -90,7 +109,13 @@ export function Login() {
       <form onSubmit={submit} noValidate className="space-y-4">
         <div>
           <h1 className="text-2xl tracking-tight">{mode === 'in' ? 'Вход' : 'Регистрация'}</h1>
-          <p className="mt-1 text-muted">{mode === 'in' ? 'Кабинет команды агентства' : 'После регистрации учредитель откроет вам доступ'}</p>
+          <p className="mt-1 text-muted">
+            {inviteName
+              ? `Вас пригласили в команду «${inviteName}». ${mode === 'in' ? 'Войдите' : 'Зарегистрируйтесь'}, и вы сразу попадёте в кабинет`
+              : mode === 'in'
+                ? 'Кабинет агентства для работы с блогерами'
+                : 'Потом создадите кабинет своего агентства или присоединитесь к команде по ссылке-приглашению'}
+          </p>
         </div>
         {mode === 'up' && (
           <Field label="Имя и фамилия">
@@ -120,7 +145,7 @@ export function Login() {
           {mode === 'in' ? 'Войти' : 'Зарегистрироваться'}
         </Button>
         <p className="text-center text-muted">
-          {mode === 'in' ? 'Нет кабинета?' : 'Уже есть кабинет?'}{' '}
+          {mode === 'in' ? 'Нет аккаунта?' : 'Уже есть аккаунт?'}{' '}
           <button
             type="button"
             className="text-ink underline underline-offset-4"
@@ -134,23 +159,6 @@ export function Login() {
           </button>
         </p>
       </form>
-    </Shell>
-  )
-}
-
-export function Pending() {
-  return (
-    <Shell>
-      <h1 className="text-2xl tracking-tight">Кабинет создан</h1>
-      <p className="mt-2 text-muted">Учредители уже получили уведомление. Когда вам откроют доступ, обновите страницу</p>
-      <div className="mt-6 flex gap-2">
-        <Button variant="primary" onClick={() => window.location.reload()}>
-          Обновить
-        </Button>
-        <Button variant="ghost" onClick={() => supabase.auth.signOut()}>
-          Выйти
-        </Button>
-      </div>
     </Shell>
   )
 }

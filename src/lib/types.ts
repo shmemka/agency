@@ -10,6 +10,17 @@ export interface Profile {
   /** когда учредитель закрыл доступ; null — новый человек, ещё не допущен */
   deactivated_at?: string | null
   created_at: string
+  /** кабинет, в котором человек сейчас работает */
+  current_workspace_id?: string | null
+}
+
+/** Кабинет агентства и моё место в нём */
+export interface Workspace {
+  id: string
+  name: string
+  role: 'admin' | 'manager'
+  is_active: boolean
+  deactivated_at: string | null
 }
 
 export type Platform = 'tiktok' | 'youtube' | 'telegram' | 'vk' | 'instagram' | 'other'
@@ -239,7 +250,6 @@ export interface Expense {
 }
 
 export interface Settings {
-  agency_name: string
   default_markup_pct: number
   tax_org_pct: number
   tax_person_pct: number

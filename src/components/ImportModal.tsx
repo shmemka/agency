@@ -185,7 +185,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
     for (let i = 0; i < fresh.length; i += 300) {
       const { error } = await supabase.from('bloggers').upsert(
         fresh.slice(i, i + 300).map((r) => ({ ...r, owner_id: profile?.id })),
-        { onConflict: 'platform,nick_key', ignoreDuplicates: true },
+        { onConflict: 'workspace_id,platform,nick_key', ignoreDuplicates: true },
       )
       if (error) {
         setBusy(false)
