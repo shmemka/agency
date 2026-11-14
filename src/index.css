@@ -287,6 +287,16 @@ input[type='search']::-webkit-search-decoration {
 .leaving.rise {
   animation: fade-out 0.16s ease-in forwards;
 }
+/* иллюстрация первого экрана: проявляется и чуть опускается на место */
+@keyframes art-in {
+  from {
+    opacity: 0;
+    translate: -50% -12px;
+  }
+}
+.onboard-art {
+  animation: art-in 0.7s var(--ease-out);
+}
 /* смена страницы */
 .page-in {
   animation: rise-s 0.26s var(--ease-out);
@@ -342,6 +352,7 @@ input[type='search']::-webkit-search-decoration {
   .sheet,
   .fade,
   .pop,
+  .onboard-art,
   .page-in,
   .appear,
   .bump,
