@@ -1,5 +1,5 @@
 import { Check, Plus } from 'lucide-react'
-import { bloggerStatusInfo, platformInfo } from '../lib/constants'
+import { bloggerStatusInfo } from '../lib/constants'
 import { count, money, plural } from '../lib/format'
 import type { Blogger } from '../lib/types'
 import { cx } from './ui'
@@ -8,7 +8,8 @@ import { cx } from './ui'
  * Карточка блогера в сетке на экране «Блогеры» (решение владельца, по референсу).
  * С фото: снимок на всю карточку, к низу он размывается в собственный цвет, и на этом фоне белый текст.
  * Без фото: почти незаметный градиент, свой оттенок у каждого ника, и крупные буквы ника.
- * Карточка - «контейнер»: в узкой (две колонки на телефоне) остаются ник, охват и цена
+ * На телефоне (две колонки) - только ник и под ним подписчики, прижаты к нижнему краю.
+ * Карточка - «контейнер»: в узкой на планшете прячутся подписчики, подпись и кнопка
  */
 
 const hash = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7)
@@ -34,7 +35,6 @@ export function BloggerCard({
   onDeal?: () => void
 }) {
   const photo = b.avatar_url
-  const p = platformInfo(b.platform)
   const st = bloggerStatusInfo(b.status)
   const black = b.status === 'blacklist'
   const hue = hash(b.nick) % 360
@@ -70,13 +70,10 @@ export function BloggerCard({
         </>
       )}
 
-      {/* верх: площадка и отметки; галочка для массовых действий справа */}
+      {/* верх: оценка блогера; галочка для массовых действий справа */}
       <div className="absolute inset-x-0 top-0 flex items-start gap-1.5 p-3">
-        <span className={cx(chip, 'font-medium')} title={p.label}>
-          {p.short}
-        </span>
         {b.status !== 'in_base' && (
-          <span className={cx(chip, '@max-[239px]:hidden')}>
+          <span className={cx(chip, 'max-sm:hidden @max-[239px]:hidden')}>
             {!black && <span className={cx('size-1.5 rounded-full', st.dot)} />}
             {st.label}
           </span>
@@ -108,12 +105,19 @@ export function BloggerCard({
           <div className="min-w-0 flex-1">
             <div className="truncate text-base leading-6 font-medium @min-[240px]:text-lg">{b.nick}</div>
             {busy ? (
-              <div className={cx('truncate text-[13px]', photo ? 'text-white/85' : 'text-ink')} title={busy.more ? `ещё ${busy.more}` : undefined}>
+              <div className={cx('truncate text-[13px] max-sm:hidden', photo ? 'text-white/85' : 'text-ink')} title={busy.more ? `ещё ${busy.more}` : undefined}>
                 в работе: {busy.first}
                 {busy.more > 0 && <span className="num opacity-70"> +{busy.more}</span>}
               </div>
             ) : (
-              sub && <div className={cx('truncate text-[13px] @max-[200px]:hidden', photo ? 'text-white/75' : 'text-muted')}>{sub}</div>
+              sub && <div className={cx('truncate text-[13px] max-sm:hidden @max-[200px]:hidden', photo ? 'text-white/75' : 'text-muted')}>{sub}</div>
+            )}
+            {/* телефон: под ником только подписчики */}
+            {b.followers != null && (
+            <div className="num truncate text-[13px] sm:hidden">
+              {count(b.followers)}
+              <span className={photo ? 'text-white/70' : 'text-muted'}> {b.followers >= 1000 ? 'подписчиков' : plural(b.followers, 'подписчик', 'подписчика', 'подписчиков')}</span>
+            </div>
             )}
           </div>
           {onDeal && !black && (
@@ -123,24 +127,24 @@ export function BloggerCard({
                 e.stopPropagation()
                 onDeal()
               }}
-              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-white px-3 text-[13px] font-medium text-ink shadow-[0_2px_8px_rgb(21_23_28/0.12)] transition-[background-color,transform] duration-150 hover:bg-white/90 active:scale-[0.97] @max-[259px]:hidden"
+              className="inline-flex h-9 shrink-0 items-center gap-1 rounded-full bg-white px-3 text-[13px] font-medium text-ink shadow-[0_2px_8px_rgb(21_23_28/0.12)] transition-[background-color,transform] duration-150 hover:bg-white/90 active:scale-[0.97] max-sm:hidden @max-[259px]:hidden"
             >
               <Plus className="size-3.5" strokeWidth={1.5} />В сделку
             </button>
           )}
         </div>
-        <dl className="num mt-2.5 flex gap-4 text-[13px] leading-4 whitespace-nowrap @min-[240px]:mt-3">
+        <dl className="num mt-2.5 flex gap-3 text-[13px] leading-4 whitespace-nowrap max-sm:hidden @min-[240px]:mt-3">
           <div className="@max-[239px]:hidden">
             <dt className={cx('text-[11px]', photo ? 'text-white/70' : 'text-muted')}>подписчики</dt>
-            <dd className="mt-1">{count(b.followers)}</dd>
+            <dd className="mt-0.5">{count(b.followers)}</dd>
           </div>
           <div>
             <dt className={cx('text-[11px]', photo ? 'text-white/70' : 'text-muted')}>охват</dt>
-            <dd className="mt-1">{count(b.avg_reach)}</dd>
+            <dd className="mt-0.5">{count(b.avg_reach)}</dd>
           </div>
           <div>
             <dt className={cx('text-[11px]', photo ? 'text-white/70' : 'text-muted')}>цена</dt>
-            <dd className="mt-1">{money(b.price)}</dd>
+            <dd className="mt-0.5">{money(b.price)}</dd>
           </div>
         </dl>
       </div>
