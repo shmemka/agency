@@ -39,7 +39,7 @@ export function useAttention(): Attention[] {
 
 /** Логотип агентства из настроек кабинета: по высоте значка, длинный - до ширины меню */
 export function BrandLogo({ src, name, className }: { src: string; name: string; className?: string }) {
-  return <img src={src} alt={name} title={name} className={cx('h-8 w-auto max-w-40 object-contain object-left', className)} />
+  return <img src={src} alt={name} title={name} className={cx('h-8 w-auto max-w-36 min-w-0 object-contain object-left', className)} />
 }
 
 export function Mark() {

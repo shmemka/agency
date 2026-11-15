@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Check, Pipette, Upload } from 'lucide-react'
-import { Link } from 'react-router-dom'
+import { Bell, Building2, Check, CircleArrowUp, Coins, LayoutGrid, ListTodo, LogOut, Palette, Pipette, Upload, Users, type LucideIcon } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { fetchAll, siteUrl, supabase } from '../lib/supabase'
 import { AVATAR_BUCKET, avatarPath } from '../lib/avatars'
 import { useAuth } from '../auth/AuthProvider'
@@ -9,43 +9,74 @@ import { parseNumber, plural } from '../lib/format'
 import type { Settings as SettingsRow } from '../lib/types'
 import { toast } from '../lib/toast'
 import { confirmDialog } from '../components/dialogs'
-import { Avatar, Button, Card, Field, Input, Loading, Modal, PageHeader, Skel, cx, submitOnEnter } from '../components/ui'
+import { Avatar, Button, Card, Field, Input, Loading, Modal, PageHeader, Segmented, Skel, cx, submitOnEnter } from '../components/ui'
 import { PLAN, UpgradeButton, WorkspaceTile } from '../components/Workspace'
 import { BrandLogo, Mark } from '../components/Layout'
-import { BRAND_PRESETS, DEFAULT_BRAND, LOGO_BUCKET, applyBrand, logoPath, normalizeHex, onBrand, removeLogo, uploadLogo } from '../lib/brand'
+import { BRAND_PRESETS, DEFAULT_BRAND, LOGO_BUCKET, applyBrand, logoPath, normalizeHex, onBrand, prepareLogo, removeLogo, uploadLogo, type PreparedLogo } from '../lib/brand'
+
+type SectionId = 'general' | 'brand' | 'money' | 'danger'
+
+/** Разделы настроек: у каждого свой адрес, /settings/brand и т. п. Учредитель видит все, специалист - общее и выход */
+const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; admin?: boolean }[] = [
+  { id: 'general', label: 'Общее', icon: Building2 },
+  { id: 'brand', label: 'Оформление', icon: Palette, admin: true },
+  { id: 'money', label: 'Деньги и ОРД', icon: Coins, admin: true },
+  { id: 'danger', label: 'Выход и удаление', icon: LogOut },
+]
 
 /**
  * Настройки текущего кабинета. Открываются из меню профиля.
- * Видят все участники; менять название, деньги и тариф могут учредители, покинуть кабинет - любой.
- * Сверху «паспорт» кабинета, ниже деньги, в самом низу - необратимое
+ * Слева разделы (на телефоне - переключатель сверху), справа - один выбранный раздел
  */
 export function Settings() {
   const { workspace, isAdmin } = useAuth()
   const { settings } = useData()
+  const { section } = useParams()
+  const navigate = useNavigate()
+  const list = SECTIONS.filter((x) => !x.admin || isAdmin)
+  const cur = list.find((x) => x.id === section) ?? list[0]
   if (!workspace) return null
+  const go = (id: SectionId) => navigate(id === 'general' ? '/settings' : `/settings/${id}`, { replace: true })
   return (
     <>
       <PageHeader title="Настройки кабинета" sub={isAdmin ? undefined : 'Менять настройки могут учредители'} />
-      <div className="grid max-w-2xl gap-3">
-        <Passport />
-        {isAdmin && <BrandCard />}
-        {isAdmin &&
-          (settings ? (
-            <MoneyCard s={settings} />
-          ) : (
-            <Loading className="rounded-card bg-surface p-6">
-              <Skel className="h-4 w-32" />
-              <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                {[0, 1].map((r) => (
-                  <div key={r}>
-                    <Skel className="h-3 w-32" />
-                    <Skel className="mt-2.5 h-10 w-full rounded-2xl" />
-                  </div>
-                ))}
-              </div>
-            </Loading>
+      <div className="lg:grid lg:grid-cols-[200px_minmax(0,42rem)] lg:items-start lg:gap-8">
+        <nav aria-label="Разделы настроек" className="sticky top-8 hidden space-y-0.5 lg:block">
+          {list.map((x) => (
+            <button
+              key={x.id}
+              type="button"
+              aria-current={x.id === cur.id ? 'page' : undefined}
+              onClick={() => go(x.id)}
+              className={cx('flex h-9 w-full items-center gap-2.5 rounded-full px-3 text-left transition-colors duration-150', x.id === cur.id ? 'bg-surface text-ink' : 'text-muted hover:bg-ink/5 hover:text-ink')}
+            >
+              <x.icon className="size-4" strokeWidth={1.5} />
+              {x.label}
+            </button>
           ))}
-        <DangerCard />
+        </nav>
+        <Segmented className="mb-4 max-w-full lg:hidden" value={cur.id} options={list.map((x) => ({ id: x.id, label: x.label }))} onChange={go} />
+        <div key={cur.id} className="fade grid min-w-0 grid-cols-1 gap-3">
+          {cur.id === 'general' && <Passport />}
+          {cur.id === 'brand' && <BrandSection />}
+          {cur.id === 'money' &&
+            (settings ? (
+              <MoneyCard s={settings} />
+            ) : (
+              <Loading className="rounded-card bg-surface p-6">
+                <Skel className="h-4 w-32" />
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  {[0, 1].map((r) => (
+                    <div key={r}>
+                      <Skel className="h-3 w-32" />
+                      <Skel className="mt-2.5 h-10 w-full rounded-2xl" />
+                    </div>
+                  ))}
+                </div>
+              </Loading>
+            ))}
+          {cur.id === 'danger' && <DangerCard />}
+        </div>
       </div>
     </>
   )
@@ -126,175 +157,251 @@ function Passport() {
   )
 }
 
-/** Логотип в меню и брендовый цвет вместо зелёного. Пока ничего не выбрано, всё как у «Сверки» */
-function BrandCard() {
+type LogoDraft = { kind: 'keep' } | { kind: 'none' } | { kind: 'new'; logo: PreparedLogo; name: string }
+
+/**
+ * Логотип и брендовый цвет. Всё, что выбрано, сразу видно в предпросмотре, а сохраняется одной кнопкой.
+ * Логотип подгоняется сам: поля по краям обрезаются, рисунок вписывается в место в меню
+ */
+function BrandSection() {
   const { workspace, reloadProfile } = useAuth()
   const saved = workspace?.brand_color || DEFAULT_BRAND
+  const savedLogo = workspace?.logo_url || null
   const [color, setColor] = useState(saved)
   const [hex, setHex] = useState<string | null>(null)
+  const [draft, setDraft] = useState<LogoDraft>({ kind: 'keep' })
+  const [reading, setReading] = useState(false)
+  const [drag, setDrag] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [busy, setBusy] = useState<'upload' | 'remove' | null>(null)
   const file = useRef<HTMLInputElement>(null)
-  const dirty = color !== saved
-  const custom = !BRAND_PRESETS.some((p) => p.hex === color)
 
-  // выбранный цвет сразу виден на сайте; без сохранения вернётся прежний
+  // выбранный цвет сразу виден на всём сайте; без сохранения вернётся прежний
   useEffect(() => {
     applyBrand(color)
     return () => applyBrand(saved)
   }, [color, saved])
+  // предпросмотр нового файла живёт в памяти браузера - освобождаем, когда он больше не нужен
+  useEffect(() => () => void (draft.kind === 'new' && URL.revokeObjectURL(draft.logo.url)), [draft])
 
   if (!workspace) return null
-  const logo = workspace.logo_url || null
+  const logo = draft.kind === 'new' ? draft.logo.url : draft.kind === 'none' ? null : savedLogo
+  const dirty = color !== saved || draft.kind !== 'keep'
+  const custom = !BRAND_PRESETS.some((p) => p.hex === color)
   const migrate = (m: string) => (/logo_url|brand_color|schema cache/i.test(m) ? 'Нужно запустить миграцию 019_workspace_brand.sql в Supabase' : m)
 
-  async function upload(f: File) {
-    setBusy('upload')
+  async function pick(f: File | undefined) {
+    if (!f) return
+    setReading(true)
     try {
-      const url = await uploadLogo(workspace!.id, f)
-      const { error } = await supabase.from('workspaces').update({ logo_url: url }).eq('id', workspace!.id)
-      if (error) {
-        await removeLogo(url)
-        throw new Error(migrate(error.message))
-      }
-      if (logo && logoPath(logo)) await supabase.storage.from(LOGO_BUCKET).remove([logoPath(logo)!])
-      await reloadProfile()
-      toast('Логотип загружен')
+      setDraft({ kind: 'new', logo: await prepareLogo(f), name: f.name })
     } catch (e) {
       toast((e as Error).message)
     }
-    setBusy(null)
-  }
-
-  async function remove() {
-    setBusy('remove')
-    const { error } = await supabase.from('workspaces').update({ logo_url: null }).eq('id', workspace!.id)
-    if (error) toast(migrate(error.message))
-    else {
-      await removeLogo(logo)
-      await reloadProfile()
-      toast('Логотип убран')
-    }
-    setBusy(null)
+    setReading(false)
   }
 
   async function save() {
     setSaving(true)
-    const { error } = await supabase
-      .from('workspaces')
-      .update({ brand_color: color === DEFAULT_BRAND ? null : color })
-      .eq('id', workspace!.id)
+    let uploaded: string | null = null
+    try {
+      if (draft.kind === 'new') uploaded = await uploadLogo(workspace!.id, draft.logo)
+      const logo_url = draft.kind === 'keep' ? savedLogo : uploaded
+      const { error } = await supabase
+        .from('workspaces')
+        .update({ logo_url, brand_color: color === DEFAULT_BRAND ? null : color })
+        .eq('id', workspace!.id)
+      if (error) throw new Error(migrate(error.message))
+      if (draft.kind !== 'keep') await removeLogo(savedLogo)
+      await reloadProfile()
+      setDraft({ kind: 'keep' })
+      toast('Оформление сохранено')
+    } catch (e) {
+      if (uploaded) await removeLogo(uploaded)
+      toast((e as Error).message)
+    }
     setSaving(false)
-    if (error) return toast(migrate(error.message))
-    await reloadProfile()
-    toast('Цвет сохранён')
   }
 
+  function reset() {
+    setColor(saved)
+    setHex(null)
+    setDraft({ kind: 'keep' })
+  }
+
+  const note =
+    draft.kind === 'new'
+      ? `${draft.name}${draft.logo.trimmed ? ' - пустые поля обрезаны' : ''}`
+      : draft.kind === 'none'
+        ? 'В меню вернутся значок и название агентства'
+        : 'SVG или PNG на прозрачном фоне. Файл можно перетащить на предпросмотр выше'
   const swatch = 'relative flex size-9 shrink-0 items-center justify-center rounded-full shadow-[inset_0_0_0_1px_rgb(21_23_28/0.08)] transition-transform duration-150 active:scale-90'
   const picked = 'ring-2 ring-ink ring-offset-2 ring-offset-surface'
 
   return (
     <Card>
-      <h2 className="text-base">Оформление</h2>
-      <div>
-        <Group title="Логотип" sub="SVG или PNG до 1 МБ. Стоит в меню вместо значка и названия агентства">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            {/* так верх меню выглядит на сайте: на том же сером фоне */}
-            <div className="flex h-16 min-w-0 flex-1 items-center gap-1.5 rounded-inner bg-canvas px-4">
-              {logo ? (
-                <BrandLogo src={logo} name={workspace.name} />
-              ) : (
-                <>
-                  <Mark />
-                  <span className="truncate pl-1 text-[15px] font-medium">{workspace.name}</span>
-                </>
-              )}
+      {/* предпросмотр: кусок меню и карточка с акцентами - в выбранных логотипе и цвете */}
+      <div
+        className={cx('relative overflow-hidden rounded-inner bg-canvas p-4 transition-shadow duration-150', drag && 'shadow-[inset_0_0_0_2px_var(--color-ink)]')}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDrag(true)
+        }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDrag(false)
+          pick(e.dataTransfer.files?.[0])
+        }}
+      >
+        <div className="flex gap-4" aria-hidden>
+          <div className="w-52 shrink-0">
+            <div className="flex items-center gap-1.5 px-2">
+              {/* пунктир - место логотипа в меню */}
+              <div className="flex h-8 w-36 min-w-0 items-center rounded-[6px] outline-1 outline-offset-2 outline-ink/20 outline-dashed">
+                {logo ? (
+                  <BrandLogo key={logo} src={logo} name={workspace.name} className="appear" />
+                ) : (
+                  <>
+                    <Mark />
+                    <span className="truncate pl-2.5 text-[15px] leading-5 font-medium">{workspace.name}</span>
+                  </>
+                )}
+              </div>
+              <span className="ml-auto flex size-10 shrink-0 items-center justify-center rounded-full bg-surface text-muted">
+                <Bell className="size-[18px]" strokeWidth={1.5} />
+              </span>
             </div>
-            <div className="flex gap-2">
-              <Button loading={busy === 'upload'} disabled={!!busy} onClick={() => file.current?.click()}>
-                {busy !== 'upload' && <Upload className="size-4" strokeWidth={1.5} />}
-                {logo ? 'Заменить' : 'Загрузить'}
-              </Button>
-              {logo && (
-                <Button variant="ghost" loading={busy === 'remove'} disabled={!!busy} onClick={remove}>
-                  Убрать
-                </Button>
-              )}
+            <div className="mt-5 space-y-0.5">
+              {[
+                [LayoutGrid, 'Обзор'],
+                [Users, 'Блогеры'],
+                [ListTodo, 'Задачи'],
+              ].map(([Icon, label], i) => {
+                const I = Icon as LucideIcon
+                return (
+                  <div key={i} className={cx('flex h-9 items-center gap-2.5 rounded-full px-3', i === 0 ? 'bg-surface' : 'text-muted')}>
+                    <I className="size-[18px]" strokeWidth={1.5} />
+                    {label as string}
+                  </div>
+                )
+              })}
             </div>
-            <input
-              ref={file}
-              type="file"
-              accept=".svg,.png,image/svg+xml,image/png"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                e.target.value = ''
-                if (f) upload(f)
-              }}
-            />
           </div>
-        </Group>
+          <div className="hidden min-w-0 flex-1 rounded-[20px] bg-surface p-4 sm:block">
+            <div className="text-xs text-muted">Кампания</div>
+            <div className="truncate text-[15px]">Весенний запуск</div>
+            <div className="mt-4 flex h-1.5 overflow-hidden rounded-full bg-ink/6">
+              <span className="bar-lime w-[62%] rounded-full" />
+            </div>
+            <div className="num mt-1.5 flex justify-between text-xs text-faint">
+              <span>5 из 8 интеграций</span>
+              <span>62 %</span>
+            </div>
+            <div className="mt-4">
+              <span className="inline-flex h-8 items-center gap-1.5 rounded-full bg-lime px-3 text-[13px] font-medium text-lime-ink">
+                <CircleArrowUp className="size-3.5" strokeWidth={1.5} />
+                Улучшить
+              </span>
+            </div>
+          </div>
+        </div>
+        {drag && (
+          <div className="fade absolute inset-0 flex items-center justify-center bg-canvas/85 text-sm">
+            Отпустите, чтобы поставить логотип
+          </div>
+        )}
+      </div>
 
-        <Group title="Брендовый цвет" sub="Заменяет зелёный в кнопках, полосах прогресса и отметках">
-          <div className="flex flex-wrap items-center gap-3" role="radiogroup" aria-label="Брендовый цвет">
-            {BRAND_PRESETS.map((p) => (
-              <button
-                key={p.hex}
-                type="button"
-                role="radio"
-                aria-checked={color === p.hex}
-                title={p.label}
-                onClick={() => {
-                  setColor(p.hex)
-                  setHex(null)
-                }}
-                className={cx(swatch, color === p.hex && picked)}
-                style={{ background: p.hex, color: onBrand(p.hex) }}
-              >
-                {color === p.hex && <Check className="size-4" strokeWidth={2} />}
-              </button>
-            ))}
-            {/* свой цвет: системная палитра или код из брендбука */}
-            <label title="Свой цвет" className={cx(swatch, 'cursor-pointer', custom ? picked : 'bg-soft text-muted ring-1 ring-line hover:text-ink')} style={custom ? { background: color, color: onBrand(color) } : undefined}>
-              {custom ? <Check className="size-4" strokeWidth={2} /> : <Pipette className="size-4" strokeWidth={1.5} />}
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => {
-                  setColor(e.target.value)
-                  setHex(null)
-                }}
-                className="absolute inset-0 cursor-pointer opacity-0"
-                aria-label="Свой цвет"
-              />
-            </label>
+      <section className="mt-5 border-t border-line pt-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+          <div className="min-w-0">
+            <h3 className="text-sm font-medium">Логотип</h3>
+            <p className="mt-1 text-[13px] break-words text-muted">{note}</p>
+            {draft.kind === 'new' && draft.logo.warnings.length > 0 && (
+              <ul className="mt-1.5 space-y-1 text-[13px] text-warn">
+                {draft.logo.warnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            )}
           </div>
-          <div className="mt-4 max-w-40" onKeyDown={(e) => submitOnEnter(e, e.currentTarget.closest('section')!, 'button[data-save]')}>
-            <Field label="Код цвета">
-              <Input
-                className="num"
-                value={hex ?? color}
-                maxLength={7}
-                spellCheck={false}
-                onChange={(e) => {
-                  setHex(e.target.value)
-                  const v = normalizeHex(e.target.value)
-                  if (v && e.target.value.replace('#', '').length === 6) setColor(v)
-                }}
-                onBlur={() => setHex(null)}
-              />
-            </Field>
+          <div className="flex shrink-0 gap-2">
+            <Button loading={reading} disabled={saving} onClick={() => file.current?.click()}>
+              {!reading && <Upload className="size-4" strokeWidth={1.5} />}
+              {logo ? 'Заменить' : 'Загрузить'}
+            </Button>
+            {logo && (
+              <Button variant="ghost" disabled={saving || reading} onClick={() => setDraft(savedLogo ? { kind: 'none' } : { kind: 'keep' })}>
+                Убрать
+              </Button>
+            )}
           </div>
-          <SaveBar
-            dirty={dirty}
-            saving={saving}
-            onSave={save}
-            onReset={() => {
-              setColor(saved)
-              setHex(null)
+          <input
+            ref={file}
+            type="file"
+            accept=".svg,.png,image/svg+xml,image/png"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              pick(f)
             }}
           />
-        </Group>
+        </div>
+      </section>
+
+      <Group title="Цвет" sub="Заменяет зелёный в кнопках, полосах прогресса и отметках">
+        <div className="flex flex-wrap items-center gap-3" role="radiogroup" aria-label="Цвет">
+          {BRAND_PRESETS.map((p) => (
+            <button
+              key={p.hex}
+              type="button"
+              role="radio"
+              aria-checked={color === p.hex}
+              title={p.label}
+              onClick={() => {
+                setColor(p.hex)
+                setHex(null)
+              }}
+              className={cx(swatch, color === p.hex && picked)}
+              style={{ background: p.hex, color: onBrand(p.hex) }}
+            >
+              {color === p.hex && <Check className="size-4" strokeWidth={2} />}
+            </button>
+          ))}
+          {/* свой цвет: системная палитра или код из брендбука */}
+          <label title="Свой цвет" className={cx(swatch, 'cursor-pointer', custom ? picked : 'bg-soft text-muted hover:text-ink')} style={custom ? { background: color, color: onBrand(color) } : undefined}>
+            {custom ? <Check className="size-4" strokeWidth={2} /> : <Pipette className="size-4" strokeWidth={1.5} />}
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => {
+                setColor(e.target.value)
+                setHex(null)
+              }}
+              className="absolute inset-0 cursor-pointer opacity-0"
+              aria-label="Свой цвет"
+            />
+          </label>
+          <span onKeyDown={(e) => submitOnEnter(e, e.currentTarget.closest('[data-brand]'), 'button[data-save]')}>
+            <Input
+              aria-label="Код цвета"
+              className="num h-9 w-28!"
+              value={hex ?? color}
+              maxLength={7}
+              spellCheck={false}
+              onChange={(e) => {
+                setHex(e.target.value)
+                const v = normalizeHex(e.target.value)
+                if (v && e.target.value.replace('#', '').length === 6) setColor(v)
+              }}
+              onBlur={() => setHex(null)}
+            />
+          </span>
+        </div>
+      </Group>
+      <div data-brand>
+        <SaveBar dirty={dirty} saving={saving} onSave={save} onReset={reset} />
       </div>
     </Card>
   )
@@ -356,7 +463,6 @@ function MoneyCard({ s }: { s: SettingsRow }) {
 
   return (
     <Card>
-      <h2 className="text-base">Деньги и ОРД</h2>
       <div onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')}>
         <Group title="Кампании">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -380,7 +486,7 @@ function MoneyCard({ s }: { s: SettingsRow }) {
 /** Группа полей внутри карточки: тонкая линия сверху и короткий заголовок */
 function Group({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {
   return (
-    <section className="mt-5 border-t border-line pt-5 first:mt-4 first:border-t-0 first:pt-0">
+    <section className="mt-5 border-t border-line pt-5 first:mt-0 first:border-t-0 first:pt-0">
       <h3 className="text-sm font-medium">{title}</h3>
       {sub && <p className="mt-1 text-[13px] text-muted">{sub}</p>}
       <div className="mt-4">{children}</div>
@@ -409,8 +515,7 @@ function DangerCard() {
   const { isAdmin } = useAuth()
   return (
     <Card>
-      <h2 className="text-base">Выход и удаление</h2>
-      <div className="mt-5">
+      <div>
         <LeaveRow />
         {isAdmin && (
           <>

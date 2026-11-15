@@ -68,6 +68,7 @@ function Gate() {
           <Route path="team" element={<Team />} />
           <Route path="profile" element={<Profile />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="settings/:section" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
