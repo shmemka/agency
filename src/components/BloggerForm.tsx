@@ -205,7 +205,7 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
           <FieldGroup title="Цена и охват">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Цена за интеграцию, ₽">{num('price')}</Field>
-              <Field label={p.reach} hint={d.platform === 'tiktok' ? 'По последним 9–10 видео' : undefined}>
+              <Field label={p.reach} hint={d.platform === 'tiktok' ? 'По последним 9-10 видео' : undefined}>
                 {num('avg_reach')}
               </Field>
               {d.platform === 'vk' && <Field label="Средние просмотры клипа">{num('clip_views')}</Field>}
@@ -232,7 +232,7 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
                 </Field>
               ))}
             </div>
-            {ageSum > 0 && Math.round(ageSum) !== 100 && <p className="mt-2 text-[13px] text-warn">Возрастные группы дают в сумме {Math.round(ageSum)}%, а должно быть 100</p>}
+            {ageSum > 0 && Math.round(ageSum) !== 100 && <p className="mt-2 text-[13px] text-warn">Возрастные группы дают в сумме {Math.round(ageSum)} %, а должно быть 100 %</p>}
           </FieldGroup>
 
           <FieldGroup title="Документы и ответственный">

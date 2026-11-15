@@ -14,6 +14,8 @@ export function Profile() {
   const [drag, setDrag] = useState(false)
   const input = useRef<HTMLInputElement>(null)
   if (!profile) return null
+  // пустое имя не сохраняем: коллеги увидели бы вместо него почту
+  const nameDirty = !!name.trim() && name.trim() !== (profile.full_name ?? '')
   const display = profile.full_name || profile.email || ''
 
   async function setAvatar(url: string | null) {
@@ -90,12 +92,20 @@ export function Profile() {
           <h2 className="mb-4 text-base">Данные</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Имя, которое видят коллеги">
-              <Input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name.trim() && name !== profile.full_name && saveName()} />
+              <Input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && nameDirty && saveName()} />
             </Field>
           </div>
-          <Button className="mt-4" variant="primary" loading={saving} disabled={!name.trim() || name.trim() === profile.full_name} onClick={saveName}>
-            Сохранить
-          </Button>
+          {/* как в настройках кабинета: кнопки появляются, только когда есть что сохранять */}
+          {(nameDirty || saving) && (
+            <div className="fade mt-4 flex gap-2">
+              <Button variant="primary" loading={saving} onClick={saveName}>
+                Сохранить
+              </Button>
+              <Button variant="ghost" disabled={saving} onClick={() => setName(profile.full_name ?? '')}>
+                Отменить
+              </Button>
+            </div>
+          )}
         </Card>
 
         <EmailCard current={profile.email ?? ''} onChanged={async () => {

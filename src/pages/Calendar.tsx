@@ -53,9 +53,11 @@ export function Calendar() {
       const dl = isLive(i) && !i.ord_reported_at ? ordDeadline(i, settings) : null
       if (dl) out.push({ key: `o${i.id}`, day: dl, text: `ОРД: ${nick}`, dot: 'bg-bad', onClick: () => open(i.id) })
     }
-    if (!cid) {
+    {
       for (const t of tasks) {
         if (!t.due_date || t.done_at) continue
+        // при выбранной кампании - только её задачи
+        if (cid && t.campaign_id !== cid) continue
         if (owner ? taskOwner(t) !== owner : taskOwner(t) !== profile?.id && !isAdmin) continue
         out.push({ key: `t${t.id}`, day: t.due_date, text: t.title, dot: 'bg-ink', onClick: () => navigate(`/tasks/${t.id}`) })
       }

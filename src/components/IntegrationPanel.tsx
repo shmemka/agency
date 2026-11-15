@@ -9,6 +9,7 @@ import { checklist, isLive, ordDeadline } from '../lib/rules'
 import { count, cpm, date, daysBetween, money, parseNumber, todayISO } from '../lib/format'
 import type { Decision, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
+import { removeStoredFiles } from '../lib/actions'
 import { Button, Card, Drawer, DrawerClose, Field, IconButton, Input, Segmented, Select, SkelDrawer, StatusRail, Toggle, cx } from './ui'
 import { RichEditor } from './RichEditor'
 import { BloggerName, TaskList } from './bits'
@@ -72,10 +73,14 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
   }
 
   async function remove() {
-    if (!(await confirmDialog({ title: 'Удалить интеграцию?', body: 'Её документы останутся в карточке блогера', ok: 'Удалить', danger: true }))) return
+    const own = tasks.filter((t) => t.integration_id === i!.id).length
+    const body = `Документы останутся в карточке блогера${own ? `, а задачи по ней удалятся: ${own}` : ''}`
+    if (!(await confirmDialog({ title: 'Удалить интеграцию?', body, ok: 'Удалить', danger: true }))) return
+    const fileErr = await removeStoredFiles({ integrationIds: [i!.id] })
+    if (fileErr) return toast(fileErr)
     const { error } = await supabase.from('integrations').delete().eq('id', i!.id)
     if (error) return toast(error.message)
-    await reload('integrations')
+    await reload('integrations', 'tasks')
     toast('Интеграция удалена')
     onClose()
   }
@@ -229,7 +234,7 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
               </Field>
               <Field label="Цена блогера, ₽">{num('price')}</Field>
               {v.campaign_id && (
-                <Field label="Цена для клиента, ₽" hint={v.price_client_manual ? 'Задана вручную и не пересчитывается' : `Считается сама: цена блогера + ${campaign(v.campaign_id)?.markup_pct ?? 0}%`}>
+                <Field label="Цена для клиента, ₽" hint={v.price_client_manual ? 'Задана вручную и не пересчитывается' : `Считается сама: цена блогера + ${campaign(v.campaign_id)?.markup_pct ?? 0}\u00a0%`}>
                   {num('price_client')}
                 </Field>
               )}

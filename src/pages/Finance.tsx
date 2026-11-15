@@ -11,6 +11,7 @@ import { Button, Card, Chip, Empty, Field, IconButton, Input, Modal, PageHeader,
 import { BloggerName, useIntegrationPanel } from '../components/bits'
 import { confirmDialog } from '../components/dialogs'
 import { DateInput } from '../components/DateInput'
+import { commission as commissionOf } from '../lib/rules'
 
 type Tab = 'summary' | 'incomes' | 'payouts' | 'expenses'
 type Period = 'month' | 'quarter' | 'year'
@@ -170,12 +171,12 @@ export function Finance() {
     .filter((c) => c.status !== 'cancelled')
     .map((c) => {
       const rows = integrations.filter((i) => i.campaign_id === c.id && i.client_decision === 'approved' && i.status !== 'declined')
-      return { c, plan: rows.reduce((a, i) => a + Math.max(0, (i.price_client ?? i.price ?? 0) - (i.price ?? 0)), 0), fact: incomes.filter((i) => i.campaign_id === c.id).reduce((a, i) => a + i.amount, 0) }
+      return { c, plan: commissionOf(rows), fact: incomes.filter((i) => i.campaign_id === c.id).reduce((a, i) => a + i.amount, 0) }
     })
     .filter((x) => x.plan > 0 || x.fact > 0)
 
-  // настройки переехали на отдельную страницу
-  if ((sp.get('tab') as string | null) === 'settings') return <Navigate to="/settings" replace />
+  // настройки налогов переехали в «Настройки кабинета», раздел «Деньги и ОРД»
+  if ((sp.get('tab') as string | null) === 'settings') return <Navigate to="/settings/money" replace />
 
   return (
     <>

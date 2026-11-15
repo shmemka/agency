@@ -79,8 +79,8 @@ export const platformLabel = (p: Platform) => platformInfo(p).label
 
 export const AGE_GROUPS = [
   { id: 'u18', label: 'до 18' },
-  { id: 'a18', label: '18–24' },
-  { id: 'a25', label: '25–34' },
+  { id: 'a18', label: '18-24' },
+  { id: 'a25', label: '25-34' },
   { id: 'a35', label: '35+' },
 ] as const
 

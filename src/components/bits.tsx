@@ -66,10 +66,10 @@ export function AudienceBar({ female, age, className }: { female: number | null;
   const tones = ['bg-ink/75', 'bg-ink/45', 'bg-ink/25', 'bg-ink/10']
   const top = [...parts].sort((a, b) => b.v - a.v)[0]
   return (
-    <div className={cx('min-w-28 whitespace-nowrap', className)} title={parts.map((p) => `${p.label}: ${p.v}%`).join(', ')}>
+    <div className={cx('min-w-28 whitespace-nowrap', className)} title={parts.map((p) => `${p.label}: ${p.v}\u00a0%`).join(', ')}>
       <div className="num flex justify-between gap-2 text-xs text-muted">
-        <span>{female !== null ? `жен. ${Math.round(female)}%` : ''}</span>
-        <span>{top ? `${top.label}: ${top.v}%` : ''}</span>
+        <span>{female !== null ? `жен. ${Math.round(female)}\u00a0%` : ''}</span>
+        <span>{top ? `${top.label}: ${top.v}\u00a0%` : ''}</span>
       </div>
       {parts.length > 0 && (
         <div className="mt-1 flex h-1.5 gap-px overflow-hidden rounded-full">

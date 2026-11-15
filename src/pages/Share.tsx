@@ -3,12 +3,14 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { Check, Download, ExternalLink, Printer, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { platformInfo } from '../lib/constants'
-import { count, cpm, date, downloadXlsx, money, plural } from '../lib/format'
+import { count, cpm, date, dateRange, downloadXlsx, money, plural } from '../lib/format'
 import type { AgeSplit, Platform } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Button, Card, Loading, PlatformTag, Skel, cx } from '../components/ui'
 import { AudienceBar } from '../components/bits'
 import { openViewer, type ViewItem } from '../lib/viewer'
+import { applyBrand } from '../lib/brand'
+import { BrandLogo, Mark } from '../components/Layout'
 
 interface Base {
   kind: 'shortlist' | 'report'
@@ -17,6 +19,9 @@ interface Base {
   client: string | null
   start_date: string | null
   end_date: string | null
+  /** оформление кабинета: логотип и брендовый цвет (миграция 020) */
+  logo?: string | null
+  brand?: string | null
   error?: string
 }
 interface ShortRow {
@@ -56,10 +61,17 @@ function Frame({ d, title, children, actions }: { d: Base | null; title: string;
   return (
     <div className="mx-auto min-h-full max-w-5xl px-4 pt-6 pb-32">
       <header className="mb-8 flex items-center gap-2.5">
-        <span className="flex size-8 items-center justify-center rounded-full bg-ink">
-          <span className="bar-lime size-2.5 rounded-full" />
-        </span>
-        <span className="flex-1 text-[15px] font-medium">{d?.agency ?? ''}</span>
+        {/* агентство в своём оформлении: логотип вместо значка и названия, как у команды в меню */}
+        {d?.logo ? (
+          <span className="flex min-w-0 flex-1">
+            <BrandLogo src={d.logo} name={d.agency} />
+          </span>
+        ) : (
+          <>
+            <Mark />
+            <span className="flex-1 text-[15px] font-medium">{d?.agency ?? ''}</span>
+          </>
+        )}
         <span className="no-print flex gap-2">{actions}</span>
       </header>
       {d && (
@@ -71,7 +83,7 @@ function Frame({ d, title, children, actions }: { d: Base | null; title: string;
           <h1 className="mt-1 text-[28px] leading-8 tracking-tight sm:text-[36px] sm:leading-10">{d.campaign}</h1>
           {(d.start_date || d.end_date) && (
             <p className="num mt-1 text-muted">
-              {date(d.start_date)} – {date(d.end_date)}
+              {dateRange(d.start_date, d.end_date)}
             </p>
           )}
         </div>
@@ -102,6 +114,11 @@ export function Share() {
   useEffect(() => {
     load()
   }, [load])
+  // цвет агентства вместо зелёного «Сверки»
+  useEffect(() => {
+    applyBrand(d?.brand)
+    return () => applyBrand(null)
+  }, [d?.brand])
 
   if (state === 'loading')
     return (
@@ -227,7 +244,7 @@ function Shortlist({ d, rows, token, reload, preview }: { d: Data; rows: ShortRo
                   disabled={r.locked}
                   onClick={() => decide(r, s.decision === 'approved' ? 'pending' : 'approved')}
                   aria-pressed={s.decision === 'approved'}
-                  className={cx('inline-flex h-11 items-center gap-2 rounded-full px-5 transition-colors duration-150 disabled:pointer-events-none', s.decision === 'approved' ? 'bar-lime text-ink' : 'bg-ink text-white hover:bg-ink/85')}
+                  className={cx('inline-flex h-11 items-center gap-2 rounded-full px-5 transition-colors duration-150 disabled:pointer-events-none', s.decision === 'approved' ? 'bar-lime text-lime-ink' : 'bg-ink text-white hover:bg-ink/85')}
                 >
                   <Check className="size-4" strokeWidth={2} />
                   Берём
@@ -318,7 +335,7 @@ function Report({ d, rows }: { d: Data; rows: ReportRow[] }) {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           ['Вышло интеграций', `${rows.length}`, d.planned ? `из ${d.planned} запланированных` : ''],
-          ['Охват', count(reach), guarantee ? `гарант ${count(guarantee)}, ${Math.round((reach / guarantee) * 100)}%` : ''],
+          ['Охват', count(reach), guarantee ? `гарант ${count(guarantee)}, ${Math.round((reach / guarantee) * 100)}\u00a0%` : ''],
           ['Средний CPM', reach ? money(cpm(spent, reach)) : '—', 'за тысячу просмотров'],
           ['Потрачено', money(spent), d.budget ? `из ${money(d.budget)}` : ''],
         ].map(([k, v, n]) => (

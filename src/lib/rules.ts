@@ -13,6 +13,13 @@ export const taskOwner = (t: Pick<Task, 'assignee_id' | 'created_by'>) => t.assi
 
 export const isLive = (i: Integration) => i.status === 'published' || i.status === 'done'
 
+/**
+ * Комиссия агентства по интеграциям: цена для клиента минус цена блогера.
+ * Одна формула для обзора, финансов и кампании. Если цену клиенту вручную поставили ниже цены блогера,
+ * минус честно уменьшает итог, а не теряется
+ */
+export const commission = (rows: Pick<Integration, 'price' | 'price_client'>[]) => rows.reduce((a, i) => a + (i.price_client ?? i.price ?? 0) - (i.price ?? 0), 0)
+
 export function checklist(i: Integration, docs: DocLite[]) {
   const mine = docs.filter((d) => d.integration_id === i.id)
   const has = (...k: string[]) => mine.some((d) => k.includes(d.kind))
@@ -35,7 +42,7 @@ export function transitionWarnings(i: Integration, b: Blogger | undefined, docs:
     if (!legalInfo(b.legal_status).ok) w.push(b.legal_status === 'unknown' ? 'У блогера не указан статус самозанятого или ИП' : `Работаем только с самозанятыми и ИП, а у блогера: ${legalInfo(b.legal_status).label}`)
     if ((b.followers ?? 0) >= 10_000 && b.rkn_registered !== true) w.push('У блогера 10 000+ подписчиков, а регистрация в перечне РКН не отмечена')
   }
-  if (at >= STATUS_ORDER.published && !i.erid) w.push('Нет erid — выход без маркировки публиковать нельзя')
+  if (at >= STATUS_ORDER.published && !i.erid) w.push('Нет erid - выход без маркировки публиковать нельзя')
   if (to === 'done') {
     const c = checklist(i, docs)
     if (!c[3].done) w.push('Нет чека или акта')
@@ -86,7 +93,7 @@ export function attention(opts: {
     // молчание считаем от смены этапа: правка заметки или цены не сбрасывает напоминание
     const since = i.status_changed_at ?? i.updated_at
     if (isActive(i) && (i.status === 'contacted' || i.status === 'waiting_reply') && daysBetween(since, today) >= 3) {
-      out.push({ key: `s${i.id}`, text: `${nick(i.blogger_id)} молчит ${daysBetween(since, today)} дн. — пора напомнить`, link: `?i=${i.id}`, tone: 'warn' })
+      out.push({ key: `s${i.id}`, text: `${nick(i.blogger_id)} молчит ${daysBetween(since, today)} дн. - пора напомнить`, link: `?i=${i.id}`, tone: 'warn' })
     }
     if (isActive(i) && i.publish_date && !isLive(i) && daysBetween(today, i.publish_date) >= 0 && daysBetween(today, i.publish_date) <= 1) {
       if (!i.erid) out.push({ key: `e${i.id}`, text: `Выход ${nick(i.blogger_id)} ${i.publish_date === today ? 'сегодня' : 'завтра'}, а erid нет`, link: `?i=${i.id}`, tone: 'bad' })

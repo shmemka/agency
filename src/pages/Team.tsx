@@ -61,9 +61,9 @@ export function Team() {
               <li key={p.id} className="flex flex-wrap items-center gap-3 border-t border-line py-3 first:border-0">
                 <Avatar name={p.full_name || p.email || ''} src={p.avatar_url} />
                 <div className="min-w-0 flex-1">
-                  <div>{p.full_name}</div>
-                  <div className="text-xs text-muted">
-                    {p.email}, с {date(p.created_at)}
+                  <div className="truncate">{p.full_name || p.email}</div>
+                  <div className="truncate text-xs text-muted">
+                    {p.full_name ? `${p.email}, ` : ''}с {date(p.created_at)}
                   </div>
                 </div>
                 <Button variant="primary" size="sm" onClick={() => update(p, { is_active: true, deactivated_at: null })}>
@@ -85,7 +85,7 @@ export function Team() {
                 <Avatar name={p.full_name || p.email || ''} src={p.avatar_url} className="size-10" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate">
-                    {p.full_name}
+                    {p.full_name || p.email}
                     {self && <span className="ml-2 text-xs text-muted">это вы</span>}
                   </div>
                   <div className="truncate text-[13px] text-muted">{p.email}</div>
@@ -147,7 +147,7 @@ export function Team() {
                   <Avatar name={p.full_name || p.email || ''} src={p.avatar_url} />
                   <div>
                     <div>
-                      {p.full_name}
+                      {p.full_name || p.email}
                       {self && <span className="ml-2 text-xs text-muted">это вы</span>}
                     </div>
                     <div className="text-xs text-muted">{p.email}</div>
@@ -199,9 +199,9 @@ export function Team() {
               <li key={p.id} className="flex flex-wrap items-center gap-3 border-t border-line py-3 first:border-0">
                 <Avatar name={p.full_name || p.email || ''} src={p.avatar_url} />
                 <div className="min-w-0 flex-1">
-                  <div>{p.full_name}</div>
-                  <div className="text-xs text-muted">
-                    {p.email}, закрыт {date(p.deactivated_at!)}
+                  <div className="truncate">{p.full_name || p.email}</div>
+                  <div className="truncate text-xs text-muted">
+                    {p.full_name ? `${p.email}, ` : ''}закрыт {date(p.deactivated_at!)}
                   </div>
                 </div>
                 <Button size="sm" onClick={() => update(p, { is_active: true, deactivated_at: null })}>

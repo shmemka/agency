@@ -180,7 +180,7 @@ export function UploadRow({ item, className }: { item: UploadItem; className?: s
           />
         </div>
         <div className="num mt-1 text-xs text-muted">
-          {p === null ? 'В очереди' : done ? 'Загружено' : p >= 0.99 ? 'Сохраняем…' : `${mb(item.size * p)} из ${mb(item.size)} · ${Math.round(p * 100)}%`}
+          {p === null ? 'В очереди' : done ? 'Загружено' : p >= 0.99 ? 'Сохраняем…' : `${mb(item.size * p)} из ${mb(item.size)} · ${Math.round(p * 100)}\u00a0%`}
         </div>
       </div>
     </li>

@@ -162,7 +162,7 @@ export function Layout() {
   // во вкладке браузера — агентство и сайт
   useEffect(() => preloadRichEditor(), [])
   useEffect(() => {
-    document.title = `${agency} — ${APP}`
+    document.title = `${agency} - ${APP}`
   }, [agency])
   const { openId, open } = useIntegrationPanel()
   const loc = useLocation()

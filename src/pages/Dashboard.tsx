@@ -3,7 +3,7 @@ import { ArrowUpRight } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { PHASES, statusInfo } from '../lib/constants'
-import { isActive, isLive, ordDeadline, taskOwner } from '../lib/rules'
+import { commission as commissionOf, isActive, isLive, ordDeadline, taskOwner } from '../lib/rules'
 import { count, date, money, plural, todayISO } from '../lib/format'
 import { Card, PageHeader, Skel, SkelList, StatusBadge, cx } from '../components/ui'
 import { BloggerName, TaskList, useIntegrationPanel } from '../components/bits'
@@ -37,7 +37,7 @@ export function Dashboard() {
     .filter((x) => x.dl)
     .sort((a, b) => a.dl!.localeCompare(b.dl!))
   const running = campaigns.filter((c) => c.status === 'active' || c.status === 'planning')
-  const commission = integrations.filter((i) => i.campaign_id && running.some((c) => c.id === i.campaign_id) && i.client_decision === 'approved' && i.status !== 'declined').reduce((a, i) => a + Math.max(0, (i.price_client ?? i.price ?? 0) - (i.price ?? 0)), 0)
+  const commission = commissionOf(integrations.filter((i) => i.campaign_id && running.some((c) => c.id === i.campaign_id) && i.client_decision === 'approved' && i.status !== 'declined'))
 
   return (
     <>

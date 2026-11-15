@@ -5,9 +5,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { AGE_GROUPS, DECISIONS, PLATFORMS, STATUSES, campaignStatusLabel, phaseInfo, platformLabel } from '../lib/constants'
-import { addToCampaign } from '../lib/actions'
-import { isLive } from '../lib/rules'
-import { count, cpm, date, downloadXlsx, money, parseNumber, plural } from '../lib/format'
+import { addToCampaign, removeStoredFiles } from '../lib/actions'
+import { commission, isLive } from '../lib/rules'
+import { count, cpm, date, dateRange, downloadXlsx, money, parseNumber, plural } from '../lib/format'
 import type { Blogger, Campaign, Decision, Income, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Button, Card, Chip, Empty, Field, IconButton, Input, Loading, Menu, Modal, PageHeader, Progress, Segmented, Select, Skel, SkelTable, StatusBadge, StatusSelect, Table, Toggle, cx, submitOnEnter } from '../components/ui'
@@ -21,7 +21,7 @@ const ORDER: Record<Decision, number> = { pending: 0, none: 1, approved: 2, reje
 
 export function CampaignPage() {
   const { id = '' } = useParams()
-  const { campaign, clients, integrations, loading, reload } = useData()
+  const { campaign, clients, integrations, tasks, docs, loading, reload } = useData()
   const { isAdmin, personName, profile } = useAuth()
   const nav = useNavigate()
   const [sp, setSp] = useSearchParams()
@@ -60,18 +60,26 @@ export function CampaignPage() {
     // кандидаты из подборки без кампании никому не нужны: удаляем их, а одобренные интеграции оставляем
     const drafts = rows.filter((i) => i.client_decision !== 'approved')
     const kept = rows.length - drafts.length
-    const body = [
-      drafts.length ? `Кандидаты из подборки удалятся: ${drafts.length}.` : '',
-      kept ? `Одобренные интеграции останутся у блогеров, но без кампании: ${kept}.` : '',
-    ].filter(Boolean).join(' ') || 'В кампании нет блогеров'
-    if (!(await confirmDialog({ title: `Удалить кампанию «${c!.name}»?`, body, ok: 'Удалить', danger: true }))) return
+    // вместе с кампанией база удаляет её документы, задачи и ссылки для клиента - говорим об этом заранее
+    const draftIds = new Set(drafts.map((i) => i.id))
+    const docCount = docs.filter((d) => d.campaign_id === c!.id).length
+    const taskCount = tasks.filter((t) => t.campaign_id === c!.id || (t.integration_id && draftIds.has(t.integration_id))).length
+    const items = [
+      drafts.length ? `Кандидаты из подборки: ${drafts.length}` : '',
+      docCount ? `Документы кампании: ${docCount}` : '',
+      taskCount ? `Задачи по кампании: ${taskCount}` : '',
+    ].filter(Boolean)
+    const body = [items.length ? 'Удалятся навсегда' : 'В кампании нет блогеров, документов и задач', kept ? `Одобренные интеграции останутся у блогеров, но без кампании: ${kept}` : ''].filter(Boolean).join('. ')
+    if (!(await confirmDialog({ title: `Удалить кампанию «${c!.name}»?`, body, items, ok: 'Удалить', danger: true }))) return
+    const fileErr = await removeStoredFiles({ campaignId: c!.id, integrationIds: [...draftIds] })
+    if (fileErr) return toast(fileErr)
     if (drafts.length) {
       const d = await supabase.from('integrations').delete().in('id', drafts.map((i) => i.id))
       if (d.error) return toast(d.error.message)
     }
     const { error } = await supabase.from('campaigns').delete().eq('id', c!.id)
     if (error) return toast(error.message)
-    await reload('campaigns', 'integrations')
+    await reload('campaigns', 'integrations', 'documents', 'tasks')
     nav('/campaigns')
   }
 
@@ -87,11 +95,7 @@ export function CampaignPage() {
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <Chip tone={c.status === 'active' ? 'dark' : undefined}>{campaignStatusLabel(c.status)}</Chip>
             <span>{clients.find((x) => x.id === c.client_id)?.name ?? 'Клиент не указан'}</span>
-            {(c.start_date || c.end_date) && (
-              <span className="num">
-                {date(c.start_date)} – {date(c.end_date)}
-              </span>
-            )}
+            {(c.start_date || c.end_date) && <span className="num">{dateRange(c.start_date, c.end_date)}</span>}
             {c.owner_id && <span>ведёт {personName(c.owner_id).split(' ')[0]}</span>}
           </span>
         }
@@ -190,9 +194,11 @@ function Shortlist({ c, rows }: { c: Campaign; rows: Integration[] }) {
 
   async function remove(i: Integration) {
     if (!(await confirmDialog({ title: `Убрать ${blogger(i.blogger_id)?.nick} из подборки?`, ok: 'Убрать', danger: true }))) return
+    const fileErr = await removeStoredFiles({ integrationIds: [i.id] })
+    if (fileErr) return toast(fileErr)
     const { error } = await supabase.from('integrations').delete().eq('id', i.id)
     if (error) return toast(error.message)
-    reload('integrations')
+    reload('integrations', 'tasks')
   }
 
   const excel = () =>
@@ -305,7 +311,7 @@ function Shortlist({ c, rows }: { c: Campaign; rows: Integration[] }) {
               ['Сумма для клиента', money(sum(chosen, 'price_client'))],
               ['Охват одобренных', count(reach(chosen))],
               ['Средний CPM', chosen.length && reach(chosen) ? money(cpm(sum(chosen, 'price_client'), reach(chosen))) : '—'],
-              ...(isAdmin ? [['Блогерам', money(sum(chosen, 'price'))], ['Наша комиссия', money(Math.max(0, sum(chosen, 'price_client') - sum(chosen, 'price')))], ['Наценка кампании', `${c.markup_pct}%`]] : []),
+              ...(isAdmin ? [['Блогерам', money(sum(chosen, 'price'))], ['Наша комиссия', money(commission(chosen))], ['Наценка кампании', `${c.markup_pct}\u00a0%`]] : []),
             ].map(([k, v]) => (
               <div key={k}>
                 <div className="text-[13px] text-muted">{k}</div>
@@ -430,8 +436,8 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
         </Select>
         <Select value={female} onChange={(e) => setFemale(e.target.value)} aria-label="Пол аудитории">
           <option value="">Любой пол аудитории</option>
-          <option value="f">Женская, от 60%</option>
-          <option value="m">Мужская, от 60%</option>
+          <option value="f">Женская, от 60 %</option>
+          <option value="m">Мужская, от 60 %</option>
         </Select>
         <Select value={age} onChange={(e) => setAge(e.target.value)} aria-label="Возраст аудитории">
           <option value="">Любой возраст</option>
@@ -627,9 +633,11 @@ function Money({ c, rows }: { c: Campaign; rows: Integration[] }) {
     supabase.from('incomes').select('*').eq('campaign_id', c.id).order('paid_on', { ascending: false }).then(({ data }) => setIncomes((data as Income[]) ?? []))
   }, [c.id])
 
-  const toClient = rows.reduce((a, i) => a + (i.price_client ?? 0), 0)
+  const toClient = rows.reduce((a, i) => a + (i.price_client ?? i.price ?? 0), 0)
   const toBloggers = rows.reduce((a, i) => a + (i.price ?? 0), 0)
+  const fee = commission(rows)
   const got = incomes.reduce((a, i) => a + i.amount, 0)
+  const dirty = parseNumber(budget) !== saved || (parseNumber(markup) ?? 0) !== c.markup_pct
 
   async function save() {
     const b = parseNumber(budget)
@@ -645,7 +653,7 @@ function Money({ c, rows }: { c: Campaign; rows: Integration[] }) {
     <div className="grid max-w-5xl gap-3 lg:grid-cols-2">
       <Card>
         <h2 className="text-base">Комиссия</h2>
-        <div className="num mt-2 text-[36px] leading-10 tracking-tight">{money(toClient - toBloggers)}</div>
+        <div className={cx('num mt-2 text-[36px] leading-10 tracking-tight', fee < 0 && 'text-bad')}>{money(fee)}</div>
         <p className="mt-1 text-[13px] text-muted">Разница между ценой для клиента и ценой блогера по одобренным интеграциям</p>
         <dl className="num mt-5 grid grid-cols-2 gap-3">
           <div>
@@ -660,9 +668,9 @@ function Money({ c, rows }: { c: Campaign; rows: Integration[] }) {
       </Card>
       <Card>
         <h2 className="text-base">Получено от клиента</h2>
-        <Progress className="mt-4" value={got} max={toClient - toBloggers} />
+        <Progress className="mt-4" value={got} max={Math.max(fee, 0)} />
         <div className="num mt-2 text-[13px] text-muted">
-          {money(got)} из {money(toClient - toBloggers)} комиссии
+          {money(got)} из {money(fee)} комиссии
         </div>
         <p className="mt-2 text-[13px] text-muted">
           Блогерам клиент платит напрямую, нам приходит комиссия. Поступления вносятся в разделе{' '}
@@ -673,7 +681,7 @@ function Money({ c, rows }: { c: Campaign; rows: Integration[] }) {
         <div className="mt-4 border-t border-line pt-3">
           <Toggle
             checked={c.prepaid}
-            label="Клиент внёс 100% предоплату"
+            label="Клиент внёс 100 % предоплату"
             onChange={async (v) => {
               const { error } = await supabase.from('campaigns').update({ prepaid: v }).eq('id', c.id)
               if (error) toast(`Не сохранилось: ${error.message}`)
@@ -690,9 +698,23 @@ function Money({ c, rows }: { c: Campaign; rows: Integration[] }) {
           <Field label="Наценка, %" hint="При изменении цены для клиента пересчитаются">
             <Input inputMode="numeric" className="num" value={markup} onChange={(e) => setMarkup(e.target.value)} />
           </Field>
-          <Button variant="primary" data-save className="mb-5" onClick={save} disabled={parseNumber(budget) === saved && (parseNumber(markup) ?? 0) === c.markup_pct}>
-            Сохранить
-          </Button>
+          {/* «Сохранить» появляется, только когда есть что сохранять */}
+          {dirty && (
+            <div className="fade mb-5 flex gap-2">
+              <Button variant="primary" data-save onClick={save}>
+                Сохранить
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setBudget(saved === null ? '' : String(saved))
+                  setMarkup(String(c.markup_pct))
+                }}
+              >
+                Отменить
+              </Button>
+            </div>
+          )}
         </div>
       </Card>
     </div>

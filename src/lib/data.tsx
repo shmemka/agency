@@ -141,7 +141,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     let hiddenAt = 0
     const on = () => {
       if (document.hidden) hiddenAt = Date.now()
-      else if (hiddenAt && Date.now() - hiddenAt > 5 * 60_000) reload('bloggers', 'blogger_lists', 'blogger_list_items', 'integrations', 'campaigns', 'tasks', 'task_sections', 'notifications', 'documents', 'share_links')
+      else if (hiddenAt && Date.now() - hiddenAt > 5 * 60_000) reload('bloggers', 'blogger_lists', 'blogger_list_items', 'integrations', 'campaigns', 'clients', 'tasks', 'task_sections', 'notifications', 'documents', 'campaign_members', 'share_links', 'campaign_money', 'settings')
     }
     document.addEventListener('visibilitychange', on)
     return () => document.removeEventListener('visibilitychange', on)

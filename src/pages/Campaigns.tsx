@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { campaignStatusLabel } from '../lib/constants'
 import { isLive } from '../lib/rules'
-import { date, plural } from '../lib/format'
+import { dateRange, plural } from '../lib/format'
 import type { Campaign, Client } from '../lib/types'
 import { Button, Chip, Empty, Loading, PageHeader, Progress, Skel, Table, cx, useEntrance } from '../components/ui'
 import { CampaignModal, ClientModal } from '../components/CampaignForm'
@@ -86,9 +86,7 @@ export function Campaigns() {
                     </span>
                   )}
                   {(c.start_date || c.end_date) && (
-                    <span className="num">
-                      {date(c.start_date)} – {date(c.end_date)}
-                    </span>
+                    <span className="num">{dateRange(c.start_date, c.end_date)}</span>
                   )}
                   {c.owner_id && <span>{personName(c.owner_id).split(' ')[0]}</span>}
                   {isAdmin && c.status === 'active' && !c.prepaid && <span className="text-bad">нет предоплаты</span>}

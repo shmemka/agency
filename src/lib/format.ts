@@ -81,15 +81,23 @@ export function initials(name: string | null | undefined) {
     .join('')
 }
 
-export const todayISO = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
+const localISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+export const todayISO = () => localISO(new Date())
 
+
+/** Сдвиг даты на n дней. Считаем в местном времени: через UTC на востоке страны день мог съехать */
 export function addDays(iso: string, n: number) {
   const d = new Date(`${iso}T12:00:00`)
   d.setDate(d.getDate() + n)
-  return d.toISOString().slice(0, 10)
+  return localISO(d)
+}
+
+/** Сроки кампании: «1 нояб. - 30 нояб.», «с 1 нояб.», «до 30 нояб.» - без прочерка вместо пустой даты */
+export function dateRange(from: string | null | undefined, to: string | null | undefined) {
+  if (from && to) return `${date(from)} - ${date(to)}`
+  if (from) return `с ${date(from)}`
+  if (to) return `до ${date(to)}`
+  return ''
 }
 
 /** Дата в часовом поясе пользователя: у отметок времени из базы (UTC) первые 10 символов ночью — ещё вчерашний день */
@@ -104,7 +112,7 @@ export function daysBetween(a: string, b: string) {
 }
 
 export function pct(v: number | null | undefined) {
-  return v === null || v === undefined ? '—' : `${Math.round(v)}%`
+  return v === null || v === undefined ? '—' : `${Math.round(v)}\u00a0%`
 }
 
 export function plural(n: number, one: string, few: string, many: string) {
