@@ -199,7 +199,7 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }
           setHover(false)
           upload(e.dataTransfer.files)
         }}
-        className={cx('rounded-inner p-3 transition-colors duration-150', hover ? 'bg-lime/40' : 'hatch')}
+        className={cx('dropzone rounded-inner p-3', hover && 'is-over')}
       >
         <div className="flex flex-wrap items-center gap-2">
           <Select value={kind} onChange={(e) => setKind(e.target.value as DocKind)} aria-label="Тип документа" tone="surface" className="w-36">

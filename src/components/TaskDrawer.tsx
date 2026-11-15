@@ -196,7 +196,7 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
         }}
       >
         {drag && (
-          <div className="pointer-events-none absolute inset-3 z-10 flex items-center justify-center rounded-card bg-lime/40 text-base ring-2 ring-ink/20 ring-inset md:inset-4">
+          <div className="dropzone-lg is-over fade pointer-events-none absolute inset-3 z-10 flex items-center justify-center rounded-card bg-surface/80 text-base backdrop-blur-[2px] md:inset-4">
             Отпустите, чтобы прикрепить
           </div>
         )}

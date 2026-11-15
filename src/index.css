@@ -200,6 +200,32 @@ input[type='search']::-webkit-search-decoration {
   }
 }
 
+/* Место для файла: аккуратный пунктир со скруглёнными штрихами, повторяет скругление блока.
+   Когда файл тащат над ним — пунктир темнеет, фон слегка лаймовый */
+.dropzone,
+.dropzone-lg {
+  background-color: rgb(21 23 28 / 0.015);
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><rect width='100%25' height='100%25' rx='20' ry='20' fill='none' stroke='%2315171C' stroke-opacity='0.22' stroke-width='3' stroke-dasharray='7 7' stroke-linecap='round'/></svg>");
+  transition:
+    background-color 0.25s var(--ease-out),
+    background-image 0.25s;
+}
+.dropzone-lg {
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><rect width='100%25' height='100%25' rx='28' ry='28' fill='none' stroke='%2315171C' stroke-opacity='0.22' stroke-width='3' stroke-dasharray='7 7' stroke-linecap='round'/></svg>");
+}
+.dropzone:is(label, button):hover,
+.dropzone-lg:is(label, button):hover {
+  background-color: rgb(21 23 28 / 0.035);
+}
+.dropzone.is-over {
+  background-color: rgb(197 232 78 / 0.22);
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><rect width='100%25' height='100%25' rx='20' ry='20' fill='none' stroke='%2315171C' stroke-opacity='0.55' stroke-width='3' stroke-dasharray='7 7' stroke-linecap='round'/></svg>");
+}
+.dropzone-lg.is-over {
+  background-color: rgb(197 232 78 / 0.22);
+  background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'><rect width='100%25' height='100%25' rx='28' ry='28' fill='none' stroke='%2315171C' stroke-opacity='0.55' stroke-width='3' stroke-dasharray='7 7' stroke-linecap='round'/></svg>");
+}
+
 /* фирменная деталь: штриховка = «ещё не сделано» */
 .hatch {
   background-image: repeating-linear-gradient(-45deg, rgb(21 23 28 / 0.14) 0 3px, transparent 3px 8px);

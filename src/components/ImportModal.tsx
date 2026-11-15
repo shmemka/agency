@@ -130,6 +130,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
   const [taken, setTaken] = useState<Map<string, string>>(new Map())
   const [busy, setBusy] = useState(false)
   const [parsing, setParsing] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
 
   async function read(f: File) {
     setParsing(true)
@@ -226,10 +227,15 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
     >
       {!sheets ? (
         <label
-          className={cx('hatch flex cursor-pointer flex-col items-center rounded-inner px-6 py-12 text-center', parsing && 'opacity-60')}
-          onDragOver={(e) => e.preventDefault()}
+          className={cx('dropzone flex cursor-pointer flex-col items-center rounded-inner px-6 py-12 text-center', dragOver && 'is-over', parsing && 'opacity-60')}
+          onDragOver={(e) => {
+            e.preventDefault()
+            setDragOver(true)
+          }}
+          onDragLeave={() => setDragOver(false)}
           onDrop={(e) => {
             e.preventDefault()
+            setDragOver(false)
             const f = e.dataTransfer.files[0]
             if (f) read(f)
           }}

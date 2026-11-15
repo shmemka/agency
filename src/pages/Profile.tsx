@@ -64,7 +64,7 @@ export function Profile() {
               setDrag(false)
               upload(e.dataTransfer.files[0])
             }}
-            className={`-m-3 flex flex-col items-start gap-5 rounded-inner p-3 transition-colors duration-150 sm:flex-row sm:items-center ${drag ? 'bg-soft' : ''}`}
+            className={`-m-3 flex flex-col items-start gap-5 rounded-inner p-3 sm:flex-row sm:items-center ${drag ? 'dropzone is-over' : ''}`}
           >
             <Avatar name={display} src={profile.avatar_url} className="size-24 text-2xl" />
             <div className="min-w-0 flex-1">

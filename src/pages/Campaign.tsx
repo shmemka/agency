@@ -514,7 +514,7 @@ function Work({ rows }: { rows: Integration[] }) {
                   setDrag(null)
                   setOver(null)
                 }}
-                className={cx('flex w-52 shrink-0 flex-col rounded-inner p-2 transition-colors duration-150', over === s.id ? 'bg-lime/40' : items.length ? 'bg-ink/[0.04]' : 'hatch')}
+                className={cx('flex w-52 shrink-0 flex-col rounded-inner p-2 transition-colors duration-200', over === s.id ? 'dropzone is-over' : items.length ? 'bg-ink/[0.04]' : 'dropzone')}
               >
                 <header className="flex h-8 items-center gap-2 px-2 text-[13px]">
                   <span className={cx('size-2 rounded-full', phaseInfo(s.phase).dot)} />
