@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowUpRight, Plus, Send, Trash2 } from 'lucide-react'
+import { ArrowUpRight, MessageCircle, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -91,7 +91,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
             </div>
             {tg && (
               <a href={`https://t.me/${tg}`} target="_blank" rel="noreferrer" aria-label="Написать в Telegram" title="Написать в Telegram" className="inline-flex size-10 shrink-0 items-center justify-center gap-2 rounded-full bg-soft text-sm hover:bg-ink/10 sm:w-auto sm:px-4">
-                <Send className="size-4" strokeWidth={1.5} />
+                <MessageCircle className="size-4" strokeWidth={1.5} />
                 <span className="max-sm:hidden">Написать</span>
               </a>
             )}
