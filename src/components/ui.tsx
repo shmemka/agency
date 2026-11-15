@@ -330,8 +330,8 @@ export function Select({
   children: ReactNode
   className?: string
   disabled?: boolean
-  /** field — серое поле в форме, surface — белое на сером фоне страницы, dark — на тёмной панели */
-  tone?: 'field' | 'surface' | 'dark'
+  /** field — серое поле в форме, surface — белое на сером фоне страницы, dark — на тёмной панели, quiet — тихий компактный выбор в строке списка */
+  tone?: 'field' | 'surface' | 'dark' | 'quiet'
   placeholder?: string
   'aria-label'?: string
 }) {
@@ -484,12 +484,14 @@ export function Select({
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={onKey}
         className={cx(
-          'flex h-10 w-full items-center gap-2 pr-3 pl-4 text-left text-sm transition-[background-color,box-shadow] duration-200 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
+          'flex w-full items-center gap-2 text-left transition-[background-color,box-shadow] duration-200 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
+          tone === 'quiet' ? 'h-8 pr-2 pl-3 text-[13px]' : 'h-10 pr-3 pl-4 text-sm',
           // фильтры на фоне страницы и в тёмной панели — капсулы; поля внутри карточек — со скруглением 16
           tone === 'field' ? 'rounded-2xl' : 'rounded-full',
           tone === 'field' && 'bg-soft text-ink hover:bg-ink/[0.06] focus-visible:ring-ink/25',
           tone === 'surface' && 'bg-surface text-ink hover:bg-white/70 focus-visible:ring-ink/25',
           tone === 'dark' && 'bg-white/15 text-white hover:bg-white/25 focus-visible:ring-white/50',
+          tone === 'quiet' && 'text-ink hover:bg-ink/5 focus-visible:ring-ink/25',
           open && tone !== 'dark' && 'ring-1 ring-ink/15',
         )}
       >
