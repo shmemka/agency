@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { siteUrl, supabase } from '../lib/supabase'
 
 import { inviteUrl, readInvite } from '../lib/invite'
+import { humanError } from '../lib/toast'
 import { Eye, EyeOff } from 'lucide-react'
 import { Button, Segmented, cx } from '../components/ui'
 import { ArtScreen, ArtTitle, BIG_FIELD } from '../components/ArtScreen'
@@ -66,10 +67,10 @@ export function Login() {
     setBusy(true)
     if (mode === 'in') {
       const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
-      if (error) setError(ERRORS[error.message] ?? error.message)
+      if (error) setError(ERRORS[error.message] ?? humanError(error.message))
     } else {
       const { data, error } = await supabase.auth.signUp({ email: email.trim(), password, options: { data: { full_name: name }, emailRedirectTo: invite ? inviteUrl(invite) : siteUrl() } })
-      if (error) setError(ERRORS[error.message] ?? error.message)
+      if (error) setError(ERRORS[error.message] ?? humanError(error.message))
       else if (!data.session) setInfo('Отправили письмо для подтверждения почты. После подтверждения войдите здесь')
     }
     setBusy(false)
@@ -82,7 +83,7 @@ export function Login() {
     setBusy(true)
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: siteUrl() })
     setBusy(false)
-    if (error) setError(ERRORS[error.message] ?? error.message)
+    if (error) setError(ERRORS[error.message] ?? humanError(error.message))
     else setInfo('Отправили письмо со ссылкой. Откройте её, и сайт предложит задать новый пароль')
   }
 
@@ -206,7 +207,7 @@ export function NewPassword({ onDone }: { onDone: () => void }) {
     setBusy(true)
     const { error } = await supabase.auth.updateUser({ password })
     setBusy(false)
-    if (error) return setError(error.message)
+    if (error) return setError(humanError(error.message))
     onDone()
   }
 

@@ -6,13 +6,14 @@ import { useData } from '../lib/data'
 import { DOC_KINDS } from '../lib/constants'
 import type { Doc } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Card, Empty, Input, PageHeader, Select, SkelList } from '../components/ui'
+import { Button, Card, Empty, Input, PageHeader, Select, SkelList } from '../components/ui'
 import { DocRow } from '../components/DocumentsPanel'
 
 export function Documents() {
   const { blogger, campaign, reload } = useData()
   const [docs, setDocs] = useState<Doc[] | null>(null)
   const [kind, setKind] = useState('')
+  const [limit, setLimit] = useState(100)
   const [q, setQ] = useState('')
 
   const load = useCallback(async () => {
@@ -58,7 +59,7 @@ export function Documents() {
       ) : (
         <Card className="appear py-2">
           <ul>
-            {rows.slice(0, 300).map((d) => {
+            {rows.slice(0, limit).map((d) => {
               const b = blogger(d.blogger_id)
               return (
                 <DocRow
@@ -81,7 +82,11 @@ export function Documents() {
               )
             })}
           </ul>
-          {rows.length > 300 && <p className="py-3 text-center text-[13px] text-muted">Показаны первые 300. Уточните поиск</p>}
+          {rows.length > limit && (
+            <div className="pt-2 pb-1 text-center">
+              <Button onClick={() => setLimit((l) => l + 200)}>Показать ещё {Math.min(200, rows.length - limit)}</Button>
+            </div>
+          )}
         </Card>
       )}
     </>

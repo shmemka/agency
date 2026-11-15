@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { siteUrl, supabase } from '../lib/supabase'
+import { humanError } from '../lib/toast'
 import type { Profile, Workspace } from '../lib/types'
 
 interface AuthState {
@@ -149,19 +150,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // после смены кабинета начинаем с чистого листа: все данные, подписки и открытые карточки — из нового кабинета
       switchWorkspace: async (id) => {
         const { error } = await supabase.rpc('switch_workspace', { p_ws: id })
-        if (error) return error.message
+        if (error) return humanError(error.message)
         window.location.replace(siteUrl())
         return null
       },
       createWorkspace: async (name) => {
         const { error } = await supabase.rpc('create_workspace', { p_name: name })
-        if (error) return error.message
+        if (error) return humanError(error.message)
         window.location.replace(siteUrl())
         return null
       },
       joinWorkspace: async (token) => {
         const { error } = await supabase.rpc('join_workspace', { p_token: token })
-        if (error) return error.message
+        if (error) return humanError(error.message)
         window.location.replace(siteUrl())
         return null
       },

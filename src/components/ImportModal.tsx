@@ -58,7 +58,21 @@ function detect(sheetName: string, data: unknown[][], fileName: string): Sheet |
       break
     }
   }
-  if (headerIdx < 0) return null
+  if (headerIdx < 0) {
+    // заголовков нет или они названы по-своему: ищем колонку, где лежат ссылки на профили
+    const sample = data.slice(0, 30)
+    const width = Math.max(...sample.map((r) => r?.length ?? 0), 0)
+    for (let i = 0; i < width; i++) {
+      if (sample.filter((r) => SOCIAL.test(String(r?.[i] ?? ''))).length >= Math.max(1, sample.length * 0.3)) {
+        map = { url: i }
+        // строка над первой ссылкой — заголовок, если в ней нет ссылки
+        const first = data.findIndex((r) => SOCIAL.test(String(r?.[i] ?? '')))
+        headerIdx = first - 1
+        break
+      }
+    }
+    if (headerIdx < -1 || map.url === undefined) return null
+  }
 
   const sample = data.slice(headerIdx + 1, headerIdx + 30)
   const width = Math.max(...sample.map((r) => r?.length ?? 0), 0)
@@ -78,9 +92,11 @@ function detect(sheetName: string, data: unknown[][], fileName: string): Sheet |
     const str = (k: string) => String(cell(k) ?? '').replace(/\s+/g, ' ').trim() || null
     const url = str('url')
     const validUrl = url && SOCIAL.test(url) ? url : null
-    // в листе со ссылками строки без ссылки на профиль — это итоги и пометки
-    if (map.url !== undefined && !validUrl) continue
-    const nick = (nickFromUrl(validUrl) || str('nick') || '').replace(/^@/, '').trim()
+    // в колонке ссылок вместо ссылки написали @ник — это тоже блогер
+    const atNick = !validUrl && url && /^@[A-Za-z0-9._]{2,40}$/.test(url) ? url : null
+    // в листе со ссылками остальные строки без ссылки на профиль — это итоги и пометки
+    if (map.url !== undefined && !validUrl && !atNick) continue
+    const nick = (nickFromUrl(validUrl) || atNick || str('nick') || '').replace(/^@/, '').trim()
     if (!nick || nick.length > 60 || /итого|тотал|total/i.test(nick)) continue
     const platform = validUrl ? platformFromUrl(validUrl) : 'tiktok'
     if (seen.has(key({ platform, nick }))) continue
@@ -137,7 +153,23 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
     setFile(f.name)
     try {
       const XLSX = await import('xlsx')
-      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' })
+      const buf = await f.arrayBuffer()
+      let wb
+      if (/\.csv$/i.test(f.name) || f.type === 'text/csv') {
+        let text: string
+        try {
+          text = new TextDecoder('utf-8', { fatal: true }).decode(buf)
+        } catch {
+          text = new TextDecoder('windows-1251').decode(buf)
+        }
+        text = text.replace(/^\uFEFF/, '')
+        // разделитель — тот, которого больше в первой строке
+        const head = text.split(/\r?\n/, 1)[0]
+        const FS = [';', '\t', ','].sort((a, b) => head.split(b).length - head.split(a).length)[0]
+        wb = XLSX.read(text, { type: 'string', FS, raw: true })
+      } else {
+        wb = XLSX.read(buf, { type: 'array' })
+      }
       const res = wb.SheetNames.map((n) => detect(n, XLSX.utils.sheet_to_json<unknown[]>(wb.Sheets[n], { header: 1, raw: true, defval: null }), f.name)).filter(Boolean) as Sheet[]
       // дубли ищем по всей базе, включая блогеров коллег
       const keys = [...new Set(res.flatMap((s) => s.rows.map(key)))]
@@ -212,6 +244,12 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
       wide
       title="Импорт блогеров из Excel"
       footer={
+        sheets?.length === 0 ? (
+          // в файле не нашлось блогеров — не тупик: сразу можно взять другой
+          <Button variant="primary" onClick={() => setSheets(null)}>
+            Выбрать другой файл
+          </Button>
+        ) : (
         sheets &&
         sheets.length > 0 && (
           <>
@@ -222,7 +260,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
               {fresh.length ? `Добавить ${fresh.length} в базу` : refresh && known.length ? `Обновить ${known.length}` : 'Все уже в базе'}
             </Button>
           </>
-        )
+        ))
       }
     >
       {!sheets ? (
@@ -246,7 +284,7 @@ export function ImportModal({ open, onClose }: { open: boolean; onClose: () => v
           <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={(e) => e.target.files?.[0] && read(e.target.files[0])} />
         </label>
       ) : sheets.length === 0 ? (
-        <p className="text-muted">В файле «{file}» не нашлось листов с никами или ссылками на профили</p>
+        <p className="text-muted">В файле «{file}» не нашлось блогеров. Нужна колонка со ссылками на профили (tiktok.com/@…, vk.com/…, t.me/…) или колонка «Ник»</p>
       ) : (
         <div className="space-y-2">
           <p className="text-muted">Вы станете ответственным за новых блогеров. Тех, кто уже есть в базе{owners.length ? ` (ответственные: ${owners.join(', ')})` : ''}, заново не добавляем</p>

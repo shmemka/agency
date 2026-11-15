@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { fetchAll, supabase } from './supabase'
+import { humanError } from './toast'
 import { useAuth } from '../auth/AuthProvider'
 import { statusInfo, type Status } from './constants'
 import { transitionWarnings, type DocLite } from './rules'
@@ -121,7 +122,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         setS((prev) => Object.assign({}, prev, ...parts))
         setError(null)
       } catch (e) {
-        setError((e as Error).message)
+        setError(humanError((e as Error).message))
       }
     },
     [loadOne],

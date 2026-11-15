@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Button, Input, Textarea } from './ui'
+import { Button, Input, Textarea, useScrollLock } from './ui'
 
 /** Фирменные замены window.confirm и window.prompt: возвращают Promise */
 
@@ -93,6 +93,7 @@ function Dialog({ req, done }: { req: Pending; done: (v: unknown) => void }) {
   }, [])
 
   const danger = req.kind === 'confirm' && req.danger
+  useScrollLock(true)
   return createPortal(
     <div className="fade fixed inset-0 z-[90] flex items-end justify-center bg-ink/30 p-0 md:items-center md:p-6" onMouseDown={() => done(cancelValue)}>
       <div
@@ -134,13 +135,14 @@ function Dialog({ req, done }: { req: Pending; done: (v: unknown) => void }) {
               </label>
             )}
           </div>
-          <div className="flex justify-end gap-2 border-t border-line px-6 py-4">
+          <div className="flex justify-end gap-2 border-t border-line px-6 py-4 max-md:[&>*]:flex-1">
             {!(req.kind === 'prompt' && req.readOnly) && (
               <Button type="button" variant="ghost" onClick={() => done(cancelValue)}>
                 {(req.kind === 'confirm' && req.cancel) || 'Отмена'}
               </Button>
             )}
-            <Button ref={okBtn} type="submit" variant="primary" className={danger ? 'bg-bad hover:bg-bad/90' : undefined}>
+            {/* удаление и другие необратимые действия — красной кнопкой, чтобы не нажать по привычке */}
+            <Button ref={okBtn} type="submit" variant="primary" className={danger ? 'bg-bad! hover:bg-bad/90!' : undefined}>
               {req.ok || (req.kind === 'prompt' && req.readOnly ? 'Готово' : 'Сохранить')}
             </Button>
           </div>
