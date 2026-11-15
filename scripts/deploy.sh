@@ -17,6 +17,7 @@ cp dist/index.html dist/404.html   # прямые ссылки (/bloggers, ст�
 # ссылки для клиентов (/s/?t=…) и приглашения в команду (/join/?t=…) — настоящие страницы с кодом 200, чтобы мессенджеры показывали превью
 mkdir -p dist/s dist/join && cp dist/index.html dist/s/index.html && cp dist/index.html dist/join/index.html
 touch dist/.nojekyll
+cp CLAUDE.md dist/   # правила работы для Claude: сессии открываются и на ветке gh-pages
 
 REMOTE="$(git remote get-url origin)"
 cd dist
