@@ -7,7 +7,7 @@ import { useData } from '../lib/data'
 import { date, downloadXlsx, money, parseNumber, plural, todayISO } from '../lib/format'
 import type { Expense, Income } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Card, Chip, Empty, Field, IconButton, Input, Modal, PageHeader, Progress, Segmented, Select, Skel, SkelList, SkelTable, StatusBadge, Table, Toggle, cx } from '../components/ui'
+import { Button, Card, Chip, Empty, Field, IconButton, Input, Modal, PageHeader, Segmented, Select, Skel, SkelList, SkelTable, StatusBadge, Table, Toggle, cx } from '../components/ui'
 import { BloggerName, useIntegrationPanel } from '../components/bits'
 import { confirmDialog } from '../components/dialogs'
 import { DateInput } from '../components/DateInput'
@@ -22,6 +22,93 @@ function periodRange(p: Period) {
   const len = p === 'month' ? 1 : p === 'quarter' ? 3 : 12
   const iso = (y: number, mm: number) => `${y + Math.floor(mm / 12)}-${String((mm % 12) + 1).padStart(2, '0')}-01`
   return { from: iso(d.getFullYear(), m), to: iso(d.getFullYear(), m + len) }
+}
+
+// корзина в строке таблицы: на компьютере видна при наведении на строку, на телефоне - всегда
+const TRASH = 'size-8 hover:text-bad focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:hover)]:opacity-0'
+
+const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь']
+
+/** Название текущего периода: «Ноябрь 2026», «IV квартал 2026», «2026 год» */
+function periodLabel(p: Period) {
+  const d = new Date()
+  const y = d.getFullYear()
+  if (p === 'month') return `${MONTHS[d.getMonth()]} ${y}`
+  if (p === 'quarter') return `${['I', 'II', 'III', 'IV'][Math.floor(d.getMonth() / 3)]} квартал ${y}`
+  return `${y} год`
+}
+
+/**
+ * Сверка периода: поступления минус налог минус расходы равно остаток.
+ * На компьютере - уравнение в строку, на телефоне - столбик, как в ведомости.
+ * Остаток - единственное лаймовое место раздела
+ */
+function Ledger({ busy, period, onPeriod, lines, result }: { busy: boolean; period: Period; onPeriod: (p: Period) => void; lines: { label: string; value: number; note: string; minus?: boolean }[]; result: number }) {
+  return (
+    <Card>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-base">{periodLabel(period)}</h2>
+        <Segmented<Period> value={period} onChange={onPeriod} options={[{ id: 'month', label: 'Месяц' }, { id: 'quarter', label: 'Квартал' }, { id: 'year', label: 'Год' }]} />
+      </div>
+      <div className="mt-5 lg:mt-6 lg:flex lg:items-stretch lg:gap-4">
+        {lines.map((l) => (
+          <div key={l.label} className="contents">
+            {l.minus && (
+              <span aria-hidden className="hidden w-4 shrink-0 items-center justify-center text-2xl text-faint lg:flex">
+                −
+              </span>
+            )}
+            <div className="flex items-baseline justify-between gap-3 border-b border-line py-3 first:pt-0 lg:min-w-0 lg:flex-1 lg:flex-col lg:justify-center lg:gap-1 lg:self-center lg:border-0 lg:py-0">
+              <div className="min-w-0">
+                <div className="text-[13px] text-muted">{l.label}</div>
+                <div className="mt-0.5 text-xs text-faint lg:hidden">{l.note}</div>
+              </div>
+              {busy ? (
+                <Skel className="h-6 w-28" />
+              ) : (
+                <div className="appear num shrink-0 text-lg lg:text-2xl lg:leading-8">
+                  <span className="text-faint lg:hidden">{l.minus ? '− ' : ''}</span>
+                  {money(l.value)}
+                </div>
+              )}
+              <div className="hidden text-xs text-faint lg:block">{l.note}</div>
+            </div>
+          </div>
+        ))}
+        <span aria-hidden className="hidden w-4 shrink-0 items-center justify-center text-2xl text-faint lg:flex">
+          =
+        </span>
+        <div className={cx('mt-4 rounded-inner px-5 py-4 lg:mt-0 lg:flex-[1.3]', result < 0 ? 'bg-bad/10 text-bad' : 'bg-lime text-ink')}>
+          <div className="text-[13px] opacity-70">Остаётся</div>
+          {busy ? <Skel className="mt-1.5 h-8 w-36" /> : <div className="appear num mt-0.5 text-[28px] leading-9 lg:text-[32px] lg:leading-10">{money(result)}</div>}
+          <div className="mt-0.5 text-xs opacity-70">после налога и расходов</div>
+        </div>
+      </div>
+    </Card>
+  )
+}
+
+/** Тонкая полоса: сколько из плана или лимита. Серая - обычное, жёлтая и красная - лимит близко, зелёная - получено всё */
+function Meter({ value, max, tone, className }: { value: number; max: number; tone?: 'warn' | 'bad' | 'done'; className?: string }) {
+  const p = max > 0 ? Math.min(100, (value / max) * 100) : 0
+  return (
+    <div className={cx('h-1.5 overflow-hidden rounded-full bg-ink/6', className)} role="progressbar" aria-valuenow={Math.round(p)} aria-valuemin={0} aria-valuemax={100}>
+      <div className={cx('grow h-full rounded-full', tone === 'bad' ? 'bg-bad' : tone === 'warn' ? 'bg-warn' : tone === 'done' ? 'bg-leaf' : 'bg-ink/70')} style={{ width: `${p}%` }} />
+    </div>
+  )
+}
+
+/** «Самокат, школа» вместо «Самокат, Самокат, школа»: клиента показываем, только если его нет в названии кампании */
+function ClientCampaign({ client, campaign, note }: { client?: string; campaign?: string; note: string | null }) {
+  if (!client && !campaign) return <span className="text-faint">{note ?? '—'}</span>
+  if (!campaign) return <>{client}</>
+  const dup = client && campaign.toLowerCase().includes(client.toLowerCase())
+  return (
+    <>
+      {campaign}
+      {client && !dup && <span className="text-muted"> · {client}</span>}
+    </>
+  )
 }
 
 export function Finance() {
@@ -94,7 +181,6 @@ export function Finance() {
     <>
       <PageHeader
         title="Финансы"
-        sub="Раздел видят только учредители"
         actions={
           <>
             {tab === 'incomes' && (
@@ -143,85 +229,74 @@ export function Finance() {
       />
 
       {tab === 'summary' && (
-        <>
-          <Segmented<Period> className="mb-3" value={period} onChange={setPeriod} options={[{ id: 'month', label: 'Месяц' }, { id: 'quarter', label: 'Квартал' }, { id: 'year', label: 'Год' }]} />
-          {/* на телефоне четыре цифры — сеткой 2×2, чтобы сводка помещалась на экран */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-            {[
-              ['Поступления', money(sumIn), `${inP.length} ${plural(inP.length, 'платёж', 'платежа', 'платежей')}`],
-              ['Налог к уплате', money(tax), 'по ставке каждого поступления'],
-              ['Расходы', money(sumEx), `${exP.length} ${plural(exP.length, 'запись', 'записи', 'записей')}`],
-              ['Остаётся', money(sumIn - tax - sumEx), 'после налога и расходов'],
-            ].map(([k, v, n]) => (
-              <Card key={k} className="max-sm:p-4">
-                <div className="text-[13px] text-muted">{k}</div>
-                {busy ? (
-                  <>
-                    <Skel className="mt-2.5 h-6 w-28" />
-                    <Skel className="mt-2.5 h-3 w-24" />
-                  </>
-                ) : (
-                  <div className="appear">
-                    <div className="num mt-1 text-[20px] leading-7 sm:text-[28px] sm:leading-8">{v}</div>
-                    <div className="mt-1 text-xs text-muted">{n}</div>
-                  </div>
-                )}
-              </Card>
-            ))}
-          </div>
-          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <div className="grid gap-3">
+          <Ledger
+            busy={busy}
+            period={period}
+            onPeriod={setPeriod}
+            lines={[
+              { label: 'Поступления', value: sumIn, note: `${inP.length} ${plural(inP.length, 'платёж', 'платежа', 'платежей')}` },
+              { label: 'Налог к уплате', value: tax, note: 'по ставкам поступлений', minus: true },
+              { label: 'Расходы', value: sumEx, note: `${exP.length} ${plural(exP.length, 'запись', 'записи', 'записей')}`, minus: true },
+            ]}
+            result={sumIn - tax - sumEx}
+          />
+          <div className="grid gap-3 lg:grid-cols-2">
             <Card>
               <h2 className="text-base">Доход учредителей за {new Date().getFullYear()} год</h2>
-              <p className="mt-1 text-[13px] text-muted">Лимит самозанятого: {money(limit)} в год. За его пределами доход облагается уже НДФЛ</p>
-              <ul className="mt-4 space-y-5">
+              <p className="mt-1 text-[13px] text-muted">Лимит самозанятого - {money(limit)} в год. Сверх него доход облагается НДФЛ</p>
+              <ul className="mt-5 space-y-5">
                 {busy && <SkelList rows={2} />}
-                {!busy && founders.map((f) => {
-                  const mine = incomes.filter((i) => i.receiver_id === f.id && i.paid_on >= year)
-                  const got = mine.reduce((a, i) => a + i.amount, 0)
-                  const share = got / limit
-                  const mTax = mine.filter((i) => inPeriod(i.paid_on)).reduce((a, i) => a + i.amount * rate(i), 0)
-                  return (
-                    <li key={f.id}>
-                      <div className="mb-2 flex items-baseline justify-between gap-2">
-                        <span>{f.full_name || f.email}</span>
-                        <span className="num text-[13px] text-muted">
-                          {money(got)}, {Math.round(share * 100)}% лимита
-                        </span>
-                      </div>
-                      <Progress value={got} max={limit} over={share >= 0.95} />
-                      <div className="num mt-2 flex flex-wrap justify-between gap-2 text-xs text-muted">
-                        <span>налог за период: {money(mTax)}</span>
-                        {share >= 0.95 ? <span className="text-bad">Лимит почти исчерпан, пора переходить на ИП</span> : share >= 0.8 ? <span className="text-warn">Больше 80% лимита, планируйте переход на ИП</span> : null}
-                      </div>
-                    </li>
-                  )
-                })}
+                {!busy &&
+                  founders.map((f) => {
+                    const mine = incomes.filter((i) => i.receiver_id === f.id && i.paid_on >= year)
+                    const got = mine.reduce((a, i) => a + i.amount, 0)
+                    const share = got / limit
+                    const mTax = mine.filter((i) => inPeriod(i.paid_on)).reduce((a, i) => a + i.amount * rate(i), 0)
+                    const tone = share >= 0.95 ? 'bad' : share >= 0.8 ? 'warn' : undefined
+                    return (
+                      <li key={f.id}>
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                          <span className="text-sm">{f.full_name || f.email}</span>
+                          <span className="num text-[13px]">
+                            {money(got)} <span className="text-muted">· {Math.round(share * 100)} % лимита</span>
+                          </span>
+                        </div>
+                        <Meter value={got} max={limit} tone={tone} className="mt-2" />
+                        <div className="num mt-2 flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs text-muted">
+                          <span>Налог за период {money(mTax)}</span>
+                          {tone === 'bad' ? <span className="text-bad">Лимит почти исчерпан, пора переходить на ИП</span> : tone === 'warn' ? <span className="text-warn">Больше 80 % лимита, планируйте переход на ИП</span> : null}
+                        </div>
+                      </li>
+                    )
+                  })}
               </ul>
             </Card>
             <Card>
               <h2 className="text-base">Комиссия по кампаниям</h2>
+              <p className="mt-1 text-[13px] text-muted">Наценка по одобренным интеграциям и сколько из неё уже получено</p>
               {busy ? (
-                <SkelList rows={2} className="mt-2" />
+                <SkelList rows={2} className="mt-3" />
               ) : commission.length === 0 ? (
-                <p className="mt-3 text-muted">Появится, когда клиент одобрит первых блогеров в подборке</p>
+                <p className="mt-4 text-[13px] text-muted">Появится, когда клиент одобрит первых блогеров в подборке</p>
               ) : (
-                <ul className="mt-2">
+                <ul className="mt-3">
                   {commission.map(({ c, plan, fact }) => (
-                    <li key={c.id} className="border-t border-line py-3 first:border-0">
-                      <div className="mb-2 flex items-baseline justify-between gap-2">
-                        <span className="truncate">{c.name}</span>
-                        <span className="num shrink-0 text-[13px] text-muted">
-                          получено {money(fact)} из {money(plan)}
+                    <li key={c.id} className="border-t border-line py-3 first:border-0 last:pb-0">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                        <span className="min-w-0 text-sm">{c.name}</span>
+                        <span className="num text-[13px]">
+                          {money(fact)} <span className="text-muted">из {money(plan)}</span>
                         </span>
                       </div>
-                      <Progress value={fact} max={plan} className="h-2" />
+                      <Meter value={fact} max={plan} tone={plan > 0 && fact >= plan ? 'done' : undefined} className="mt-2" />
                     </li>
                   ))}
                 </ul>
               )}
             </Card>
           </div>
-        </>
+        </div>
       )}
 
       {tab === 'incomes' &&
@@ -246,16 +321,18 @@ export function Finance() {
             }
           >
             {incomes.map((i) => (
-              <tr key={i.id} onClick={() => setEditI(i)} className="cursor-pointer hover:bg-soft">
+              <tr key={i.id} onClick={() => setEditI(i)} className="group cursor-pointer hover:bg-soft">
                 <td className="num">{date(i.paid_on)}</td>
                 <td className="num text-right font-medium">{money(i.amount)}</td>
-                <td className="max-w-64 truncate">{[clients.find((c) => c.id === i.client_id)?.name, campaign(i.campaign_id)?.name].filter(Boolean).join(', ') || <span className="text-faint">{i.note ?? '—'}</span>}</td>
+                <td className="max-w-64 truncate">
+                  <ClientCampaign client={clients.find((c) => c.id === i.client_id)?.name} campaign={campaign(i.campaign_id)?.name} note={i.note} />
+                </td>
                 <td>{personName(i.receiver_id).split(' ')[0]}</td>
                 <td className="text-muted">{i.payer_type === 'org' ? 'Организация' : 'Физлицо'}</td>
                 <td className="num text-right text-muted">{money(i.amount * rate(i))}</td>
-                <td>{i.has_receipt ? <Check className="size-4" strokeWidth={1.5} /> : <span className="text-warn">нет чека</span>}</td>
+                <td>{i.has_receipt ? <Check className="size-4 text-muted" strokeWidth={1.5} aria-label="Чек есть" /> : <Chip tone="warn">нет чека</Chip>}</td>
                 <td onClick={(e) => e.stopPropagation()}>
-                  <IconButton label="Удалить" className="size-8 hover:text-bad" onClick={() => del('incomes', i.id)}>
+                  <IconButton label="Удалить" className={TRASH} onClick={() => del('incomes', i.id)}>
                     <Trash2 className="size-4" strokeWidth={1.5} />
                   </IconButton>
                 </td>
@@ -298,7 +375,7 @@ export function Finance() {
                   <td>
                     <StatusBadge status={i.status} />
                   </td>
-                  <td>{receipt ? <Chip dot="bg-leaf">есть</Chip> : i.status === 'waiting_payment' ? <span className="text-faint">после оплаты</span> : <Chip tone="warn">нет чека</Chip>}</td>
+                  <td>{receipt ? <Check className="size-4 text-muted" strokeWidth={1.5} aria-label="Чек есть" /> : i.status === 'waiting_payment' ? <span className="text-faint">после оплаты</span> : <Chip tone="warn">нет чека</Chip>}</td>
                 </tr>
               ))}
             </Table>
@@ -326,14 +403,14 @@ export function Finance() {
             }
           >
             {expenses.map((e) => (
-              <tr key={e.id} onClick={() => setEditE(e)} className="cursor-pointer hover:bg-soft">
+              <tr key={e.id} onClick={() => setEditE(e)} className="group cursor-pointer hover:bg-soft">
                 <td className="num">{date(e.paid_on)}</td>
                 <td className="num text-right font-medium">{money(e.amount)}</td>
                 <td>{e.category ?? '—'}</td>
                 <td>{personName(e.paid_by).split(' ')[0]}</td>
                 <td className="max-w-64 truncate text-muted">{e.note}</td>
                 <td onClick={(ev) => ev.stopPropagation()}>
-                  <IconButton label="Удалить" className="size-8 hover:text-bad" onClick={() => del('expenses', e.id)}>
+                  <IconButton label="Удалить" className={TRASH} onClick={() => del('expenses', e.id)}>
                     <Trash2 className="size-4" strokeWidth={1.5} />
                   </IconButton>
                 </td>
