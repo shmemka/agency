@@ -116,8 +116,9 @@ export function FileThumb({ name, mime, bucket, path, link, uploader, className 
         )}
       </span>
       {uploader && whoName && (
-        <span className="absolute -right-1.5 -bottom-1.5 rounded-full ring-2 ring-surface" title={`Загрузил(а): ${whoName}`}>
-          <Avatar name={whoName} src={who?.avatar_url} className="size-5! text-[8px]! leading-none" />
+        // flex: обёртка ровно по размеру аватарки, и белое кольцо вокруг неё не съезжает (у строчной обёртки высота - как у строки текста)
+        <span className="absolute -right-1.5 -bottom-1.5 flex rounded-full bg-surface ring-2 ring-surface" title={`Загрузил(а): ${whoName}`}>
+          <Avatar name={whoName} src={who?.avatar_url} className="size-[22px]! text-[9px]! leading-none" />
         </span>
       )}
     </span>
