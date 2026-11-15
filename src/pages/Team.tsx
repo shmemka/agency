@@ -213,7 +213,7 @@ export function Team() {
         </Card>
       )}
 
-      <p className="mt-4 px-1 text-[13px] text-muted">{isAdmin ? 'Закрытый доступ не удаляет человека из «Сверки»: он остаётся в своих других кабинетах' : 'Новых людей приглашают учредители'}</p>
+      {!isAdmin && <p className="mt-4 px-1 text-[13px] text-muted">Новых людей приглашают учредители</p>}
 
       <Modal
         open={!!closing}
