@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ArrowDown, ArrowUp, FileSpreadsheet, MoreHorizontal, Plus, Search } from 'lucide-react'
+import { ArrowDown, ArrowUp, FileSpreadsheet, LayoutGrid, List, MoreHorizontal, Plus, Search } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -9,13 +9,34 @@ import { isActive } from '../lib/rules'
 import { count, cpm, money, plural } from '../lib/format'
 import type { Blogger } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, BloggerStatusBadge, BloggerStatusSelect, Button, Empty, Filters, Input, Menu, PageHeader, Select, Skel, SkelTable, Table, cx, useEntrance } from '../components/ui'
+import { Avatar, BloggerStatusBadge, BloggerStatusSelect, Button, Empty, Filters, Input, Loading, Menu, PageHeader, Segmented, Select, Skel, SkelTable, Table, cx, useEntrance } from '../components/ui'
+import { BloggerCard } from '../components/BloggerCard'
 import { NO_DEAL } from '../components/IntegrationBoard'
 import { confirmDialog, promptDialog } from '../components/dialogs'
 import { AudienceBar, BloggerName, statsStale } from '../components/bits'
 import { BloggerDrawer, useBloggerStatus } from '../components/BloggerDrawer'
-import { BloggerFormModal } from '../components/BloggerForm'
+import { AddToDealModal, BloggerFormModal } from '../components/BloggerForm'
 import { ImportModal } from '../components/ImportModal'
+
+/** Вид списка: карточки с фото или таблица. Запоминается в этом браузере */
+type View = 'cards' | 'table'
+const VIEW_KEY = 'bloggers:view'
+const readView = (): View => {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'table' ? 'table' : 'cards'
+  } catch {
+    return 'cards'
+  }
+}
+
+const SORTS: { id: SortKey; dir: 1 | -1; label: string }[] = [
+  { id: 'updated_at', dir: -1, label: 'Сначала новые' },
+  { id: 'avg_reach', dir: -1, label: 'Больше охват' },
+  { id: 'followers', dir: -1, label: 'Больше подписчиков' },
+  { id: 'price', dir: 1, label: 'Дешевле' },
+  { id: 'cpm', dir: 1, label: 'Ниже CPM' },
+  { id: 'nick', dir: 1, label: 'По нику' },
+]
 
 /** вкладка «Наши» в адресе: ?list=ours */
 const OURS = 'ours'
@@ -34,6 +55,16 @@ export function Bloggers() {
   const [importing, setImporting] = useState(false)
   const [limit, setLimit] = useState(100)
   const [picked, setPicked] = useState<Set<string>>(new Set())
+  const [view, setView] = useState<View>(readView)
+  const [dealFor, setDealFor] = useState<string | null>(null)
+  const changeView = (v: View) => {
+    setView(v)
+    try {
+      localStorage.setItem(VIEW_KEY, v)
+    } catch {
+      /* без памяти браузера вид просто не запомнится */
+    }
+  }
 
   const q = params.get('q') ?? ''
   // список (вкладка) и статус — отдельные фильтры; старые ссылки с ?tab= понимаем как статус
@@ -201,13 +232,18 @@ export function Bloggers() {
     </th>
   )
 
-  // блогеры - справочник: здесь только где он сейчас в работе, а этапы ведутся в кампаниях и на экране «Выходы»
-  // кандидаты подборок тоже считаются: блогер уже предложен клиенту
+  // блогеры - справочник: здесь только в какой сделке он сейчас в работе, шаги ведутся на экране «Работа»
   const busyBy = useMemo(() => {
     const m = new Map<string, typeof integrations>()
     for (const i of integrations) if (isActive(i)) m.set(i.blogger_id, [...(m.get(i.blogger_id) ?? []), i])
     return m
   }, [integrations])
+  const busyOf = (b: Blogger) => {
+    const list = busyBy.get(b.id)
+    if (!list) return undefined
+    const names = [...new Set(list.map((i) => (i.campaign_id ? (campaign(i.campaign_id)?.name ?? '') : NO_DEAL)))]
+    return { first: names[0], more: names.length - 1 }
+  }
   const work = (b: Blogger) => {
     const list = busyBy.get(b.id)
     if (!list) return <span className="text-faint">—</span>
@@ -236,6 +272,16 @@ export function Bloggers() {
               <Plus className="size-4" strokeWidth={1.5} />
               Добавить блогера
             </Button>
+            {/* на телефоне вид переключается в шапке: строка со списками и так узкая */}
+            <Segmented
+              className="md:hidden"
+              value={view}
+              onChange={changeView}
+              options={[
+                { id: 'cards', label: <LayoutGrid className="size-4" strokeWidth={1.5} aria-label="Карточки" /> },
+                { id: 'table', label: <List className="size-4" strokeWidth={1.5} aria-label="Список" /> },
+              ]}
+            />
           </>
         }
       />
@@ -292,6 +338,33 @@ export function Bloggers() {
           ))}
           <option value="stale">{`Статистика устарела ${inList.filter(statsStale).length}`}</option>
         </Select>
+        {/* у карточек нет заголовков столбцов - порядок выбирается здесь */}
+        {view === 'cards' && (
+          <Select
+            value={`${sort}:${dir}`}
+            onChange={(e) => {
+              const [k, d] = e.target.value.split(':')
+              const p = new URLSearchParams(params)
+              if (k === 'updated_at' && d === '-1') {
+                p.delete('sort')
+                p.delete('dir')
+              } else {
+                p.set('sort', k)
+                p.set('dir', d === '1' ? 'asc' : 'desc')
+              }
+              setParams(p, { replace: true })
+            }}
+            aria-label="Порядок"
+            tone="surface"
+            className="w-52"
+          >
+            {SORTS.map((o) => (
+              <option key={o.id} value={`${o.id}:${o.dir}`}>
+                {o.label}
+              </option>
+            ))}
+          </Select>
+        )}
         </Filters>
       </div>
       {/* вкладки: «Все» и списки, которые создают учредители */}
@@ -325,6 +398,15 @@ export function Bloggers() {
             </button>
           )}
         </div>
+        <Segmented
+          className="ml-auto shrink-0 max-md:hidden"
+          value={view}
+          onChange={changeView}
+          options={[
+            { id: 'cards', label: <LayoutGrid className="size-4" strokeWidth={1.5} aria-label="Карточки" /> },
+            { id: 'table', label: <List className="size-4" strokeWidth={1.5} aria-label="Таблица" /> },
+          ]}
+        />
         {isAdmin && current && (
           <Menu
             value={'' as string}
@@ -345,7 +427,15 @@ export function Bloggers() {
       </div>
 
       {loading ? (
-        <SkelTable rows={10} cols={[3, 1.4, 1, 1, 1.2, 1]} />
+        view === 'cards' ? (
+          <Loading className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+            {Array.from({ length: 10 }, (_, k) => (
+              <Skel key={k} className="aspect-[3/4] w-full rounded-card" />
+            ))}
+          </Loading>
+        ) : (
+          <SkelTable rows={10} cols={[3, 1.4, 1, 1, 1.2, 1]} />
+        )
       ) : error ? (
         <Empty title="Блогеры не загрузились">{error}</Empty>
       ) : bloggers.length === 0 ? (
@@ -370,7 +460,16 @@ export function Bloggers() {
         <Empty title="Никого не нашли">Измените поиск или фильтры</Empty>
       ) : (
         <>
-          <div className="appear hidden md:block">
+          {view === 'cards' && (
+            <ul className={cx('appear grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5', entering && 'stagger')}>
+              {rows.slice(0, limit).map((b) => (
+                <li key={b.id}>
+                  <BloggerCard b={b} busy={busyOf(b)} picked={picked.has(b.id)} picking={picked.size > 0} onOpen={() => open(b)} onPick={(shift) => toggle(b.id, shift)} onDeal={() => setDealFor(b.id)} />
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className={cx('appear hidden', view === 'table' && 'md:block')}>
             <Table
               enter={entering}
               min={860}
@@ -446,7 +545,7 @@ export function Bloggers() {
               })}
             </Table>
           </div>
-          <ul className={cx('appear space-y-2 md:hidden', entering && 'stagger')}>
+          <ul className={cx('appear space-y-2 md:hidden', view === 'cards' && 'hidden', entering && 'stagger')}>
             {rows.slice(0, limit).map((b) => (
               <li key={b.id}>
                 {/* на телефоне карточка без галочек: только то, что нужно, чтобы узнать блогера и открыть его.
@@ -517,6 +616,7 @@ export function Bloggers() {
       )}
 
       {id && <BloggerDrawer key={id} id={id} onClose={() => nav({ pathname: '/bloggers', search: params.toString() })} />}
+      {dealFor && <AddToDealModal open onClose={() => setDealFor(null)} bloggerId={dealFor} onCreated={() => toast(`${bloggers.find((b) => b.id === dealFor)?.nick ?? 'Блогер'} в работе: смотрите экран «Работа»`)} />}
       <BloggerFormModal open={adding} onClose={() => setAdding(false)} onCreated={open} />
       <ImportModal open={importing} onClose={() => setImporting(false)} />
     </>
