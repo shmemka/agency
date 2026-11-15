@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, CalendarDays, Check, ChevronDown, Clapperboard, Ellipsis, Plus, FileText, LayoutGrid, ListTodo, LogOut, Megaphone, Settings, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
+import { Bell, CalendarDays, ChevronDown, Clapperboard, Ellipsis, Plus, FileText, LayoutGrid, ListTodo, LogOut, Megaphone, Settings, UserPlus, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -9,9 +9,10 @@ import { toast } from '../lib/toast'
 import { promptDialog } from './dialogs'
 import { preloadRichEditor } from './RichEditor'
 import { attention, taskOwner, type Attention } from '../lib/rules'
-import { dateTime } from '../lib/format'
+import { dateTime, plural } from '../lib/format'
 import { Avatar, IconButton, ITEM, ITEM_DESKTOP, Loading, Modal, POPOVER, Skel, cx } from './ui'
 import { useIntegrationPanel } from './bits'
+import { PLAN, UpgradeButton, WorkspaceTile } from './Workspace'
 import { IntegrationPanel } from './IntegrationPanel'
 
 const NAV = [
@@ -176,7 +177,7 @@ export function Layout() {
     window.addEventListener('scroll', on, { passive: true })
     return () => window.removeEventListener('scroll', on)
   }, [])
-  const pageLabel = current?.label ?? (loc.pathname.startsWith('/profile') ? 'Мой профиль' : loc.pathname.startsWith('/settings') ? 'Настройки' : agency)
+  const pageLabel = current?.label ?? (loc.pathname.startsWith('/profile') ? 'Мой профиль' : loc.pathname.startsWith('/settings') ? 'Настройки кабинета' : agency)
 
   const navBox = useRef<HTMLElement>(null)
   const [pill, setPill] = useState<{ y: number; animate: boolean } | null>(null)
@@ -218,7 +219,7 @@ export function Layout() {
             </NavLink>
           ))}
         </nav>
-        <UserCard name={name} avatar={profile?.avatar_url} role={isAdmin ? 'Учредитель' : 'Специалист'} onSignOut={signOut} />
+        <UserCard name={name} email={profile?.email ?? ''} avatar={profile?.avatar_url} role={isAdmin ? 'Учредитель' : 'Специалист'} onSignOut={signOut} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -267,39 +268,59 @@ export function Layout() {
               </NavLink>
             ))}
           <div className="mx-3 my-2 h-px bg-line" />
-          <p className="px-3 pt-1 pb-1 text-[13px] text-faint">Кабинеты</p>
-          {workspaces.map((w) => (
-            <button
-              key={w.id}
-              onClick={async () => {
-                if (w.id === workspace?.id) return setMore(false)
-                const err = await switchWorkspace(w.id)
-                if (err) toast(err)
-              }}
-              className={cx('flex h-12 w-full items-center gap-3 rounded-2xl px-3 text-left text-[15px] hover:bg-soft', !w.is_active && 'text-muted')}
-            >
-              <span className="flex size-5 items-center justify-center">{w.id === workspace?.id && <Check className="size-5" strokeWidth={1.5} />}</span>
-              <span className="min-w-0 flex-1 truncate">{w.name}</span>
-              {!w.is_active && <span className="text-[13px] text-faint">{w.deactivated_at ? 'закрыт' : 'ждёт доступа'}</span>}
-            </button>
-          ))}
+          {/* текущий кабинет, другие кабинеты, аккаунт - как в меню профиля на компьютере */}
+          {workspace && (
+            <div className="mx-1 rounded-inner bg-soft p-3">
+              <div className="flex items-center gap-3">
+                <WorkspaceTile id={workspace.id} name={workspace.name} className="size-10 rounded-xl text-sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[15px] font-medium">{workspace.name}</div>
+                  <div className="text-[13px] text-muted">{isAdmin ? 'Учредитель' : 'Специалист'}</div>
+                </div>
+                {isAdmin && <UpgradeButton />}
+              </div>
+              <NavLink to="/settings" onClick={() => setMore(false)} className="mt-3 flex h-11 items-center justify-center gap-2 rounded-full bg-surface text-[15px]">
+                <Settings className="size-4 text-muted" strokeWidth={1.5} />
+                Настройки кабинета
+              </NavLink>
+            </div>
+          )}
+          {workspaces.some((w) => w.id !== workspace?.id) && <p className="px-3 pt-3 pb-1 text-[13px] text-faint">Переключить кабинет</p>}
+          {workspaces
+            .filter((w) => w.id !== workspace?.id)
+            .map((w) => (
+              <button
+                key={w.id}
+                onClick={async () => {
+                  const err = await switchWorkspace(w.id)
+                  if (err) toast(err)
+                }}
+                className="flex h-14 w-full items-center gap-3 rounded-2xl px-3 text-left hover:bg-soft"
+              >
+                <WorkspaceTile id={w.id} name={w.name} muted={!w.is_active} />
+                <span className="min-w-0 flex-1">
+                  <span className={cx('block truncate text-[15px]', !w.is_active && 'text-muted')}>{w.name}</span>
+                  <span className="block text-[13px] text-faint">{!w.is_active ? (w.deactivated_at ? 'доступ закрыт' : 'ждёт подтверждения') : w.role === 'admin' ? 'Учредитель' : 'Специалист'}</span>
+                </span>
+              </button>
+            ))}
           <button
             onClick={() => {
               setMore(false)
               newWorkspace(createWorkspace)
             }}
-            className="flex h-12 w-full items-center gap-3 rounded-2xl px-3 text-[15px] text-muted hover:bg-soft"
+            className="flex h-14 w-full items-center gap-3 rounded-2xl px-3 text-[15px] text-muted hover:bg-soft"
           >
-            <Plus className="size-5" strokeWidth={1.5} />
-            Создать кабинет
+            <span className="flex size-8 items-center justify-center rounded-[10px] border border-dashed border-ink/25">
+              <Plus className="size-4" strokeWidth={1.5} />
+            </span>
+            Новый кабинет
           </button>
           <div className="mx-3 my-2 h-px bg-line" />
-          {accountFor(isAdmin).map((n) => (
-            <NavLink key={n.to} to={n.to} onClick={() => setMore(false)} className="flex h-12 items-center gap-3 rounded-2xl px-3 text-[15px] hover:bg-soft">
-              <n.icon className="size-5 text-muted" strokeWidth={1.5} />
-              <span className="flex-1">{n.label}</span>
-            </NavLink>
-          ))}
+          <NavLink to="/profile" onClick={() => setMore(false)} className="flex h-12 items-center gap-3 rounded-2xl px-3 text-[15px] hover:bg-soft">
+            <UserRound className="size-5 text-muted" strokeWidth={1.5} />
+            <span className="flex-1">Мой профиль</span>
+          </NavLink>
           <button onClick={signOut} className="flex h-12 w-full items-center gap-3 rounded-2xl px-3 text-[15px] text-muted hover:bg-soft">
             <LogOut className="size-5" strokeWidth={1.5} />
             Выйти
@@ -312,24 +333,26 @@ export function Layout() {
   )
 }
 
-const ACCOUNT = [
-  { to: '/profile', label: 'Мой профиль', icon: UserRound },
-  // настройки агентства меняют только учредители: специалисту там нечего делать
-  { to: '/settings', label: 'Настройки', icon: Settings, admin: true },
-]
-const accountFor = (isAdmin: boolean) => ACCOUNT.filter((a) => !a.admin || isAdmin)
+/** Страницы из меню профиля: пока открыта одна из них, капсула профиля подсвечена */
+const MENU_PAGES = ['/profile', '/settings']
+
+const membersLabel = (n: number) => `${n} ${plural(n, 'участник', 'участника', 'участников')}`
 
 /**
- * Профиль внизу сайдбара: при наведении или по клику открывает меню —
- * кабинеты (переключить или создать, как в Notion), профиль, настройки и выход
+ * Профиль внизу сайдбара: при наведении или по клику открывает меню из трёх частей.
+ * 1. Текущий кабинет - карточка: настройки, приглашение, тариф.
+ * 2. Остальные кабинеты - переключение в один клик и «Новый кабинет».
+ * 3. Аккаунт - профиль и выход
  */
-function UserCard({ name, avatar, role, onSignOut }: { name: string; avatar?: string | null; role: string; onSignOut: () => void }) {
+function UserCard({ name, email, avatar, role, onSignOut }: { name: string; email: string; avatar?: string | null; role: string; onSignOut: () => void }) {
   const [open, setOpen] = useState(false)
   const timer = useRef<number | undefined>(undefined)
   const box = useRef<HTMLDivElement>(null)
   const loc = useLocation()
-  const { isAdmin, workspaces, workspace, switchWorkspace, createWorkspace } = useAuth()
-  const here = ACCOUNT.some((a) => loc.pathname.startsWith(a.to))
+  const { isAdmin, team, workspaces, workspace, switchWorkspace, createWorkspace } = useAuth()
+  const here = MENU_PAGES.some((p) => loc.pathname.startsWith(p))
+  const others = workspaces.filter((w) => w.id !== workspace?.id)
+  const members = team.filter((t) => t.is_active).length
 
   const show = () => {
     window.clearTimeout(timer.current)
@@ -340,7 +363,7 @@ function UserCard({ name, avatar, role, onSignOut }: { name: string; avatar?: st
     timer.current = window.setTimeout(() => setOpen(false), delay)
   }
 
-  useEffect(() => setOpen(false), [loc.pathname])
+  useEffect(() => setOpen(false), [loc.pathname, loc.search])
   useEffect(() => {
     if (!open) return
     const out = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false)
@@ -354,6 +377,8 @@ function UserCard({ name, avatar, role, onSignOut }: { name: string; avatar?: st
   }, [open])
 
   const item = cx(ITEM, ITEM_DESKTOP, 'gap-2.5 transition-colors duration-150 hover:bg-soft')
+  const action = 'flex h-8 items-center justify-center gap-1.5 rounded-full bg-surface text-[13px] transition-colors duration-150 hover:bg-white/60'
+  const label = 'px-2.5 pt-2 pb-1 text-xs text-faint'
 
   return (
     <div
@@ -364,45 +389,85 @@ function UserCard({ name, avatar, role, onSignOut }: { name: string; avatar?: st
       onBlur={(e) => !box.current?.contains(e.relatedTarget as Node) && hide(0)}
     >
       {open && (
-        // pb-1.5 — невидимый мостик: курсор доходит до меню, не покидая блок
-        <div className="absolute inset-x-0 bottom-full pb-1.5">
-          <div role="menu" aria-label="Аккаунт и кабинеты" className={cx('fade max-h-[70vh] overflow-y-auto', POPOVER)}>
-            <p className="px-2.5 pt-1.5 pb-1 text-xs text-faint">Кабинеты</p>
-            {workspaces.map((w) => (
+        // pb-1.5 — невидимый мостик: курсор доходит до меню, не покидая блок. Меню шире сайдбара
+        <div className="absolute bottom-full left-0 w-72 pb-1.5">
+          <div role="menu" aria-label="Кабинет и аккаунт" className={cx('fade max-h-[calc(100vh-96px)] overflow-y-auto', POPOVER)}>
+            {/* 1. текущий кабинет */}
+            {workspace && (
+              <div className="rounded-[14px] bg-soft p-3">
+                <div className="flex items-center gap-3">
+                  <WorkspaceTile id={workspace.id} name={workspace.name} className="size-10 rounded-xl text-sm" />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[15px] leading-5 font-medium">{workspace.name}</div>
+                    <div className="truncate text-xs text-muted">
+                      {role} · {membersLabel(members)}
+                    </div>
+                  </div>
+                </div>
+                <div className={cx('mt-3 grid gap-1.5', isAdmin ? 'grid-cols-2' : 'grid-cols-1')}>
+                  <NavLink to="/settings" role="menuitem" className={action}>
+                    <Settings className="size-3.5 text-muted" strokeWidth={1.5} />
+                    Настройки
+                  </NavLink>
+                  {isAdmin && (
+                    <NavLink to="/team?invite=1" role="menuitem" className={action}>
+                      <UserPlus className="size-3.5 text-muted" strokeWidth={1.5} />
+                      Пригласить
+                    </NavLink>
+                  )}
+                </div>
+                {isAdmin && (
+                  <div className="mt-1.5 flex items-center gap-2 rounded-full bg-surface py-1 pr-1 pl-3">
+                    <span className="min-w-0 flex-1 truncate text-[13px] text-muted">{PLAN} план</span>
+                    <UpgradeButton />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 2. другие кабинеты */}
+            <p className={label}>{others.length ? 'Переключить кабинет' : 'Другие кабинеты'}</p>
+            {others.map((w) => (
               <button
                 key={w.id}
                 role="menuitem"
-                className={cx(item, !w.is_active && 'text-muted')}
+                className={cx(ITEM, 'h-11 gap-2.5 text-[13px] transition-colors duration-150 hover:bg-soft')}
                 onClick={async () => {
                   setOpen(false)
-                  if (w.id === workspace?.id) return
                   const err = await switchWorkspace(w.id)
                   if (err) toast(err)
                 }}
               >
-                <span className="min-w-0 flex-1 truncate">{w.name}</span>
-                {!w.is_active && <span className="shrink-0 text-xs text-faint">{w.deactivated_at ? 'закрыт' : 'ждёт доступа'}</span>}
-                {w.id === workspace?.id && <Check className="size-4 shrink-0" strokeWidth={1.5} />}
+                <WorkspaceTile id={w.id} name={w.name} muted={!w.is_active} className="size-7 text-[11px]" />
+                <span className="min-w-0 flex-1 leading-4">
+                  <span className={cx('block truncate', !w.is_active && 'text-muted')}>{w.name}</span>
+                  <span className="block truncate text-xs text-faint">{!w.is_active ? (w.deactivated_at ? 'доступ закрыт' : 'ждёт подтверждения') : w.role === 'admin' ? 'Учредитель' : 'Специалист'}</span>
+                </span>
               </button>
             ))}
             <button
               role="menuitem"
-              className={cx(item, 'text-muted hover:text-ink')}
+              className={cx(ITEM, 'h-11 gap-2.5 text-[13px] text-muted transition-colors duration-150 hover:bg-soft hover:text-ink')}
               onClick={() => {
                 setOpen(false)
                 newWorkspace(createWorkspace)
               }}
             >
-              <Plus className="size-4 shrink-0" strokeWidth={1.5} />
-              Создать кабинет
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-[10px] border border-dashed border-ink/25">
+                <Plus className="size-3.5" strokeWidth={1.5} />
+              </span>
+              Новый кабинет
             </button>
-            <div className="mx-2.5 my-1 h-px bg-line" />
-            {accountFor(isAdmin).map((a) => (
-              <NavLink key={a.to} to={a.to} role="menuitem" className={({ isActive }) => cx(item, isActive && 'bg-soft')}>
-                <a.icon className="size-4 shrink-0 text-muted" strokeWidth={1.5} />
-                {a.label}
-              </NavLink>
-            ))}
+
+            {/* 3. аккаунт */}
+            <div className="mx-2.5 my-1.5 h-px bg-line" />
+            <p className={cx(label, 'truncate pt-1')} title={email}>
+              {email}
+            </p>
+            <NavLink to="/profile" role="menuitem" className={({ isActive }) => cx(item, isActive && 'bg-soft')}>
+              <UserRound className="size-4 shrink-0 text-muted" strokeWidth={1.5} />
+              Мой профиль
+            </NavLink>
             <button role="menuitem" className={cx(item, 'text-muted hover:text-ink')} onClick={onSignOut}>
               <LogOut className="size-4 shrink-0" strokeWidth={1.5} />
               Выйти

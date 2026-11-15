@@ -5,7 +5,6 @@ import { Avatar, Button, Card, Field, Input, PageHeader } from '../components/ui
 import { siteUrl, supabase } from '../lib/supabase'
 import { removeAvatar, uploadAvatar } from '../lib/avatars'
 import { toast } from '../lib/toast'
-import { confirmDialog } from '../components/dialogs'
 
 export function Profile() {
   const { profile, isAdmin, reloadProfile, reloadTeam } = useAuth()
@@ -104,55 +103,8 @@ export function Profile() {
           await reloadTeam()
         }} />
         <PasswordCard />
-        <LeaveCard />
       </div>
     </>
-  )
-}
-
-/** Выйти из кабинета самому: например, из агентства, с которым закончили работать */
-function LeaveCard() {
-  const { workspace, workspaces, team, profile, isAdmin } = useAuth()
-  const [busy, setBusy] = useState(false)
-  if (!workspace || !profile) return null
-  const other = workspaces.find((w) => w.id !== workspace.id && w.is_active)
-  // кабинет не должен остаться без учредителя
-  const lastAdmin = isAdmin && !team.some((m) => m.id !== profile.id && m.role === 'admin' && m.is_active)
-  if (lastAdmin)
-    return (
-      <Card>
-        <h2 className="text-base">Кабинет «{workspace.name}»</h2>
-        <p className="mt-1 text-muted">Вы единственный учредитель, поэтому покинуть кабинет нельзя. Чтобы уйти, сначала назначьте учредителем кого-то из команды</p>
-      </Card>
-    )
-  return (
-    <Card>
-      <h2 className="text-base">Кабинет «{workspace.name}»</h2>
-      <p className="mt-1 mb-4 text-muted">
-        {other ? `После выхода откроется «${other.name}».` : 'Это ваш единственный кабинет: после выхода можно будет создать свой или войти в команду по ссылке.'} Блогеры, задачи и документы останутся в кабинете
-      </p>
-      <Button
-        variant="danger"
-        className="bg-bad/8"
-        loading={busy}
-        onClick={async () => {
-          const ok = await confirmDialog({
-            title: `Покинуть «${workspace.name}»?`,
-            body: 'Вернуться можно будет только по новой ссылке-приглашению от учредителя',
-            ok: 'Покинуть',
-            danger: true,
-          })
-          if (!ok) return
-          setBusy(true)
-          const { error } = await supabase.rpc('leave_workspace')
-          setBusy(false)
-          if (error) return toast(error.message)
-          window.location.replace(siteUrl())
-        }}
-      >
-        Покинуть кабинет
-      </Button>
-    </Card>
   )
 }
 

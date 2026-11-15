@@ -10,6 +10,7 @@ import { ToastHost } from './components/ui'
 import { DialogHost } from './components/dialogs'
 import { TooltipHost } from './components/Tooltip'
 import { FileViewerHost } from './components/FileViewer'
+import { PlanHost } from './components/Workspace'
 import { Login, NewPassword, NotConfigured, Offline } from './pages/Login'
 import { JoinInvite, Onboarding, WsPending } from './pages/Workspaces'
 import { readInvite, saveInvite } from './lib/invite'
@@ -66,7 +67,7 @@ function Gate() {
           {isAdmin && <Route path="finance" element={<Finance />} />}
           <Route path="team" element={<Team />} />
           <Route path="profile" element={<Profile />} />
-          {isAdmin && <Route path="settings" element={<Settings />} />}
+          <Route path="settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
@@ -98,6 +99,7 @@ createRoot(document.getElementById('root')!).render(
         <DialogHost />
         <TooltipHost />
         <FileViewerHost />
+        <PlanHost />
       </BrowserRouter>
     ) : (
       <NotConfigured />
