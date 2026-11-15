@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, CalendarDays, ChevronDown, Ellipsis, Plus, FileText, LayoutGrid, Handshake, ListTodo, LogOut, Settings, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
+import { Bell, CalendarDays, ChevronDown, Ellipsis, Plus, FileText, LayoutGrid, Clapperboard, ListTodo, LogOut, Settings, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -21,7 +21,7 @@ const NAV = [
   { to: '/', label: 'Обзор', icon: LayoutGrid, end: true, phone: true },
   { to: '/bloggers', label: 'Блогеры', icon: Users, phone: true },
   // «Работа» - сделки с клиентами и доска интеграций по этапам
-  { to: '/work', label: 'Работа', icon: Handshake, phone: true },
+  { to: '/work', label: 'Работа', icon: Clapperboard, phone: true },
   { to: '/tasks', label: 'Задачи', icon: ListTodo, phone: true },
   { to: '/calendar', label: 'Календарь', icon: CalendarDays },
   { to: '/documents', label: 'Документы', icon: FileText },
