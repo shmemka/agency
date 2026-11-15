@@ -1,6 +1,6 @@
 import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Navigate, Route, Routes, useSearchParams } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom'
 import './index.css'
 import { isConfigured } from './lib/supabase'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
@@ -27,7 +27,8 @@ import { Team } from './pages/Team'
 import { Share } from './pages/Share'
 import { OfferGone } from './pages/Login'
 import { Profile } from './pages/Profile'
-import { Settings } from './pages/Settings'
+import { Settings, SettingsModal } from './pages/Settings'
+import { useSettingsBackground } from './lib/settingsNav'
 
 /** /join/?t=… — запоминаем приглашение и идём на главную: там вход, регистрация или сразу кнопка «Присоединиться» */
 function JoinRoute() {
@@ -41,6 +42,9 @@ function JoinRoute() {
 function Gate() {
   const { session, profile, profileError, loading, isAdmin, recovery, endRecovery, workspace } = useAuth()
   const [invite, setInvite] = useState(readInvite)
+  const loc = useLocation()
+  // настройки на компьютере - окном: под ним остаётся страница, с которой их открыли
+  const bg = useSettingsBackground()
   // пока проверяем вход, показываем каркас кабинета, а не крутилку: страница не «прыгает», когда всё загрузится
   if (loading) return session ? <ShellSkeleton /> : null
   if (!session) return <Login />
@@ -52,7 +56,7 @@ function Gate() {
   if (!profile.is_active) return <WsPending />
   return (
     <DataProvider>
-      <Routes>
+      <Routes location={bg ?? loc}>
         <Route element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="bloggers" element={<Bloggers />} />
@@ -72,6 +76,7 @@ function Gate() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
+      {bg && <SettingsModal />}
     </DataProvider>
   )
 }

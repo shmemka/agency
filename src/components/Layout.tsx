@@ -15,6 +15,7 @@ import { useIntegrationPanel } from './bits'
 import { UpgradeButton, WorkspaceTile } from './Workspace'
 import { applyBrand } from '../lib/brand'
 import { IntegrationPanel } from './IntegrationPanel'
+import { isSettings, useSettingsBackground } from '../lib/settingsNav'
 
 const NAV = [
   { to: '/', label: 'Обзор', icon: LayoutGrid, end: true, phone: true },
@@ -168,7 +169,9 @@ export function Layout() {
     document.title = `${agency} - ${APP}`
   }, [agency])
   const { openId, open } = useIntegrationPanel()
-  const loc = useLocation()
+  // под окном настроек показывается прежняя страница: меню и прокрутка - как у неё
+  const real = useLocation()
+  const loc = useSettingsBackground() ?? real
   const [more, setMore] = useState(false)
   const nav = NAV.filter((n) => !n.admin || isAdmin)
   const current = nav.find((n) => (n.end ? loc.pathname === n.to : loc.pathname.startsWith(n.to)))
@@ -426,7 +429,7 @@ function UserCard({ name, email, avatar, role, onSignOut }: { name: string; emai
                   </div>
                 </div>
                 <div className={cx('mt-3 grid gap-1.5', isAdmin ? 'grid-cols-2' : 'grid-cols-1')}>
-                  <NavLink to="/settings" role="menuitem" className={action}>
+                  <NavLink to="/settings" state={{ bg: isSettings(loc.pathname) ? undefined : loc, back: true }} role="menuitem" className={action}>
                     <Settings className="size-3.5 text-muted" strokeWidth={1.5} />
                     Настройки
                   </NavLink>

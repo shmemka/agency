@@ -11,6 +11,7 @@ import { Button, Card, Chip, Empty, Field, IconButton, Input, Modal, PageHeader,
 import { BloggerName, useIntegrationPanel } from '../components/bits'
 import { confirmDialog } from '../components/dialogs'
 import { DateInput } from '../components/DateInput'
+import { bgLocation } from '../lib/settingsNav'
 import { commission as commissionOf } from '../lib/rules'
 
 type Tab = 'summary' | 'incomes' | 'payouts' | 'expenses'
@@ -176,7 +177,7 @@ export function Finance() {
     .filter((x) => x.plan > 0 || x.fact > 0)
 
   // настройки налогов переехали в «Настройки кабинета», раздел «Деньги и ОРД»
-  if ((sp.get('tab') as string | null) === 'settings') return <Navigate to="/settings/money" replace />
+  if ((sp.get('tab') as string | null) === 'settings') return <Navigate to="/settings/money" replace state={{ bg: bgLocation('/finance') }} />
 
   return (
     <>

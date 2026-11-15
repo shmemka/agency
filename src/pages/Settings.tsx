@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { Bell, Building2, Check, ChevronLeft, ChevronRight, CircleArrowUp, Coins, HardDrive, LayoutGrid, ListTodo, LogOut, Palette, Pipette, Upload, Users, type LucideIcon } from 'lucide-react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { createPortal } from 'react-dom'
+import { Bell, Building2, Check, ChevronLeft, ChevronRight, CircleArrowUp, Coins, HardDrive, LayoutGrid, ListTodo, LogOut, Palette, Pipette, Upload, Users, X, type LucideIcon } from 'lucide-react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { bgLocation, type SettingsState } from '../lib/settingsNav'
 import { fetchAll, siteUrl, supabase } from '../lib/supabase'
 import { AVATAR_BUCKET, avatarPath } from '../lib/avatars'
 import { useAuth } from '../auth/AuthProvider'
@@ -9,7 +11,7 @@ import { parseNumber, plural } from '../lib/format'
 import type { Settings as SettingsRow } from '../lib/types'
 import { toast } from '../lib/toast'
 import { confirmDialog, confirmDiscard } from '../components/dialogs'
-import { Avatar, Button, Card, Field, Input, Loading, Modal, PageHeader, Skel, cx, submitOnEnter } from '../components/ui'
+import { Avatar, Button, Card, Field, IconButton, Input, Loading, Modal, PageHeader, Skel, cx, reducedMotion, submitOnEnter, useScrollLock } from '../components/ui'
 import { PLAN, UpgradeButton, WorkspaceTile } from '../components/Workspace'
 import { BrandLogo, Mark } from '../components/Layout'
 import { BRAND_PRESETS, DEFAULT_BRAND, LOGO_BUCKET, applyBrand, logoPath, normalizeHex, onBrand, prepareLogo, removeLogo, uploadLogo, uploadWorkspaceAvatar, type PreparedLogo } from '../lib/brand'
@@ -44,12 +46,33 @@ const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 })
 
 /**
  * Настройки текущего кабинета. Открываются из меню профиля.
- * Компьютер: слева разделы, справа выбранный. Телефон: сначала список разделов, из раздела - назад к списку
+ * Компьютер: окно поверх страницы, слева разделы, справа выбранный. Телефон: страница, сначала список разделов, из раздела - назад к списку
  */
 export function Settings() {
+  return <SettingsView />
+}
+
+/** Окно настроек на компьютере. Закрывается крестиком, Esc и кликом мимо и возвращает на страницу под ним */
+export function SettingsModal() {
+  const navigate = useNavigate()
+  const loc = useLocation()
+  const [leaving, setLeaving] = useState(false)
+  useScrollLock(true)
+  function close() {
+    const st = loc.state as SettingsState
+    const bg = st?.bg ?? bgLocation('/')
+    setLeaving(true)
+    // окно сначала плавно уходит, потом меняется адрес
+    setTimeout(() => (st?.back ? navigate(-1) : navigate(bg.pathname + bg.search + bg.hash, { replace: true, state: bg.state })), reducedMotion() ? 0 : 200)
+  }
+  return <SettingsView modal={{ close, leaving }} />
+}
+
+function SettingsView({ modal }: { modal?: { close: () => void; leaving: boolean } }) {
   const { workspace, isAdmin } = useAuth()
   const { settings } = useData()
-  const { section } = useParams()
+  const loc = useLocation()
+  const section = loc.pathname.split('/')[2]
   const navigate = useNavigate()
   const [use, setUse] = useState<Use>(undefined)
   useEffect(() => {
@@ -64,6 +87,24 @@ export function Settings() {
     return () => window.removeEventListener('beforeunload', on)
   }, [])
 
+  async function close() {
+    if (!modal || modal.leaving) return
+    if (dirty.current && !(await confirmDiscard())) return
+    modal.close()
+  }
+  const closeRef = useRef(close)
+  closeRef.current = close
+  useEffect(() => {
+    if (!modal) return
+    const k = (e: KeyboardEvent) => {
+      // Esc закрывает то, что открыто поверх настроек: окно удаления, выпадающий список
+      if (e.key !== 'Escape' || document.querySelectorAll('[role="dialog"], [role="alertdialog"], [role="listbox"]').length > 1) return
+      closeRef.current()
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [modal])
+
   if (!workspace) return null
   const list = SECTIONS.filter((x) => !x.admin || isAdmin)
   const picked = list.find((x) => x.id === section)
@@ -73,8 +114,89 @@ export function Settings() {
   async function go(id: SectionId | null, push?: boolean) {
     if (id === cur.id && picked) return
     if (dirty.current && !(await confirmDiscard())) return
-    navigate(id ? `/settings/${id}` : '/settings', { replace: !push })
+    // state хранит страницу под окном - переходы между разделами его не теряют
+    navigate(id ? `/settings/${id}` : '/settings', { replace: !push, state: loc.state })
   }
+
+  const sideNav = (
+    <nav aria-label="Разделы настроек" className="space-y-0.5">
+      {list.map((x) => (
+        <button
+          key={x.id}
+          type="button"
+          aria-current={x.id === cur.id ? 'page' : undefined}
+          onClick={() => go(x.id)}
+          className={cx('flex h-9 w-full items-center gap-2.5 rounded-full px-3 text-left transition-colors duration-150', x.id === cur.id ? 'bg-surface text-ink' : 'text-muted hover:bg-ink/5 hover:text-ink')}
+        >
+          <x.icon className="size-4" strokeWidth={1.5} />
+          <span className="flex-1 truncate">{x.label}</span>
+          {x.id === 'plan' && full && <span className="size-1.5 rounded-full bg-warn" aria-label="Место заканчивается" />}
+        </button>
+      ))}
+    </nav>
+  )
+
+  const content = (
+    <>
+      {cur.id === 'general' && <General />}
+      {cur.id === 'brand' && <BrandSection />}
+      {cur.id === 'plan' && <PlanSection use={use} />}
+      {cur.id === 'money' &&
+        (settings ? (
+          <MoneyCard s={settings} />
+        ) : (
+          <Loading className="rounded-card bg-surface p-6">
+            <Skel className="h-4 w-32" />
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              {[0, 1].map((r) => (
+                <div key={r}>
+                  <Skel className="h-3 w-32" />
+                  <Skel className="mt-2.5 h-10 w-full rounded-2xl" />
+                </div>
+              ))}
+            </div>
+          </Loading>
+        ))}
+      {cur.id === 'danger' && <DangerCard />}
+    </>
+  )
+
+  if (modal)
+    return createPortal(
+      <Unsaved.Provider value={setDirty}>
+        <div className={cx('fade fixed inset-0 z-[55] flex items-center justify-center bg-ink/30 p-6', modal.leaving && 'leaving pointer-events-none')} onMouseDown={close}>
+          <div
+            role="dialog"
+            aria-modal={modal.leaving ? undefined : 'true'}
+            aria-label="Настройки кабинета"
+            className="sheet flex h-[min(720px,calc(100dvh-48px))] w-full max-w-[1000px] overflow-hidden rounded-card bg-canvas"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <aside className="flex w-60 shrink-0 flex-col border-r border-line p-4">
+              <div className="px-3 pt-1.5 pb-5">
+                <h2 className="text-lg leading-6">Настройки кабинета</h2>
+                {!isAdmin && <p className="mt-1 text-[13px] text-muted">Менять настройки могут учредители</p>}
+              </div>
+              {sideNav}
+            </aside>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <header className="flex h-16 shrink-0 items-center justify-between gap-4 pr-4 pl-8">
+                <h3 className="truncate text-lg">{cur.label}</h3>
+                <IconButton label="Закрыть" onClick={close}>
+                  <X className="size-[18px]" strokeWidth={1.5} />
+                </IconButton>
+              </header>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-8 pb-8">
+                <div key={cur.id} className="fade grid min-w-0 grid-cols-1 gap-3">
+                  {content}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Unsaved.Provider>,
+      document.body,
+    )
 
   return (
     <Unsaved.Provider value={setDirty}>
@@ -91,21 +213,7 @@ export function Settings() {
         </div>
       )}
       <div className="lg:grid lg:grid-cols-[200px_minmax(0,42rem)] lg:items-start lg:gap-8">
-        <nav aria-label="Разделы настроек" className="sticky top-8 hidden space-y-0.5 lg:block">
-          {list.map((x) => (
-            <button
-              key={x.id}
-              type="button"
-              aria-current={x.id === cur.id ? 'page' : undefined}
-              onClick={() => go(x.id)}
-              className={cx('flex h-9 w-full items-center gap-2.5 rounded-full px-3 text-left transition-colors duration-150', x.id === cur.id ? 'bg-surface text-ink' : 'text-muted hover:bg-ink/5 hover:text-ink')}
-            >
-              <x.icon className="size-4" strokeWidth={1.5} />
-              <span className="flex-1 truncate">{x.label}</span>
-              {x.id === 'plan' && full && <span className="size-1.5 rounded-full bg-warn" aria-label="Место заканчивается" />}
-            </button>
-          ))}
-        </nav>
+        <div className="sticky top-8 hidden lg:block">{sideNav}</div>
 
         {/* телефон: список разделов */}
         {!picked && (
@@ -124,26 +232,7 @@ export function Settings() {
         )}
 
         <div key={cur.id} className={cx('fade min-w-0 grid-cols-1 gap-3', picked ? 'grid' : 'hidden lg:grid')}>
-          {cur.id === 'general' && <General />}
-          {cur.id === 'brand' && <BrandSection />}
-          {cur.id === 'plan' && <PlanSection use={use} />}
-          {cur.id === 'money' &&
-            (settings ? (
-              <MoneyCard s={settings} />
-            ) : (
-              <Loading className="rounded-card bg-surface p-6">
-                <Skel className="h-4 w-32" />
-                <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                  {[0, 1].map((r) => (
-                    <div key={r}>
-                      <Skel className="h-3 w-32" />
-                      <Skel className="mt-2.5 h-10 w-full rounded-2xl" />
-                    </div>
-                  ))}
-                </div>
-              </Loading>
-            ))}
-          {cur.id === 'danger' && <DangerCard />}
+          {content}
         </div>
       </div>
     </Unsaved.Provider>
@@ -316,6 +405,7 @@ const PART_TONE = [1, 0.6, 0.38, 0.2]
 /** Тариф и место в хранилище: сколько занято из лимита и чем. Каждая строка ведёт туда, где эти файлы лежат */
 function PlanSection({ use }: { use: Use }) {
   const { isAdmin } = useAuth()
+  const loc = useLocation()
   const part = usedPart(use)
   const tone = part >= 1 ? 'bg-bad' : part >= 0.8 ? 'bg-warn' : 'bg-ink'
   const parts = use ? STORAGE_PARTS.filter((p) => isAdmin || p.id !== 'brand').map((p, i) => ({ ...p, size: use[p.id], opacity: PART_TONE[i] })) : []
@@ -347,7 +437,8 @@ function PlanSection({ use }: { use: Use }) {
               <ul className="mt-4 divide-y divide-line">
                 {parts.map((p) => (
                   <li key={p.id}>
-                    <Link to={PART_LINK[p.id]} className="group flex h-11 items-center gap-3 text-sm">
+                    {/* оформление - раздел этого же окна: переход не добавляет шаг в историю и помнит страницу под окном */}
+                    <Link to={PART_LINK[p.id]} replace={p.id === 'brand'} state={p.id === 'brand' ? loc.state : undefined} className="group flex h-11 items-center gap-3 text-sm">
                       <span className={cx('size-2 shrink-0 rounded-full', tone)} style={{ opacity: p.opacity }} />
                       <span className="flex-1 truncate">{p.label}</span>
                       <span className="num text-muted">{bytes(p.size)}</span>
