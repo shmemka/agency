@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { Download, ExternalLink, EyeOff, Link2, Trash2, Upload, X } from 'lucide-react'
+import { Link2, Upload, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -8,8 +8,9 @@ import { DOC_KINDS, docKindLabel } from '../lib/constants'
 import { date, fileSize } from '../lib/format'
 import type { Doc, DocKind, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Chip, IconButton, Input, Select, Spinner, cx, submitOnEnter } from './ui'
+import { Button, IconButton, Input, Select, Spinner, cx, submitOnEnter } from './ui'
 import { confirmDialog } from './dialogs'
+import { FileMenu, FileThumb, downloadFrom } from './Files'
 
 const BUCKET = 'documents'
 const isImage = (d: Doc) => Boolean(d.storage_path && (d.mime?.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(d.name)))
@@ -74,42 +75,46 @@ export function DocRow({ d, extra, onChanged }: { d: Doc; extra?: ReactNode; onC
     onChanged()
   }
 
+  async function toggleClient() {
+    const { error } = await supabase.from('documents').update({ hide_from_client: !d.hide_from_client }).eq('id', d.id)
+    if (error) toast(`Не сохранилось: ${error.message}`)
+    onChanged()
+  }
+
   return (
-    <li className="flex min-h-12 items-center gap-3 border-t border-line py-2 first:border-0">
-      {/* на телефоне тип — в подписи под названием, чтобы названию хватило места */}
-      <Chip className="w-24 shrink-0 justify-center max-md:hidden">{docKindLabel(d.kind)}</Chip>
+    <li className="flex min-h-14 items-center gap-3 border-t border-line py-2.5 first:border-0">
+      <button onClick={open} aria-label={`Открыть ${d.name}`} className="shrink-0">
+        <FileThumb name={d.name} mime={d.mime} bucket={BUCKET} path={d.storage_path} link={!!d.external_url} uploader={d.uploaded_by} />
+      </button>
       <div className="min-w-0 flex-1">
         <button className="block max-w-full truncate text-left hover:underline" onClick={open}>
           {d.name}
         </button>
         <div className="truncate text-xs text-muted">
-          <span className="md:hidden">{docKindLabel(d.kind)}, </span>
-          {extra}
+          {docKindLabel(d.kind)}
           {extra ? ', ' : ''}
+          {extra}
+          {', '}
           {[d.external_url ? 'ссылка' : fileSize(d.size), d.uploaded_by ? personName(d.uploaded_by).split(' ')[0] : '', date(d.created_at)].filter(Boolean).join(', ')}
+          {d.kind === 'stats' && d.hide_from_client && <span className="ml-1.5 rounded-full bg-soft px-1.5 py-px text-[11px] text-muted">скрыт от клиента</span>}
         </div>
       </div>
-      {d.kind === 'stats' && (
-        <IconButton
-          label={d.hide_from_client ? 'Скрыт от клиента. Показать в отчёте' : 'Виден клиенту в отчёте. Скрыть'}
-          className={cx('size-9', d.hide_from_client && 'bg-ink text-white hover:bg-ink/85 hover:text-white')}
-          onClick={async () => {
-            const { error } = await supabase.from('documents').update({ hide_from_client: !d.hide_from_client }).eq('id', d.id)
-            if (error) toast(`Не сохранилось: ${error.message}`)
-            onChanged()
-          }}
-        >
-          <EyeOff className="size-4" strokeWidth={1.5} />
-        </IconButton>
-      )}
-      <IconButton label={d.external_url ? 'Открыть ссылку' : 'Открыть файл'} className="size-9 max-md:hidden" onClick={open}>
-        {d.external_url ? <ExternalLink className="size-4" strokeWidth={1.5} /> : <Download className="size-4" strokeWidth={1.5} />}
-      </IconButton>
-      {canDelete && (
-        <IconButton label="Удалить" className="size-9 hover:text-bad" onClick={remove}>
-          <Trash2 className="size-4" strokeWidth={1.5} />
-        </IconButton>
-      )}
+      <FileMenu
+        name={d.name}
+        actions={[
+          d.external_url
+            ? { id: 'open', label: 'Открыть ссылку', run: open }
+            : {
+                id: 'download',
+                label: 'Скачать',
+                run: async () => {
+                  if (d.storage_path && !(await downloadFrom(BUCKET, d.storage_path, d.name))) toast('Файл не скачался, попробуйте ещё раз')
+                },
+              },
+          ...(d.kind === 'stats' ? [{ id: 'client', label: d.hide_from_client ? 'Показать клиенту в отчёте' : 'Скрыть от клиента', run: toggleClient }] : []),
+          ...(canDelete ? [{ id: 'delete', label: 'Удалить', danger: true, run: remove }] : []),
+        ]}
+      />
       {view && <ImageViewer url={view} name={d.name} onClose={() => setView(null)} />}
     </li>
   )

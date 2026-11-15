@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUp, Check, FileText, Image as ImageIcon, Paperclip, Trash2 } from 'lucide-react'
+import { ArrowUp, Check, Paperclip, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -9,6 +9,7 @@ import type { Task, TaskComment, TaskFile } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Avatar, Button, Drawer, DrawerClose, IconButton, Select, Spinner, cx } from './ui'
 import { RichEditor } from './RichEditor'
+import { FileMenu, FileThumb, downloadFrom } from './Files'
 import { RichText } from './RichText'
 import { DateInput } from './DateInput'
 import { confirmDialog, confirmDiscard } from './dialogs'
@@ -320,27 +321,30 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
             <p className="text-muted">Перетащите файлы сюда или нажмите «Прикрепить»</p>
           ) : (
             <ul className="-mx-2">
-              {files.map((f) => {
-                const I = isImage(f) ? ImageIcon : FileText
-                return (
-                  <li key={f.id} className="group flex items-center gap-3 rounded-2xl px-2 py-2 hover:bg-soft">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-soft group-hover:bg-surface">
-                      <I className="size-4 text-muted" strokeWidth={1.5} />
-                    </span>
-                    <button onClick={() => open(f)} className="min-w-0 flex-1 text-left">
-                      <span className="block truncate">{f.name}</span>
-                      <span className="block text-xs text-muted">
-                        {[sizeLabel(f.size), personName(f.created_by).split(' ')[0], dateTime(f.created_at)].filter(Boolean).join(', ')}
-                      </span>
-                    </button>
-                    {(isAdmin || f.created_by === profile?.id) && (
-                      <IconButton label={`Удалить ${f.name}`} onClick={() => dropFile(f)} className="size-8 opacity-0 group-hover:opacity-100 hover:text-bad focus-visible:opacity-100 max-md:opacity-100">
-                        <Trash2 className="size-4" strokeWidth={1.5} />
-                      </IconButton>
-                    )}
-                  </li>
-                )
-              })}
+              {files.map((f) => (
+                <li key={f.id} className="flex items-center gap-3 rounded-2xl px-2 py-2 transition-colors duration-200 hover:bg-soft">
+                  <button onClick={() => open(f)} aria-label={`Открыть ${f.name}`} className="shrink-0">
+                    <FileThumb name={f.name} mime={f.mime} bucket={TASK_BUCKET} path={f.storage_path} uploader={f.created_by} />
+                  </button>
+                  <button onClick={() => open(f)} className="min-w-0 flex-1 text-left">
+                    <span className="block truncate">{f.name}</span>
+                    <span className="block text-xs text-muted">{[sizeLabel(f.size), personName(f.created_by).split(' ')[0], dateTime(f.created_at)].filter(Boolean).join(', ')}</span>
+                  </button>
+                  <FileMenu
+                    name={f.name}
+                    actions={[
+                      {
+                        id: 'download',
+                        label: 'Скачать',
+                        run: async () => {
+                          if (!(await downloadFrom(TASK_BUCKET, f.storage_path, f.name))) toast('Файл не скачался, попробуйте ещё раз')
+                        },
+                      },
+                      ...(isAdmin || f.created_by === profile?.id ? [{ id: 'delete', label: 'Удалить', danger: true, run: () => dropFile(f) }] : []),
+                    ]}
+                  />
+                </li>
+              ))}
             </ul>
           )}
         </section>

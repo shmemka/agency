@@ -623,7 +623,7 @@ export function Menu<T extends string>({
   chevron = true,
 }: {
   value: T
-  options: { id: T; label: string; dot?: string; group?: string }[]
+  options: { id: T; label: string; dot?: string; group?: string; danger?: boolean }[]
   onChange: (v: T) => void
   trigger: ReactNode
   title: string
@@ -655,7 +655,7 @@ export function Menu<T extends string>({
       <button
         role="option"
         aria-selected={o.id === value}
-        className={cx(ITEM, 'gap-1.5 hover:bg-soft', phone ? ITEM_PHONE : ITEM_DESKTOP)}
+        className={cx(ITEM, 'gap-1.5 hover:bg-soft', o.danger && 'text-bad', phone ? ITEM_PHONE : ITEM_DESKTOP)}
         onClick={() => {
           setOpen(false)
           if (o.id !== value) onChange(o.id)
@@ -684,7 +684,9 @@ export function Menu<T extends string>({
           const groups = new Set(options.map((o) => o.group)).size
           const h = options.length * 36 + (groups - 1) * 13 + 12
           const below = window.innerHeight - r.bottom - POPOVER_GAP - 8
-          setPos({ top: below >= h ? r.bottom + POPOVER_GAP : Math.max(8, r.top - POPOVER_GAP - h), left: Math.max(8, Math.min(r.left - 6, window.innerWidth - 232)) })
+          // кнопка у правого края (например, «⋯» в строке файла) — меню раскрывается влево, под самой кнопкой
+          const right = r.left > window.innerWidth / 2
+          setPos({ top: below >= h ? r.bottom + POPOVER_GAP : Math.max(8, r.top - POPOVER_GAP - h), left: right ? Math.max(8, r.right - 224 + 6) : Math.max(8, Math.min(r.left - 6, window.innerWidth - 232)) })
           setOpen((o) => !o)
         }}
       >
