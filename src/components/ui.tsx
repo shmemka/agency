@@ -737,7 +737,8 @@ export function StatusRail({ value, onChange }: { value: Status; onChange: (s: S
 }
 
 /** Переключатель-пилюля: активное — чёрное */
-export function Segmented<T extends string>({ value, options, onChange, className }: { value: T; options: { id: T; label: ReactNode }[]; onChange: (v: T) => void; className?: string }) {
+export function Segmented<T extends string>({ value, options, onChange, className, size = 'md' }: { value: T; options: { id: T; label: ReactNode }[]; onChange: (v: T) => void; className?: string; size?: 'md' | 'lg' }) {
+  const lg = size === 'lg'
   // тёмная подложка переезжает под выбранный вариант, а не перескакивает
   const box = useRef<HTMLDivElement>(null)
   const [pill, setPill] = useState<{ x: number; w: number; animate: boolean } | null>(null)
@@ -758,11 +759,11 @@ export function Segmented<T extends string>({ value, options, onChange, classNam
     return () => ro.disconnect()
   }, [])
   return (
-    <div ref={box} className={cx('relative inline-flex max-w-full gap-1 overflow-x-auto rounded-full bg-surface p-1', className)} role="tablist">
+    <div ref={box} className={cx('relative inline-flex max-w-full gap-1 overflow-x-auto rounded-full bg-surface', lg ? 'p-1.5' : 'p-1', className)} role="tablist">
       {pill && (
         <span
           aria-hidden
-          className={cx('absolute top-1 left-0 h-8 rounded-full bg-ink', pill.animate && 'transition-[transform,width] duration-250 ease-[var(--ease-out)]')}
+          className={cx('absolute left-0 rounded-full bg-ink', lg ? 'top-1.5 h-11' : 'top-1 h-8', pill.animate && 'transition-[transform,width] duration-250 ease-[var(--ease-out)]')}
           style={{ transform: `translateX(${pill.x}px)`, width: pill.w }}
         />
       )}
@@ -773,7 +774,8 @@ export function Segmented<T extends string>({ value, options, onChange, classNam
           aria-selected={value === o.id}
           onClick={() => onChange(o.id)}
           className={cx(
-            'relative inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] whitespace-nowrap transition-colors duration-200',
+            'relative inline-flex shrink-0 items-center justify-center gap-1.5 rounded-full whitespace-nowrap transition-colors duration-200',
+            lg ? 'h-11 flex-1 px-5 text-[15px]' : 'h-8 px-3.5 text-[13px]',
             value === o.id ? cx('text-white', !pill && 'bg-ink') : 'text-muted hover:text-ink',
           )}
         >

@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from 'react'
 import { ChevronLeft, Plus, UsersRound } from 'lucide-react'
-import art from '../assets/onboarding.svg'
+import { ArtScreen, ArtTitle, BIG_FIELD } from '../components/ArtScreen'
 import { useAuth } from '../auth/AuthProvider'
 import { clearInvite, parseInvite } from '../lib/invite'
-import { Button, Field, Input } from '../components/ui'
+import { Button, Field, Input, cx } from '../components/ui'
 import { Shell, useInviteName } from './Login'
 
 /** Форма «Создать кабинет»: название агентства → кабинет, где вы учредитель */
@@ -34,58 +34,44 @@ function CreateForm({ autoFocus }: { autoFocus?: boolean }) {
   )
 }
 
-/*
- * Первый экран после регистрации. Иллюстрация — фон во весь экран: фигура сверху по центру,
- * ленты уходят за края. Блок с выбором стоит под фигурой при любом размере окна:
- * картинка растягивается по большей стороне, а отступ блока считается от её высоты.
- */
-const ART_H = 'max(100vw * 906 / 1677, 100dvh)'
-
+/** Первый экран после регистрации: создать свой кабинет или войти в команду по ссылке */
 export function Onboarding() {
   const { signOut } = useAuth()
   const [step, setStep] = useState<'choose' | 'create' | 'join'>('choose')
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-canvas">
-      <img
-        src={art}
-        alt=""
-        aria-hidden
-        draggable={false}
-        className="onboard-art pointer-events-none absolute top-0 left-1/2 max-w-none -translate-x-1/2 select-none"
-        style={{ width: 'max(100vw, 100dvh * 1677 / 906)', aspectRatio: '1677 / 906' }}
-      />
-      <button onClick={signOut} className="absolute top-4 right-4 z-10 rounded-full px-4 py-2 text-[13px] text-muted transition-colors duration-150 hover:bg-ink/5 hover:text-ink md:top-6 md:right-6">
-        Выйти
-      </button>
-      <main className="relative flex flex-col items-center px-4 pb-12 text-center" style={{ paddingTop: `calc(${ART_H} * 0.5)` }}>
-        <div key={step} className="rise flex w-full flex-col items-center">
-          {step === 'choose' && (
-            <>
-              <h1 className="text-[26px] leading-8 tracking-tight md:text-[34px] md:leading-10">Привет! С чего начнём?</h1>
-              <p className="mt-3 max-w-lg text-muted">Кабинет — это пространство агентства: блогеры, кампании, задачи и команда</p>
-              <div className="mt-8 flex w-full max-w-sm flex-col gap-3 md:mt-10 md:w-auto md:max-w-none md:flex-row md:gap-4">
-                <Choice icon={<Plus className="size-5" strokeWidth={1.5} />} onClick={() => setStep('create')}>
-                  Создать свой кабинет
-                </Choice>
-                <Choice icon={<UsersRound className="size-5" strokeWidth={1.5} />} onClick={() => setStep('join')}>
-                  Присоединиться к команде
-                </Choice>
-              </div>
-            </>
-          )}
-          {step === 'create' && (
-            <Step title="Как называется агентство?" sub="Название увидят коллеги и клиенты на подборках. Поменять его можно в настройках" onBack={() => setStep('choose')}>
-              <CreateInline />
-            </Step>
-          )}
-          {step === 'join' && (
-            <Step title="Вставьте ссылку-приглашение" sub="Её присылает учредитель кабинета из раздела «Команда»" onBack={() => setStep('choose')}>
-              <JoinInline />
-            </Step>
-          )}
-        </div>
-      </main>
-    </div>
+    <ArtScreen
+      corner={
+        <button onClick={signOut} className="rounded-full px-4 py-2 text-[13px] text-muted transition-colors duration-150 hover:bg-ink/5 hover:text-ink">
+          Выйти
+        </button>
+      }
+    >
+      <div key={step} className="rise flex w-full flex-col items-center">
+        {step === 'choose' && (
+          <>
+            <ArtTitle title="Привет! С чего начнём?" sub="Кабинет — это пространство агентства: блогеры, кампании, задачи и команда" />
+            <div className="mt-8 flex w-full max-w-sm flex-col gap-3 md:mt-10 md:w-auto md:max-w-none md:flex-row md:gap-4">
+              <Choice icon={<Plus className="size-5" strokeWidth={1.5} />} onClick={() => setStep('create')}>
+                Создать свой кабинет
+              </Choice>
+              <Choice icon={<UsersRound className="size-5" strokeWidth={1.5} />} onClick={() => setStep('join')}>
+                Присоединиться к команде
+              </Choice>
+            </div>
+          </>
+        )}
+        {step === 'create' && (
+          <Step title="Как называется агентство?" sub="Название увидят коллеги и клиенты на подборках. Поменять его можно в настройках" onBack={() => setStep('choose')}>
+            <CreateInline />
+          </Step>
+        )}
+        {step === 'join' && (
+          <Step title="Вставьте ссылку-приглашение" sub="Её присылает учредитель кабинета из раздела «Команда»" onBack={() => setStep('choose')}>
+            <JoinInline />
+          </Step>
+        )}
+      </div>
+    </ArtScreen>
   )
 }
 
@@ -105,8 +91,7 @@ function Choice({ icon, children, onClick }: { icon: React.ReactNode; children: 
 function Step({ title, sub, onBack, children }: { title: string; sub: string; onBack: () => void; children: React.ReactNode }) {
   return (
     <>
-      <h1 className="text-[26px] leading-8 tracking-tight md:text-[34px] md:leading-10">{title}</h1>
-      <p className="mt-3 max-w-md text-muted">{sub}</p>
+      <ArtTitle title={title} sub={sub} />
       <div className="mt-8 w-full max-w-xl md:mt-10">{children}</div>
       <button onClick={onBack} className="mt-4 inline-flex items-center gap-1 rounded-full px-4 py-2 text-muted transition-colors duration-150 hover:bg-ink/5 hover:text-ink">
         <ChevronLeft className="size-4" strokeWidth={1.5} />
@@ -134,7 +119,7 @@ function InlineForm({ value, onChange, placeholder, label, action, busy, error, 
           maxLength={maxLength}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="h-14 w-full min-w-0 shrink-0 rounded-full bg-surface px-6 text-[17px] text-ink ring-1 ring-transparent transition-shadow duration-150 placeholder:text-faint focus:ring-ink/25 focus:outline-none md:h-16 md:flex-1"
+          className={cx(BIG_FIELD, 'shrink-0 text-[17px] md:h-16 md:flex-1')}
         />
         <Button variant="primary" type="submit" loading={busy} className="h-14! px-8! text-[17px]! md:h-16!">
           {action}

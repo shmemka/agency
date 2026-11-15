@@ -1,8 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { siteUrl, supabase } from '../lib/supabase'
-import { APP, PHASES } from '../lib/constants'
+
 import { inviteUrl, readInvite } from '../lib/invite'
-import { Button, Field, Input, cx } from '../components/ui'
+import { Eye, EyeOff } from 'lucide-react'
+import { Button, Segmented, cx } from '../components/ui'
+import { ArtScreen, ArtTitle, BIG_FIELD } from '../components/ArtScreen'
 
 const ERRORS: Record<string, string> = {
   'Invalid login credentials': 'Почта или пароль не подходят',
@@ -10,35 +12,15 @@ const ERRORS: Record<string, string> = {
   'User already registered': 'Эта почта уже зарегистрирована. Войдите',
 }
 
-export function Shell({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    document.title = APP
-  }, [])
+/** Служебные экраны до входа в кабинет: та же иллюстрация, что на входе и при выборе кабинета */
+export function Shell({ children, corner }: { children: React.ReactNode; corner?: React.ReactNode }) {
   return (
-    <div className="flex min-h-full items-center justify-center p-4">
-      <div className="rise grid w-full max-w-4xl overflow-hidden rounded-card bg-surface md:grid-cols-2">
-        <div className="hidden flex-col justify-between bg-soft p-8 md:flex">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-full bg-ink">
-              <span className="bar-lime size-2.5 rounded-full" />
-            </span>
-            <span className="text-[15px] font-medium">{APP}</span>
-          </div>
-          <div>
-            <p className="text-[32px] leading-9 tracking-tight">Блогеры, договоры и выходы агентства в одном кабинете</p>
-            <div className="mt-8 flex gap-1" aria-hidden>
-              {PHASES.slice(0, 5).map((p, i) => (
-                <div key={p.id} className="flex-1">
-                  <div className={cx('h-3 rounded-full', i < 3 ? 'bar-lime' : 'hatch')} />
-                  <div className="mt-2 text-xs text-muted">{p.label}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="p-6 sm:p-8">{children}</div>
+    <ArtScreen corner={corner}>
+      {/* заголовки и кнопки внутри — того же размера, что на входе и выборе кабинета */}
+      <div className="rise flex w-full max-w-lg flex-col items-center [&_button[data-variant]]:h-14 [&_button[data-variant]]:min-w-64 [&_button[data-variant]]:text-[16px] [&_h1]:text-[26px] [&_h1]:leading-8 [&_h1]:text-balance md:[&_h1]:text-[34px] md:[&_h1]:leading-10">
+        {children}
       </div>
-    </div>
+    </ArtScreen>
   )
 }
 
@@ -104,62 +86,71 @@ export function Login() {
     else setInfo('Отправили письмо со ссылкой. Откройте её, и сайт предложит задать новый пароль')
   }
 
+  const switchMode = (m: 'in' | 'up') => {
+    setMode(m)
+    setError(null)
+    setInfo(null)
+  }
+
   return (
-    <Shell>
-      <form onSubmit={submit} noValidate className="space-y-4">
-        <div>
-          <h1 className="text-2xl tracking-tight">{mode === 'in' ? 'Вход' : 'Регистрация'}</h1>
-          <p className="mt-1 text-muted">
-            {inviteName
+    <ArtScreen>
+      <div className="rise flex w-full max-w-sm flex-col items-center">
+        <ArtTitle
+          title={mode === 'in' ? 'С возвращением!' : 'Добро пожаловать!'}
+          sub={
+            inviteName
               ? `Вас пригласили в команду «${inviteName}». ${mode === 'in' ? 'Войдите' : 'Зарегистрируйтесь'}, и вы сразу попадёте в кабинет`
               : mode === 'in'
-                ? 'Кабинет агентства для работы с блогерами'
-                : 'Потом создадите кабинет своего агентства или присоединитесь к команде по ссылке-приглашению'}
-          </p>
-        </div>
-        {mode === 'up' && (
-          <Field label="Имя и фамилия">
-            <Input value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" />
-          </Field>
-        )}
-        <Field label="Почта">
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-        </Field>
-        <Field
-          label="Пароль"
-          hint={
-            mode === 'up' ? (
-              'Не короче 6 символов'
-            ) : (
-              <button type="button" className="underline underline-offset-2 hover:text-ink" onClick={forgot}>
-                Забыли пароль?
-              </button>
-            )
+                ? 'Сверка — кабинет агентства для работы с блогерами'
+                : 'Потом создадите кабинет или присоединитесь к команде'
           }
-        >
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === 'in' ? 'current-password' : 'new-password'} />
-        </Field>
-        {error && <p className="rounded-2xl bg-orange-100 px-4 py-3 text-bad">{error}</p>}
-        {info && <p className="rounded-2xl bg-soft px-4 py-3">{info}</p>}
-        <Button variant="primary" type="submit" loading={busy} className="w-full">
-          {mode === 'in' ? 'Войти' : 'Зарегистрироваться'}
-        </Button>
-        <p className="text-center text-muted">
-          {mode === 'in' ? 'Нет аккаунта?' : 'Уже есть аккаунт?'}{' '}
-          <button
-            type="button"
-            className="text-ink underline underline-offset-4"
-            onClick={() => {
-              setMode(mode === 'in' ? 'up' : 'in')
-              setError(null)
-              setInfo(null)
-            }}
-          >
-            {mode === 'in' ? 'Зарегистрироваться' : 'Войти'}
-          </button>
-        </p>
-      </form>
-    </Shell>
+        />
+        <Segmented
+          size="lg"
+          className="mt-7 w-full"
+          value={mode}
+          onChange={switchMode}
+          options={[
+            { id: 'in', label: 'Вход' },
+            { id: 'up', label: 'Регистрация' },
+          ]}
+        />
+        <form onSubmit={submit} noValidate className="mt-3 flex w-full flex-col gap-3">
+          {mode === 'up' && <input key="name" className={cx('rise', BIG_FIELD)} value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" placeholder="Имя и фамилия" aria-label="Имя и фамилия" />}
+          <input className={BIG_FIELD} type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" placeholder="Почта" aria-label="Почта" />
+          <PasswordField value={password} onChange={setPassword} autoComplete={mode === 'in' ? 'current-password' : 'new-password'} placeholder={mode === 'in' ? 'Пароль' : 'Пароль, не короче 6 символов'} />
+          {error && <p className="fade rounded-3xl bg-orange-100 px-5 py-3 text-bad">{error}</p>}
+          {info && <p className="fade rounded-3xl bg-surface px-5 py-3">{info}</p>}
+          <Button variant="primary" type="submit" loading={busy} className="mt-1 h-14! w-full text-[16px]!">
+            {mode === 'in' ? 'Войти' : 'Зарегистрироваться'}
+          </Button>
+          {mode === 'in' && (
+            <button type="button" onClick={forgot} className="mx-auto rounded-full px-4 py-2 text-muted transition-colors duration-150 hover:bg-ink/5 hover:text-ink">
+              Забыли пароль?
+            </button>
+          )}
+        </form>
+      </div>
+    </ArtScreen>
+  )
+}
+
+/** Пароль с кнопкой «показать»: глаз меняется плавно */
+function PasswordField({ value, onChange, autoComplete, placeholder, autoFocus }: { value: string; onChange: (v: string) => void; autoComplete: string; placeholder: string; autoFocus?: boolean }) {
+  const [shown, setShown] = useState(false)
+  return (
+    <div className="relative w-full">
+      <input className={cx(BIG_FIELD, 'pr-14')} type={shown ? 'text' : 'password'} value={value} onChange={(e) => onChange(e.target.value)} autoComplete={autoComplete} placeholder={placeholder} aria-label="Пароль" autoFocus={autoFocus} />
+      <button
+        type="button"
+        onClick={() => setShown(!shown)}
+        aria-label={shown ? 'Скрыть пароль' : 'Показать пароль'}
+        title={shown ? 'Скрыть пароль' : 'Показать пароль'}
+        className="absolute top-1/2 right-2 flex size-10 -translate-y-1/2 items-center justify-center rounded-full text-faint transition-[color,background-color,transform] duration-150 hover:bg-ink/5 hover:text-ink active:scale-90"
+      >
+        {shown ? <EyeOff className="fade size-[18px]" strokeWidth={1.5} /> : <Eye className="fade size-[18px]" strokeWidth={1.5} />}
+      </button>
+    </div>
   )
 }
 
@@ -220,20 +211,17 @@ export function NewPassword({ onDone }: { onDone: () => void }) {
   }
 
   return (
-    <Shell>
-      <form onSubmit={submit} noValidate className="space-y-4">
-        <div>
-          <h1 className="text-2xl tracking-tight">Новый пароль</h1>
-          <p className="mt-1 text-muted">Придумайте пароль, с ним вы будете входить дальше</p>
-        </div>
-        <Field label="Пароль" hint="Не короче 6 символов">
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" autoFocus />
-        </Field>
-        {error && <p className="rounded-2xl bg-orange-100 px-4 py-3 text-bad">{error}</p>}
-        <Button variant="primary" type="submit" loading={busy} className="w-full">
-          Сохранить пароль
-        </Button>
-      </form>
-    </Shell>
+    <ArtScreen>
+      <div className="rise flex w-full max-w-sm flex-col items-center">
+        <ArtTitle title="Новый пароль" sub="Придумайте пароль, с ним вы будете входить дальше" />
+        <form onSubmit={submit} noValidate className="mt-7 flex w-full flex-col gap-3">
+          <PasswordField value={password} onChange={setPassword} autoComplete="new-password" placeholder="Не короче 6 символов" autoFocus />
+          {error && <p className="fade rounded-3xl bg-orange-100 px-5 py-3 text-bad">{error}</p>}
+          <Button variant="primary" type="submit" loading={busy} className="mt-1 h-14! w-full text-[16px]!">
+            Сохранить пароль
+          </Button>
+        </form>
+      </div>
+    </ArtScreen>
   )
 }
