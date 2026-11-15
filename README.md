@@ -25,7 +25,7 @@
    1. [`supabase/schema.sql`](supabase/schema.sql) — основа;
    2. `seed.sql` — блогеры из ваших таблиц (файла нет в репозитории, в нём контакты и цены; этот шаг можно пропустить);
    3. [`supabase/migrations/002_workspace.sql`](supabase/migrations/002_workspace.sql) — права по ролям, подборки, задачи, финансы. Старые статусы блогеров он сам переносит в интеграции;
-   4. остальные файлы из `supabase/migrations` по номерам, до [`014_workspaces.sql`](supabase/migrations/014_workspaces.sql) включительно (кабинеты).
+   4. остальные файлы из `supabase/migrations` по номерам, до последнего ([`016_blogger_statuses.sql`](supabase/migrations/016_blogger_statuses.sql)) включительно.
 3. **Authentication → URL Configuration:** *Site URL* = `https://shmemka.github.io/agency/`, в *Redirect URLs* добавьте `https://shmemka.github.io/agency/**`.
 4. **Authentication → Sign In / Providers → Email**: для быстрого старта можно выключить *Confirm email*.
 5. **Project Settings → API**: скопируйте *Project URL* и *anon public key*.

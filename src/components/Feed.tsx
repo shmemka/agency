@@ -12,7 +12,9 @@ import { RichEditor } from './RichEditor'
 import { RichText } from './RichText'
 import { confirmDialog } from './dialogs'
 
-const label = (s: string | null) => STATUSES.find((x) => x.id === s)?.label ?? BLOGGER_STATUSES.find((x) => x.id === s)?.label ?? s ?? ''
+/** Статусы, которых больше нет, но они остались в старой истории */
+const OLD_LABELS: Record<string, string> = { replied: 'Откликнулся' }
+const label = (s: string | null) => STATUSES.find((x) => x.id === s)?.label ?? BLOGGER_STATUSES.find((x) => x.id === s)?.label ?? (s && OLD_LABELS[s]) ?? s ?? ''
 
 /** Комментарии и история: по блогеру целиком или по одной интеграции */
 export function Feed({ bloggerId, integrationId }: { bloggerId: string; integrationId?: string }) {
