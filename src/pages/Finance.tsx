@@ -78,7 +78,7 @@ function Ledger({ busy, period, onPeriod, lines, result }: { busy: boolean; peri
         <span aria-hidden className="hidden w-4 shrink-0 items-center justify-center text-2xl text-faint lg:flex">
           =
         </span>
-        <div className={cx('mt-4 rounded-inner px-5 py-4 lg:mt-0 lg:flex-[1.3]', result < 0 ? 'bg-bad/10 text-bad' : 'bg-lime text-ink')}>
+        <div className={cx('mt-4 rounded-inner px-5 py-4 lg:mt-0 lg:flex-[1.3]', result < 0 ? 'bg-bad/10 text-bad' : 'bg-lime text-lime-ink')}>
           <div className="text-[13px] opacity-70">Остаётся</div>
           {busy ? <Skel className="mt-1.5 h-8 w-36" /> : <div className="appear num mt-0.5 text-[28px] leading-9 lg:text-[32px] lg:leading-10">{money(result)}</div>}
           <div className="mt-0.5 text-xs opacity-70">после налога и расходов</div>

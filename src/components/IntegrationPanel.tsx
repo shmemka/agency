@@ -160,7 +160,7 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
               <ul className="mt-3 grid gap-2 sm:grid-cols-2">
                 {list.map((x) => (
                   <li key={x.label} className={cx('flex items-center gap-2.5', !x.done && 'text-muted')}>
-                    <span className={cx('flex size-5 shrink-0 items-center justify-center rounded-full', x.done ? 'bar-lime text-ink' : 'hatch')}>{x.done && <Check className="size-3" strokeWidth={2.5} />}</span>
+                    <span className={cx('flex size-5 shrink-0 items-center justify-center rounded-full', x.done ? 'bar-lime text-lime-ink' : 'hatch')}>{x.done && <Check className="size-3" strokeWidth={2.5} />}</span>
                     {x.label}
                   </li>
                 ))}

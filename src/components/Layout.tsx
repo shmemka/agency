@@ -13,6 +13,7 @@ import { dateTime, plural } from '../lib/format'
 import { Avatar, IconButton, ITEM, ITEM_DESKTOP, Loading, Modal, POPOVER, Skel, cx } from './ui'
 import { useIntegrationPanel } from './bits'
 import { UpgradeButton, WorkspaceTile } from './Workspace'
+import { applyBrand } from '../lib/brand'
 import { IntegrationPanel } from './IntegrationPanel'
 
 const NAV = [
@@ -36,7 +37,12 @@ export function useAttention(): Attention[] {
   )
 }
 
-function Mark() {
+/** Логотип агентства из настроек кабинета: по высоте значка, длинный - до ширины меню */
+export function BrandLogo({ src, name, className }: { src: string; name: string; className?: string }) {
+  return <img src={src} alt={name} title={name} className={cx('h-8 w-auto max-w-40 object-contain object-left', className)} />
+}
+
+export function Mark() {
   return (
     <span className="relative inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-ink" aria-hidden>
       <span className="bar-lime size-2.5 rounded-full" />
@@ -147,6 +153,12 @@ export function Layout() {
   const { profile, signOut, isAdmin, team, workspace, workspaces, switchWorkspace, createWorkspace } = useAuth()
   const { tasks } = useData()
   const agency = workspace?.name ?? APP
+  const logo = workspace?.logo_url || null
+  // брендовый цвет кабинета вместо зелёного; страницы для клиентов остаются в цветах «Сверки»
+  useEffect(() => {
+    applyBrand(workspace?.brand_color)
+    return () => applyBrand(null)
+  }, [workspace?.brand_color])
   // во вкладке браузера — агентство и сайт
   useEffect(() => preloadRichEditor(), [])
   useEffect(() => {
@@ -192,11 +204,19 @@ export function Layout() {
           Выше содержимого, но ниже панелей (z-50), окон (z-60) и плашки массовых действий (z-40) */}
       <aside className="no-print sticky top-0 z-30 hidden h-screen w-60 shrink-0 flex-col p-4 md:flex">
         <div className="flex items-center gap-1.5 px-2 pt-1 pb-6">
-          <Mark />
           {/* кабинеты переключаются в меню профиля внизу сайдбара */}
-          <span className="min-w-0 flex-1 truncate pl-1 text-[15px] leading-5 font-medium" title={agency}>
-            {agency}
-          </span>
+          {logo ? (
+            <span className="flex min-w-0 flex-1">
+              <BrandLogo src={logo} name={agency} />
+            </span>
+          ) : (
+            <>
+              <Mark />
+              <span className="min-w-0 flex-1 truncate pl-1 text-[15px] leading-5 font-medium" title={agency}>
+                {agency}
+              </span>
+            </>
+          )}
           <BellButton />
         </div>
         <nav ref={navBox} className="relative flex-1 space-y-0.5" aria-label="Разделы">
@@ -224,10 +244,10 @@ export function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className={cx('no-print sticky top-0 z-30 flex h-14 items-center gap-2.5 bg-canvas/85 px-4 backdrop-blur-md transition-shadow duration-300 md:hidden', scrolled && 'shadow-[0_1px_0_var(--color-line)]')}>
-          <Mark />
-          <span className="relative h-5 min-w-0 flex-1 text-[15px] leading-5 font-medium">
-            <span className={cx('absolute inset-0 truncate transition-[opacity,transform] duration-300', scrolled ? '-translate-y-1 opacity-0' : 'opacity-100')}>{agency}</span>
-            <span aria-hidden={!scrolled} className={cx('absolute inset-0 truncate transition-[opacity,transform] duration-300', scrolled ? 'opacity-100' : 'translate-y-1 opacity-0')}>
+          {!logo && <Mark />}
+          <span className={cx('relative min-w-0 flex-1 text-[15px] leading-5 font-medium', logo ? 'h-8' : 'h-5')}>
+            <span className={cx('absolute inset-0 truncate transition-[opacity,transform] duration-300', logo && 'flex', scrolled ? '-translate-y-1 opacity-0' : 'opacity-100')}>{logo ? <BrandLogo src={logo} name={agency} /> : agency}</span>
+            <span aria-hidden={!scrolled} className={cx('absolute inset-0 truncate transition-[opacity,transform] duration-300', logo && 'leading-8', scrolled ? 'opacity-100' : 'translate-y-1 opacity-0')}>
               {pageLabel}
             </span>
           </span>

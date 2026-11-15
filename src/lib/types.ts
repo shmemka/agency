@@ -21,6 +21,10 @@ export interface Workspace {
   role: 'admin' | 'manager'
   is_active: boolean
   deactivated_at: string | null
+  /** логотип в меню вместо значка и названия; появляется после миграции 019 */
+  logo_url?: string | null
+  /** брендовый цвет вместо зелёного, #rrggbb */
+  brand_color?: string | null
 }
 
 export type Platform = 'tiktok' | 'youtube' | 'telegram' | 'vk' | 'instagram' | 'other'

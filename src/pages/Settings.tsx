@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Check, Pipette, Upload } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { fetchAll, siteUrl, supabase } from '../lib/supabase'
 import { AVATAR_BUCKET, avatarPath } from '../lib/avatars'
@@ -8,8 +9,10 @@ import { parseNumber, plural } from '../lib/format'
 import type { Settings as SettingsRow } from '../lib/types'
 import { toast } from '../lib/toast'
 import { confirmDialog } from '../components/dialogs'
-import { Avatar, Button, Card, Field, Input, Loading, Modal, PageHeader, Skel, submitOnEnter } from '../components/ui'
+import { Avatar, Button, Card, Field, Input, Loading, Modal, PageHeader, Skel, cx, submitOnEnter } from '../components/ui'
 import { PLAN, UpgradeButton, WorkspaceTile } from '../components/Workspace'
+import { BrandLogo, Mark } from '../components/Layout'
+import { BRAND_PRESETS, DEFAULT_BRAND, LOGO_BUCKET, applyBrand, logoPath, normalizeHex, onBrand, removeLogo, uploadLogo } from '../lib/brand'
 
 /**
  * Настройки текущего кабинета. Открываются из меню профиля.
@@ -25,6 +28,7 @@ export function Settings() {
       <PageHeader title="Настройки кабинета" sub={isAdmin ? undefined : 'Менять настройки могут учредители'} />
       <div className="grid max-w-2xl gap-3">
         <Passport />
+        {isAdmin && <BrandCard />}
         {isAdmin &&
           (settings ? (
             <MoneyCard s={settings} />
@@ -118,6 +122,180 @@ function Passport() {
           <SaveBar dirty={dirty} saving={saving} onSave={save} onReset={() => setName(workspace.name)} />
         </div>
       )}
+    </Card>
+  )
+}
+
+/** Логотип в меню и брендовый цвет вместо зелёного. Пока ничего не выбрано, всё как у «Сверки» */
+function BrandCard() {
+  const { workspace, reloadProfile } = useAuth()
+  const saved = workspace?.brand_color || DEFAULT_BRAND
+  const [color, setColor] = useState(saved)
+  const [hex, setHex] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [busy, setBusy] = useState<'upload' | 'remove' | null>(null)
+  const file = useRef<HTMLInputElement>(null)
+  const dirty = color !== saved
+  const custom = !BRAND_PRESETS.some((p) => p.hex === color)
+
+  // выбранный цвет сразу виден на сайте; без сохранения вернётся прежний
+  useEffect(() => {
+    applyBrand(color)
+    return () => applyBrand(saved)
+  }, [color, saved])
+
+  if (!workspace) return null
+  const logo = workspace.logo_url || null
+  const migrate = (m: string) => (/logo_url|brand_color|schema cache/i.test(m) ? 'Нужно запустить миграцию 019_workspace_brand.sql в Supabase' : m)
+
+  async function upload(f: File) {
+    setBusy('upload')
+    try {
+      const url = await uploadLogo(workspace!.id, f)
+      const { error } = await supabase.from('workspaces').update({ logo_url: url }).eq('id', workspace!.id)
+      if (error) {
+        await removeLogo(url)
+        throw new Error(migrate(error.message))
+      }
+      if (logo && logoPath(logo)) await supabase.storage.from(LOGO_BUCKET).remove([logoPath(logo)!])
+      await reloadProfile()
+      toast('Логотип загружен')
+    } catch (e) {
+      toast((e as Error).message)
+    }
+    setBusy(null)
+  }
+
+  async function remove() {
+    setBusy('remove')
+    const { error } = await supabase.from('workspaces').update({ logo_url: null }).eq('id', workspace!.id)
+    if (error) toast(migrate(error.message))
+    else {
+      await removeLogo(logo)
+      await reloadProfile()
+      toast('Логотип убран')
+    }
+    setBusy(null)
+  }
+
+  async function save() {
+    setSaving(true)
+    const { error } = await supabase
+      .from('workspaces')
+      .update({ brand_color: color === DEFAULT_BRAND ? null : color })
+      .eq('id', workspace!.id)
+    setSaving(false)
+    if (error) return toast(migrate(error.message))
+    await reloadProfile()
+    toast('Цвет сохранён')
+  }
+
+  const swatch = 'relative flex size-9 shrink-0 items-center justify-center rounded-full shadow-[inset_0_0_0_1px_rgb(21_23_28/0.08)] transition-transform duration-150 active:scale-90'
+  const picked = 'ring-2 ring-ink ring-offset-2 ring-offset-surface'
+
+  return (
+    <Card>
+      <h2 className="text-base">Оформление</h2>
+      <div>
+        <Group title="Логотип" sub="SVG или PNG до 1 МБ. Стоит в меню вместо значка и названия агентства">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            {/* так верх меню выглядит на сайте: на том же сером фоне */}
+            <div className="flex h-16 min-w-0 flex-1 items-center gap-1.5 rounded-inner bg-canvas px-4">
+              {logo ? (
+                <BrandLogo src={logo} name={workspace.name} />
+              ) : (
+                <>
+                  <Mark />
+                  <span className="truncate pl-1 text-[15px] font-medium">{workspace.name}</span>
+                </>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button loading={busy === 'upload'} disabled={!!busy} onClick={() => file.current?.click()}>
+                {busy !== 'upload' && <Upload className="size-4" strokeWidth={1.5} />}
+                {logo ? 'Заменить' : 'Загрузить'}
+              </Button>
+              {logo && (
+                <Button variant="ghost" loading={busy === 'remove'} disabled={!!busy} onClick={remove}>
+                  Убрать
+                </Button>
+              )}
+            </div>
+            <input
+              ref={file}
+              type="file"
+              accept=".svg,.png,image/svg+xml,image/png"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                e.target.value = ''
+                if (f) upload(f)
+              }}
+            />
+          </div>
+        </Group>
+
+        <Group title="Брендовый цвет" sub="Заменяет зелёный в кнопках, полосах прогресса и отметках">
+          <div className="flex flex-wrap items-center gap-3" role="radiogroup" aria-label="Брендовый цвет">
+            {BRAND_PRESETS.map((p) => (
+              <button
+                key={p.hex}
+                type="button"
+                role="radio"
+                aria-checked={color === p.hex}
+                title={p.label}
+                onClick={() => {
+                  setColor(p.hex)
+                  setHex(null)
+                }}
+                className={cx(swatch, color === p.hex && picked)}
+                style={{ background: p.hex, color: onBrand(p.hex) }}
+              >
+                {color === p.hex && <Check className="size-4" strokeWidth={2} />}
+              </button>
+            ))}
+            {/* свой цвет: системная палитра или код из брендбука */}
+            <label title="Свой цвет" className={cx(swatch, 'cursor-pointer', custom ? picked : 'bg-soft text-muted ring-1 ring-line hover:text-ink')} style={custom ? { background: color, color: onBrand(color) } : undefined}>
+              {custom ? <Check className="size-4" strokeWidth={2} /> : <Pipette className="size-4" strokeWidth={1.5} />}
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => {
+                  setColor(e.target.value)
+                  setHex(null)
+                }}
+                className="absolute inset-0 cursor-pointer opacity-0"
+                aria-label="Свой цвет"
+              />
+            </label>
+          </div>
+          <div className="mt-4 max-w-40" onKeyDown={(e) => submitOnEnter(e, e.currentTarget.closest('section')!, 'button[data-save]')}>
+            <Field label="Код цвета">
+              <Input
+                className="num"
+                value={hex ?? color}
+                maxLength={7}
+                spellCheck={false}
+                onChange={(e) => {
+                  setHex(e.target.value)
+                  const v = normalizeHex(e.target.value)
+                  if (v && e.target.value.replace('#', '').length === 6) setColor(v)
+                }}
+                onBlur={() => setHex(null)}
+              />
+            </Field>
+          </div>
+          <SaveBar
+            dirty={dirty}
+            saving={saving}
+            onSave={save}
+            onReset={() => {
+              setColor(saved)
+              setHex(null)
+            }}
+          />
+        </Group>
+      </div>
     </Card>
   )
 }
@@ -331,6 +509,7 @@ function DeleteRow() {
         ['documents', await paths('documents', 'storage_path')],
         ['task-files', await paths('task_files', 'storage_path')],
         [AVATAR_BUCKET, (await paths('bloggers', 'avatar_url')).map(avatarPath).filter((p): p is string => Boolean(p?.startsWith('bloggers/')))],
+        [LOGO_BUCKET, [logoPath(workspace.logo_url)].filter((p): p is string => Boolean(p))],
       ]
       const total = groups.reduce((a, [, p]) => a + p.length, 0)
       let done = 0

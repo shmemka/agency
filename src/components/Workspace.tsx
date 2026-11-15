@@ -54,7 +54,7 @@ export function UpgradeButton({ className, size = 'sm' }: { className?: string; 
         type="button"
         onClick={openPlan}
         className={cx(
-          'inline-flex shrink-0 items-center gap-1.5 rounded-full bg-lime font-medium text-ink transition-[filter,transform] duration-200 hover:brightness-95 active:scale-[0.97]',
+          'inline-flex shrink-0 items-center gap-1.5 rounded-full bg-lime font-medium text-lime-ink transition-[filter,transform] duration-200 hover:brightness-95 active:scale-[0.97]',
           size === 'sm' ? 'h-7 px-2.5 text-xs' : size === 'fill' ? 'h-8 w-full justify-center text-[13px]' : 'h-10 px-4 text-sm',
           className,
         )}
