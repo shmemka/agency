@@ -1,4 +1,4 @@
-import { Link2, Lock, RefreshCw, Send, Share, UserPlus } from 'lucide-react'
+import { Link2, Lock, RefreshCw, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
@@ -250,7 +250,7 @@ export function Team() {
   )
 }
 
-/** Кнопка «Пригласить» в шапке: по ней окно со ссылкой, которую можно скопировать или сразу отправить */
+/** Кнопка «Пригласить» в шапке: по ней окно со ссылкой-приглашением и кнопкой «Скопировать» */
 function InviteButton() {
   const { workspace } = useAuth()
   const [open, setOpen] = useState(false)
@@ -283,8 +283,14 @@ function InviteButton() {
 
   if (token === null) return null
   const url = token ? inviteUrl(token) : ''
-  const text = `Присоединяйтесь к команде «${workspace?.name ?? ''}» в Сверке`
-  const canShare = typeof navigator !== 'undefined' && 'share' in navigator
+
+  async function copyLink() {
+    try {
+      await copy(url)
+    } catch {
+      await promptDialog({ title: 'Скопируйте ссылку', body: 'Браузер не дал скопировать автоматически. Ссылка уже выделена', value: url, readOnly: true })
+    }
+  }
 
   return (
     <>
@@ -293,56 +299,31 @@ function InviteButton() {
         Пригласить
       </Button>
       <Modal open={open} onClose={() => setOpen(false)} title="Пригласить в команду">
-        <p className="text-muted">Коллега откроет ссылку, зарегистрируется и сразу окажется в команде специалистом. Роль можно поменять в списке</p>
+        <p className="text-muted">
+          По этой ссылке коллега зарегистрируется и сразу попадёт в <span className="whitespace-nowrap">«{workspace?.name}»</span> специалистом. Роль можно поменять в списке команды
+        </p>
 
-        {/* ссылка и копирование в одной строке */}
-        <div className="mt-5 flex items-center gap-3 rounded-full bg-soft py-1.5 pr-1.5 pl-5">
-          <Link2 className="size-4 shrink-0 text-faint" strokeWidth={1.5} />
-          <span className="min-w-0 flex-1 truncate text-[13px] text-muted" title={url}>
-            {url.replace(/^https?:\/\//, '')}
-          </span>
-          <Button
-            variant="primary"
-            className="min-w-36"
-            onClick={async () => {
-              try {
-                await copy(url)
-              } catch {
-                await promptDialog({ title: 'Скопируйте ссылку', body: 'Браузер не дал скопировать автоматически. Ссылка уже выделена', value: url, readOnly: true })
-              }
-            }}
-          >
-            <CopyIcon copied={copied} />
-            {copied ? 'Скопировано' : 'Скопировать'}
-          </Button>
+        {/* ссылка целиком, а не обрезанная: видно, что отправляешь. Касание выделяет её всю */}
+        <div className="mt-5 rounded-inner bg-soft px-4 py-3.5">
+          <div className="flex items-center gap-1.5 text-[12px] text-faint">
+            <Link2 className="size-3.5" strokeWidth={1.5} />
+            Ссылка-приглашение
+          </div>
+          <div className="mt-1 text-[15px] leading-snug break-all select-all">{url.replace(/^https?:\/\//, '')}</div>
         </div>
 
-        {/* или сразу отправить: в Telegram или через меню «Поделиться» телефона */}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <a
-            href={`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex h-10 items-center gap-2 rounded-full bg-soft px-4 text-sm font-medium transition-[background-color,transform] duration-200 hover:bg-ink/8 active:scale-[0.98]"
-          >
-            <Send className="size-4" strokeWidth={1.5} />
-            Отправить в Telegram
-          </a>
-          {canShare && (
-            <Button onClick={() => navigator.share({ title: 'Приглашение в Сверку', text, url }).catch(() => {})}>
-              <Share className="size-4" strokeWidth={1.5} />
-              Поделиться
-            </Button>
-          )}
-        </div>
+        <Button variant="primary" onClick={copyLink} className={cx('mt-3 h-12 w-full text-[15px]', copied && 'bg-leaf! text-ink! hover:bg-leaf!')}>
+          <CopyIcon copied={copied} />
+          {copied ? 'Скопировано' : 'Скопировать ссылку'}
+        </Button>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line pt-4 text-[13px]">
-          <span className="text-faint">Ссылка попала не к тому человеку?</span>
-          <button onClick={reset} disabled={busy} className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-muted transition-colors duration-200 hover:bg-ink/5 hover:text-ink disabled:opacity-40">
-            <RefreshCw className={cx('size-3.5', busy && 'animate-spin')} strokeWidth={1.5} />
-            Сделать новую ссылку
+        <p className="mt-5 text-center text-[13px] text-faint">
+          Ссылка попала не к тому человеку?{' '}
+          <button onClick={reset} disabled={busy} className="inline-flex items-center gap-1 font-medium text-muted underline-offset-4 transition-colors duration-200 hover:text-ink hover:underline disabled:opacity-40">
+            {busy && <RefreshCw className="size-3 animate-spin" strokeWidth={1.5} />}
+            Сделать новую
           </button>
-        </div>
+        </p>
       </Modal>
     </>
   )
