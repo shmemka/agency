@@ -451,9 +451,9 @@ export function NewIntegrationModal({ open, onClose, bloggerId, onCreated }: { o
             </Select>
           </Field>
         )}
-        <Field label="Кампания" hint="В кампании блогер сначала попадает в подборку и ждёт решения клиента">
+        <Field label="Кампания" hint={cid ? 'Блогер попадёт в подборку и будет ждать решения клиента' : 'Без клиента блогер сразу идёт в работу'}>
           <Select value={cid} onChange={(e) => setCid(e.target.value)}>
-            <option value="">Без кампании</option>
+            <option value="">Без клиента</option>
             {campaigns
               .filter((c) => c.status === 'planning' || c.status === 'active')
               .map((c) => (

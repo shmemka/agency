@@ -9,7 +9,8 @@ import { isActive } from '../lib/rules'
 import { count, cpm, money, plural } from '../lib/format'
 import type { Blogger } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, BloggerStatusBadge, BloggerStatusSelect, Button, Empty, Filters, Input, Menu, PageHeader, Select, Skel, SkelTable, StatusSelect, Table, cx, useEntrance } from '../components/ui'
+import { Avatar, BloggerStatusBadge, BloggerStatusSelect, Button, Empty, Filters, Input, Menu, PageHeader, Select, Skel, SkelTable, Table, cx, useEntrance } from '../components/ui'
+import { NO_CLIENT } from '../components/IntegrationBoard'
 import { confirmDialog, promptDialog } from '../components/dialogs'
 import { AudienceBar, BloggerName, statsStale } from '../components/bits'
 import { BloggerDrawer, useBloggerStatus } from '../components/BloggerDrawer'
@@ -19,7 +20,7 @@ import { ImportModal } from '../components/ImportModal'
 type SortKey = 'nick' | 'followers' | 'avg_reach' | 'price' | 'cpm' | 'updated_at'
 
 export function Bloggers() {
-  const { bloggers, integrations, campaign, lists, listItems, loading, error, moveIntegration, reload } = useData()
+  const { bloggers, integrations, campaign, lists, listItems, loading, error, reload } = useData()
   const entering = useEntrance(!loading)
   const { team, personName, personAvatar, profile, isAdmin } = useAuth()
   const { id } = useParams()
@@ -195,19 +196,22 @@ export function Bloggers() {
     </th>
   )
 
+  // блогеры - справочник: здесь только где он сейчас в работе, а этапы ведутся в кампаниях и на экране «Выходы»
+  // кандидаты подборок тоже считаются: блогер уже предложен клиенту
+  const busyBy = useMemo(() => {
+    const m = new Map<string, typeof integrations>()
+    for (const i of integrations) if (isActive(i) || (i.campaign_id && i.status !== 'declined' && i.status !== 'done' && i.client_decision !== 'rejected')) m.set(i.blogger_id, [...(m.get(i.blogger_id) ?? []), i])
+    return m
+  }, [integrations])
   const work = (b: Blogger) => {
-    const list = activeBy.get(b.id)
+    const list = busyBy.get(b.id)
     if (!list) return <span className="text-faint">—</span>
+    const names = [...new Set(list.map((i) => (i.campaign_id ? (campaign(i.campaign_id)?.name ?? '') : NO_CLIENT)))]
     return (
-      <div className="flex flex-col items-start gap-1">
-        {list.slice(0, 2).map((i) => (
-          <span key={i.id} onClick={(e) => e.stopPropagation()}>
-            <StatusSelect value={i.status} onChange={(s) => moveIntegration(i, s)} />
-            {i.campaign_id && <span className="mt-0.5 block max-w-36 truncate pl-2.5 text-xs text-muted">{campaign(i.campaign_id)?.name}</span>}
-          </span>
-        ))}
-        {list.length > 2 && <span className="text-xs text-muted">и ещё {list.length - 2}</span>}
-      </div>
+      <span className="flex min-w-0 items-center gap-1.5" title={names.join(', ')}>
+        <span className="truncate">{names[0]}</span>
+        {names.length > 1 && <span className="num shrink-0 text-xs text-muted">+{names.length - 1}</span>}
+      </span>
     )
   }
 
@@ -368,7 +372,7 @@ export function Bloggers() {
                   <th className="w-10" />
                   <Th k="nick">Блогер</Th>
                   <th>Статус</th>
-                  <th>В работе</th>
+                  <th>В кампаниях</th>
                   <Th k="followers" right>
                     Подписчики
                   </Th>
@@ -411,7 +415,7 @@ export function Bloggers() {
                     <td onClick={(e) => e.stopPropagation()}>
                       <BloggerStatusSelect value={b.status} onChange={(s) => setStatus(b, s)} />
                     </td>
-                    <td>{work(b)}</td>
+                    <td className="max-w-44">{work(b)}</td>
                     <td className="num text-right">{count(b.followers)}</td>
                     <td className={cx('num text-right', statsStale(b) && 'text-faint')} title={statsStale(b) ? 'Статистика старше 60 дней' : undefined}>
                       {count(b.avg_reach)}
@@ -453,7 +457,7 @@ export function Bloggers() {
                     <span>охват {count(b.avg_reach)}</span>
                     <span className="ml-auto text-ink">{money(b.price)}</span>
                   </div>
-                  {activeBy.has(b.id) && <div className="mt-3">{work(b)}</div>}
+                  {busyBy.has(b.id) && <div className="mt-2 text-[13px] text-muted">{work(b)}</div>}
                 </div>
               </li>
             ))}

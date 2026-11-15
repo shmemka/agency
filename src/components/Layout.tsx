@@ -19,10 +19,11 @@ import { IntegrationPanel } from './IntegrationPanel'
 const NAV = [
   { to: '/', label: 'Обзор', icon: LayoutGrid, end: true, phone: true },
   { to: '/bloggers', label: 'Блогеры', icon: Users, phone: true },
-  { to: '/integrations', label: 'Интеграции', icon: Clapperboard },
-  { to: '/campaigns', label: 'Кампании', icon: Megaphone },
+  // кампании - главный рабочий экран, «Выходы» - все интеграции всех кампаний на одной доске
+  { to: '/campaigns', label: 'Кампании', icon: Megaphone, phone: true },
+  { to: '/integrations', label: 'Выходы', icon: Clapperboard },
   { to: '/tasks', label: 'Задачи', icon: ListTodo, phone: true },
-  { to: '/calendar', label: 'Календарь', icon: CalendarDays, phone: true },
+  { to: '/calendar', label: 'Календарь', icon: CalendarDays },
   { to: '/documents', label: 'Документы', icon: FileText },
   { to: '/finance', label: 'Финансы', icon: Wallet, admin: true },
   { to: '/team', label: 'Команда', icon: UsersRound },

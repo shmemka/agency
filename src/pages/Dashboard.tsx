@@ -47,8 +47,8 @@ export function Dashboard() {
         <Card className="rise lg:col-span-2">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="text-base">В работе сейчас</h2>
-            <Link to="/integrations?tab=active" className="text-[13px] text-muted hover:text-ink">
-              Все интеграции
+            <Link to="/integrations" className="text-[13px] text-muted hover:text-ink">
+              Все выходы
             </Link>
           </div>
           {loading ? (
@@ -63,7 +63,7 @@ export function Dashboard() {
             {flow.map((p, idx) => {
               const n = byPhase(p.id).length
               return (
-                <Link key={p.id} to={`/integrations?tab=active&phase=${p.id}`} className="group min-w-12 sm:min-w-24" style={{ flex: `${Math.max(n / total, 0.08)} 1 0` }}>
+                <Link key={p.id} to={`/integrations?phase=${p.id}`} className="group min-w-12 sm:min-w-24" style={{ flex: `${Math.max(n / total, 0.08)} 1 0` }}>
                   {loading ? (
                     <Skel className="h-10 w-full" />
                   ) : (

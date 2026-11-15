@@ -142,21 +142,21 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
           <>
             <Card>
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h3 className="text-base">В работе</h3>
+                <h3 className="text-base">Кампании</h3>
                 <Button size="sm" variant="primary" disabled={b.status === 'blacklist'} onClick={() => setAdding(true)}>
                   <Plus className="size-4" strokeWidth={1.5} />
-                  Новая интеграция
+                  В кампанию
                 </Button>
               </div>
               {active.length === 0 ? (
-                <p className="text-muted">{b.status === 'blacklist' ? 'Блогер в чёрном списке, новые интеграции закрыты' : 'Активных интеграций нет. Создайте интеграцию, когда начнёте переговоры'}</p>
+                <p className="text-muted">{b.status === 'blacklist' ? 'Блогер в чёрном списке, новые интеграции закрыты' : 'Блогер сейчас не в работе. Добавьте его в подборку кампании или возьмите в работу без клиента'}</p>
               ) : (
                 <div className="space-y-3">
                   {active.map((i) => (
                     <div key={i.id} className="rounded-inner bg-soft p-4">
                       <button onClick={() => open(i.id)} className="mb-3 flex w-full items-center gap-2 text-left">
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate">{campaign(i.campaign_id)?.name ?? 'Без кампании'}</span>
+                          <span className="block truncate">{campaign(i.campaign_id)?.name ?? 'Без клиента'}</span>
                           <span className="num block text-xs text-muted">
                             {i.publish_date ? `выход ${date(i.publish_date)}, ` : ''}
                             {money(i.price)}
@@ -177,7 +177,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
                     <li key={i.id}>
                       <button onClick={() => open(i.id)} className="flex min-h-11 w-full items-center gap-3 border-t border-line py-2 text-left hover:bg-soft">
                         <span className="num w-20 shrink-0 text-muted">{date(i.publish_date)}</span>
-                        <span className="min-w-0 flex-1 truncate">{campaign(i.campaign_id)?.name ?? 'Без кампании'}</span>
+                        <span className="min-w-0 flex-1 truncate">{campaign(i.campaign_id)?.name ?? 'Без клиента'}</span>
                         <span className="num hidden sm:inline">{money(i.price)}</span>
                         {i.campaign_id && i.client_decision !== 'approved' ? <Chip>В подборке</Chip> : <StatusBadge status={i.status} />}
                       </button>

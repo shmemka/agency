@@ -107,7 +107,7 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
                     {c.name}
                   </Link>
                 ) : (
-                  'Без кампании'
+                  'Без клиента'
                 )}
                 {c && i.client_decision !== 'approved' && <span>, клиент: {DECISIONS[i.client_decision].toLowerCase()}</span>}
               </div>
@@ -207,7 +207,7 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
                     setD((x) => ({ ...x, campaign_id: e.target.value || null, ...(e.target.value && !i.campaign_id ? { client_decision: 'approved' as Decision } : {}) }))
                   }
                 >
-                  <option value="">Без кампании</option>
+                  <option value="">Без клиента</option>
                   {campaigns.filter((x) => x.status === 'planning' || x.status === 'active' || x.id === i.campaign_id).map((x) => (
                     <option key={x.id} value={x.id}>
                       {x.name}

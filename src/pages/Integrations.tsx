@@ -13,6 +13,7 @@ import { Button, Chip, Empty, Filters, Input, PageHeader, Segmented, Select, Ske
 import { BloggerName, useIntegrationPanel } from '../components/bits'
 import { NewIntegrationModal } from '../components/BloggerForm'
 import { confirmDialog } from '../components/dialogs'
+import { IntegrationBoard, NO_CLIENT } from '../components/IntegrationBoard'
 
 export function Integrations() {
   const { integrations, blogger, campaign, campaigns, docs, settings, loading, moveIntegration, reload } = useData()
@@ -24,7 +25,9 @@ export function Integrations() {
   const [busy, setBusy] = useState(false)
   const [limit, setLimit] = useState(100)
   const q = params.get('q') ?? ''
-  const tab = params.get('tab') ?? 'active'
+  // доска - главный вид; старые ссылки ?tab=active и ?tab=live ведут на доску и в полный список
+  const raw = params.get('tab') ?? 'board'
+  const tab = raw === 'active' ? 'board' : raw === 'live' ? 'all' : raw
   const cid = params.get('campaign') ?? ''
   const phase = params.get('phase') ?? ''
   const set = (k: string, v: string) => {
@@ -45,8 +48,7 @@ export function Integrations() {
     const needle = q.trim().toLowerCase()
     return all
       .filter((i) => {
-        if (tab === 'active' && !isActive(i)) return false
-        if (tab === 'live' && !isLive(i)) return false
+        if (tab === 'board' && !isActive(i)) return false
         if (tab === 'ord' && !needsOrd(i)) return false
         if (tab === 'docs' && !noDocs(i)) return false
         if (cid === 'none' ? i.campaign_id : cid && i.campaign_id !== cid) return false
@@ -89,8 +91,8 @@ export function Integrations() {
   return (
     <>
       <PageHeader
-        title="Интеграции"
-        sub="Каждый выход блогера: этап, деньги, документы и маркировка"
+        title="Выходы"
+        sub="Интеграции всех кампаний по этапам: от поиска блогера до выхода"
         actions={
           <Button variant="primary" onClick={() => setAdding(true)}>
             <Plus className="size-4" strokeWidth={1.5} />
@@ -113,7 +115,7 @@ export function Integrations() {
         >
         <Select value={cid} onChange={(e) => set('campaign', e.target.value)} tone="surface" className="w-56" aria-label="Кампания">
           <option value="">Все кампании</option>
-          <option value="none">Без кампании</option>
+          <option value="none">{NO_CLIENT}</option>
           {campaigns.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
@@ -135,11 +137,10 @@ export function Integrations() {
           value={tab}
           onChange={(v) => set('tab', v)}
           options={[
-            { id: 'active', label: `В работе ${all.filter(isActive).length}` },
-            { id: 'live', label: `Вышли ${all.filter(isLive).length}` },
-            { id: 'docs', label: `Не хватает документов ${all.filter(noDocs).length}` },
+            { id: 'board', label: `Доска ${all.filter(isActive).length}` },
+            { id: 'docs', label: `Нет документов ${all.filter(noDocs).length}` },
             { id: 'ord', label: `Не сдано в ОРД ${all.filter(needsOrd).length}` },
-            { id: 'all', label: 'Все' },
+            { id: 'all', label: 'Все списком' },
           ]}
         />
         {tab === 'ord' && rows.length > 0 && (
@@ -152,7 +153,11 @@ export function Integrations() {
       {loading ? (
         <SkelTable rows={10} cols={[2.4, 1.6, 1.2, 1, 1, 1]} />
       ) : rows.length === 0 ? (
-        <Empty title={all.length ? 'Под фильтры ничего не подходит' : 'Интеграций пока нет'}>{all.length ? 'Измените фильтры или поиск' : 'Интеграция появляется, когда вы начинаете переговоры с блогером или клиент одобряет его в подборке'}</Empty>
+        <Empty title={all.length ? 'Под фильтры ничего не подходит' : 'Выходов пока нет'}>{all.length ? 'Измените фильтры или поиск' : 'Интеграция появляется, когда клиент одобряет блогера в подборке кампании или вы берёте блогера в работу без клиента'}</Empty>
+      ) : tab === 'board' ? (
+        <div className="appear">
+          <IntegrationBoard rows={rows} showCampaign />
+        </div>
       ) : (
         <>
           <div className="appear hidden md:block">
@@ -183,7 +188,7 @@ export function Integrations() {
                     <td className="max-w-52">
                       <BloggerName b={blogger(i.blogger_id)} />
                     </td>
-                    <td className="max-w-44 truncate text-muted">{campaign(i.campaign_id)?.name ?? '—'}</td>
+                    <td className={cx('max-w-44 truncate', i.campaign_id ? 'text-muted' : 'text-faint')}>{i.campaign_id ? campaign(i.campaign_id)?.name : NO_CLIENT}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <StatusSelect value={i.status} onChange={(s) => moveIntegration(i, s)} />
                     </td>
@@ -224,7 +229,7 @@ export function Integrations() {
                   <div className="num mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted">
                     <span>{date(i.publish_date)}</span>
                     <span className="text-ink">{money(i.price)}</span>
-                    <span className="truncate">{campaign(i.campaign_id)?.name}</span>
+                    <span className="truncate">{i.campaign_id ? campaign(i.campaign_id)?.name : NO_CLIENT}</span>
                     {isLive(i) && <Chip className="ml-auto h-6 text-xs">{ready(i)} из 6</Chip>}
                   </div>
                 </div>
@@ -233,7 +238,7 @@ export function Integrations() {
           </ul>
         </>
       )}
-      {!loading && rows.length > limit && (
+      {!loading && tab !== 'board' && rows.length > limit && (
         <div className="mt-3 text-center">
           <Button onClick={() => setLimit((l) => l + 200)}>Показать ещё {Math.min(200, rows.length - limit)}</Button>
         </div>

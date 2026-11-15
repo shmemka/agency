@@ -4,17 +4,18 @@ import { CalendarDays, ChevronLeft, Download, Pencil, Plus, Search, Trash2 } fro
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
-import { AGE_GROUPS, DECISIONS, PLATFORMS, STATUSES, campaignStatusLabel, phaseInfo, platformLabel } from '../lib/constants'
+import { AGE_GROUPS, DECISIONS, PLATFORMS, campaignStatusLabel, platformLabel } from '../lib/constants'
 import { addToCampaign, removeStoredFiles } from '../lib/actions'
 import { commission, isLive } from '../lib/rules'
-import { count, cpm, date, dateRange, downloadXlsx, money, parseNumber, plural } from '../lib/format'
+import { count, cpm, dateRange, downloadXlsx, money, parseNumber, plural } from '../lib/format'
 import type { Blogger, Campaign, Decision, Income, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Card, Chip, Empty, Field, IconButton, Input, Loading, Menu, Modal, PageHeader, Progress, Segmented, Select, Skel, SkelTable, StatusBadge, StatusSelect, Table, Toggle, cx, submitOnEnter } from '../components/ui'
+import { Button, Card, Chip, Empty, Field, IconButton, Input, Loading, Menu, Modal, PageHeader, Progress, Segmented, Select, Skel, SkelTable, StatusBadge, Table, Toggle, cx, submitOnEnter } from '../components/ui'
 import { AudienceBar, BloggerName, useIntegrationPanel } from '../components/bits'
 import { CampaignModal, ShareBox } from '../components/CampaignForm'
 import { DocumentsPanel } from '../components/DocumentsPanel'
 import { confirmDialog } from '../components/dialogs'
+import { IntegrationBoard } from '../components/IntegrationBoard'
 
 type Tab = 'shortlist' | 'work' | 'docs' | 'report' | 'money'
 const ORDER: Record<Decision, number> = { pending: 0, none: 1, approved: 2, rejected: 3 }
@@ -491,76 +492,10 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
   )
 }
 
+/** Одобренные клиентом блогеры идут по этапам на доске - той же, что на экране «Выходы» */
 function Work({ rows }: { rows: Integration[] }) {
-  const { blogger, moveIntegration } = useData()
-  const { open } = useIntegrationPanel()
-  const [drag, setDrag] = useState<string | null>(null)
-  const [over, setOver] = useState<string | null>(null)
-  if (!rows.length) return <Empty title="Клиент пока никого не одобрил">Одобренные в подборке блогеры появятся здесь и пойдут по этапам: от первого сообщения до выхода</Empty>
-  const cols = STATUSES.filter((s) => s.id !== 'declined' || rows.some((i) => i.status === 'declined'))
-
-  return (
-    <>
-      <div className="-mx-4 hidden overflow-x-auto px-4 pb-4 md:-mx-6 md:block md:px-6">
-        <div className="flex gap-2">
-          {cols.map((s) => {
-            const items = rows.filter((i) => i.status === s.id)
-            return (
-              <section
-                key={s.id}
-                aria-label={s.label}
-                onDragOver={(e) => {
-                  e.preventDefault()
-                  setOver(s.id)
-                }}
-                onDragLeave={() => setOver((o) => (o === s.id ? null : o))}
-                onDrop={() => {
-                  const i = rows.find((x) => x.id === drag)
-                  if (i) moveIntegration(i, s.id)
-                  setDrag(null)
-                  setOver(null)
-                }}
-                className={cx('flex w-52 shrink-0 flex-col rounded-inner p-2 transition-colors duration-200', over === s.id ? 'dropzone is-over' : items.length ? 'bg-ink/[0.04]' : 'dropzone')}
-              >
-                <header className="flex h-8 items-center gap-2 px-2 text-[13px]">
-                  <span className={cx('size-2 rounded-full', phaseInfo(s.phase).dot)} />
-                  <span className="flex-1 truncate">{s.label}</span>
-                  <span className="num text-muted">{items.length || ''}</span>
-                </header>
-                <div className="flex min-h-12 flex-col gap-1.5">
-                  {items.map((i) => (
-                    <button key={i.id} draggable onDragStart={() => setDrag(i.id)} onDragEnd={() => setDrag(null)} onClick={() => open(i.id)} className={cx('rounded-2xl bg-surface p-3 text-left transition-opacity duration-150', drag === i.id && 'opacity-40')}>
-                      <span className="block truncate font-medium">{blogger(i.blogger_id)?.nick}</span>
-                      <span className="num mt-1 flex justify-between text-xs text-muted">
-                        <span>{i.publish_date ? date(i.publish_date) : 'без даты'}</span>
-                        <span>{money(i.price)}</span>
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </section>
-            )
-          })}
-        </div>
-      </div>
-      <ul className="space-y-2 md:hidden">
-        {[...rows]
-          .sort((a, b) => STATUSES.findIndex((s) => s.id === a.status) - STATUSES.findIndex((s) => s.id === b.status))
-          .map((i) => (
-            <li key={i.id} className="flex items-center gap-3 rounded-inner bg-surface p-4">
-              <button className="min-w-0 flex-1 text-left" onClick={() => open(i.id)}>
-                <BloggerName b={blogger(i.blogger_id)} />
-                <span className="num mt-1 block text-xs text-muted">
-                  {i.publish_date ? `выход ${date(i.publish_date)}, ` : ''}
-                  {money(i.price)}
-                </span>
-              </button>
-              <StatusSelect value={i.status} onChange={(s) => moveIntegration(i, s)} />
-            </li>
-          ))}
-      </ul>
-    </>
-  )
+  if (!rows.length) return <Empty title="Клиент пока никого не одобрил">Одобренные в подборке блогеры появятся здесь и пойдут по этапам: от переговоров до выхода</Empty>
+  return <IntegrationBoard rows={rows} />
 }
 
 function Report({ c, rows }: { c: Campaign; rows: Integration[] }) {

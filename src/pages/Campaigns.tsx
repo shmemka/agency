@@ -9,6 +9,7 @@ import { dateRange, plural } from '../lib/format'
 import type { Campaign, Client } from '../lib/types'
 import { Button, Chip, Empty, Loading, PageHeader, Progress, Skel, Table, cx, useEntrance } from '../components/ui'
 import { CampaignModal, ClientModal } from '../components/CampaignForm'
+import { NO_CLIENT } from '../components/IntegrationBoard'
 
 export function Campaigns() {
   const { campaigns, clients, integrations, loading } = useData()
@@ -17,6 +18,9 @@ export function Campaigns() {
   const nav = useNavigate()
   const [editC, setEditC] = useState<Partial<Campaign> | null>(null)
   const [editClient, setEditClient] = useState<Partial<Client> | null>(null)
+  // работа без клиента тоже живёт здесь: отдельной карточкой рядом с кампаниями
+  const direct = integrations.filter((i) => !i.campaign_id && i.status !== 'declined')
+  const directLive = direct.filter(isLive).length
 
   return (
     <>
@@ -57,7 +61,7 @@ export function Campaigns() {
             </div>
           ))}
         </Loading>
-      ) : campaigns.length === 0 ? (
+      ) : campaigns.length === 0 && direct.length === 0 ? (
         <Empty title="Кампаний пока нет">{isAdmin ? 'Кампания собирает подборку блогеров под заказ клиента, его согласование и отчёт' : 'Учредитель добавит вас в кампанию, и она появится здесь'}</Empty>
       ) : (
         <div className={cx('grid grid-cols-1 gap-3 lg:grid-cols-2', entering && 'stagger')}>
@@ -94,6 +98,19 @@ export function Campaigns() {
               </Link>
             )
           })}
+          {direct.length > 0 && (
+            <Link to="/integrations?campaign=none" className="min-w-0 rounded-card bg-surface/60 p-5 ring-1 ring-line ring-inset transition-[background-color,transform] duration-200 hover:-translate-y-0.5 hover:bg-surface active:translate-y-0 sm:p-6">
+              <div className="text-[13px] text-muted">Прямые договорённости с блогерами</div>
+              <h2 className="mt-0.5 truncate text-lg">{NO_CLIENT}</h2>
+              <Progress className="mt-5" value={directLive} max={direct.length} />
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-muted">
+                <span className="num text-ink">
+                  Вышло {directLive} из {direct.length}
+                </span>
+                <span>открываются на доске «Выходы»</span>
+              </div>
+            </Link>
+          )}
         </div>
       )}
 
