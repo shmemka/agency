@@ -44,10 +44,10 @@ const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 })
 
 /**
  * Настройки текущего кабинета. Открываются из меню профиля.
- * Компьютер: слева разделы, справа выбранный. Телефон: сначала список разделов с тем, что в них сейчас, из раздела - назад к списку
+ * Компьютер: слева разделы, справа выбранный. Телефон: сначала список разделов, из раздела - назад к списку
  */
 export function Settings() {
-  const { workspace, isAdmin, team } = useAuth()
+  const { workspace, isAdmin } = useAuth()
   const { settings } = useData()
   const { section } = useParams()
   const navigate = useNavigate()
@@ -74,17 +74,6 @@ export function Settings() {
     if (id === cur.id && picked) return
     if (dirty.current && !(await confirmDiscard())) return
     navigate(id ? `/settings/${id}` : '/settings', { replace: !push })
-  }
-
-  // что сейчас в разделе - одной строкой, чтобы на телефоне не заходить в каждый
-  const people = team.filter((t) => t.is_active).length
-  const color = workspace.brand_color ? (BRAND_PRESETS.find((p) => p.hex === workspace.brand_color)?.label.toLowerCase() ?? workspace.brand_color) : null
-  const summary: Record<SectionId, string> = {
-    general: `${workspace.name}, ${people} ${plural(people, 'участник', 'участника', 'участников')}`,
-    brand: [workspace.logo_url ? 'Свой логотип' : 'Без логотипа', color ? `цвет ${color}` : 'цвет «Сверки»'].join(', '),
-    plan: use ? `${PLAN}, занято ${bytes(use.total)} из ${bytes(use.limit)}` : PLAN,
-    money: settings ? `Наценка ${nf.format(settings.default_markup_pct)} %, налоги ${nf.format(settings.tax_org_pct)} % и ${nf.format(settings.tax_person_pct)} %` : 'Наценка, сроки и налоги',
-    danger: isAdmin ? 'Покинуть или удалить кабинет' : 'Покинуть кабинет',
   }
 
   return (
@@ -126,10 +115,8 @@ export function Settings() {
                 <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-soft">
                   <x.icon className="size-[18px]" strokeWidth={1.5} />
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[15px]">{x.label}</span>
-                  <span className={cx('num mt-0.5 block truncate text-[13px]', x.id === 'plan' && full ? 'text-warn' : 'text-muted')}>{summary[x.id]}</span>
-                </span>
+                <span className="min-w-0 flex-1 truncate text-[15px]">{x.label}</span>
+                {x.id === 'plan' && full && <span className="size-1.5 shrink-0 rounded-full bg-warn" aria-label="Место заканчивается" />}
                 <ChevronRight className="size-5 shrink-0 text-faint" strokeWidth={1.5} />
               </button>
             ))}
