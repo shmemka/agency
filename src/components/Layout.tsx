@@ -256,7 +256,9 @@ export function Layout() {
 
   return (
     <div className="flex min-h-full">
-      <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col p-4 md:flex">
+      {/* z-30: липкий сайдбар - отдельный слой, и без него меню кабинетов уходило под поиск страницы.
+          Выше содержимого, но ниже панелей (z-50), окон (z-60) и плашки массовых действий (z-40) */}
+      <aside className="no-print sticky top-0 z-30 hidden h-screen w-60 shrink-0 flex-col p-4 md:flex">
         <div className="flex items-center gap-1.5 px-2 pt-1 pb-6">
           <Mark />
           <WorkspaceMenu name={agency} />
