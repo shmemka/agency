@@ -407,9 +407,6 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
           </div>
         </section>
 
-        <p className="px-2 pb-2 text-xs text-faint">
-          {task.created_by ? `Автор: ${personName(task.created_by)}, ${dateTime(task.created_at)}` : `Создана ${dateTime(task.created_at)}`}
-        </p>
       </div>
     </Drawer>
   )
