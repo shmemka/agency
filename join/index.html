@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/agency/favicon.svg" />
+    <link rel="manifest" href="/agency/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/agency/icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#eef0f4" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="robots" content="noindex" />
+    <meta name="description" content="Сверка: кабинет агентства для рекламы у блогеров" />
+    <meta property="og:title" content="Сверка" />
+    <meta property="og:description" content="Кабинет агентства: блогеры, кампании, подборки и отчёты для клиентов" />
+    <meta property="og:type" content="website" />
+    <title>Сверка</title>
+    <!-- до загрузки скрипта: фон сайта вместо белого экрана, а у вошедших — каркас кабинета -->
+    <style>html,body{background:#eef0f4;margin:0}#boot{min-height:100vh;display:none}#boot .s{background:#15171c0f;border-radius:999px}#boot aside{box-sizing:border-box;width:240px;padding:20px 24px}#boot .m{background:#15171c;border-radius:50%;width:32px;height:32px;margin-bottom:30px}#boot aside .s{height:12px;margin:0 0 24px 2px}#boot main{flex:1;padding:32px 24px}@media (width<=767px){#boot aside{display:none}#boot main{padding:64px 16px}}</style>
+    <script type="module" crossorigin src="/agency/assets/index-B9CNZDJf.js"></script>
+    <link rel="modulepreload" crossorigin href="/agency/assets/rolldown-runtime-BCiCTKAo.js">
+    <link rel="stylesheet" crossorigin href="/agency/assets/index-CDhIoll6.css">
+  </head>
+  <body>
+    <div id="root">
+      <div id="boot">
+        <aside>
+          <div class="m"></div>
+          <div class="s" style="width: 64px"></div><div class="s" style="width: 76px"></div><div class="s" style="width: 88px"></div>
+          <div class="s" style="width: 72px"></div><div class="s" style="width: 60px"></div><div class="s" style="width: 80px"></div>
+        </aside>
+        <main>
+          <div class="s" style="height: 32px; width: 224px"></div>
+          <div class="s" style="height: 14px; width: 288px; max-width: 100%; margin-top: 12px"></div>
+        </main>
+      </div>
+    </div>
+    <script>
+      try {
+        if (!/\/(s|o|join)\/?$/.test(location.pathname) && Object.keys(localStorage).some((k) => /^sb-.+-auth-token$/.test(k))) document.getElementById('boot').style.display = 'flex'
+      } catch (e) {}
+    </script>
+  </body>
+</html>
