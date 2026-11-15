@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
-import { Link2, Upload, X } from 'lucide-react'
+import { Link2, Upload } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -8,12 +7,12 @@ import { DOC_KINDS, docKindLabel } from '../lib/constants'
 import { date, fileSize } from '../lib/format'
 import type { Doc, DocKind, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, IconButton, Input, Select, Spinner, cx, submitOnEnter } from './ui'
+import { Button, Input, Select, Spinner, cx, submitOnEnter } from './ui'
 import { confirmDialog } from './dialogs'
 import { FileMenu, FileThumb, downloadFrom } from './Files'
+import { openViewer, type ViewItem } from '../lib/viewer'
 
 const BUCKET = 'documents'
-const isImage = (d: Doc) => Boolean(d.storage_path && (d.mime?.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(d.name)))
 
 function safeName(name: string) {
   const dot = name.lastIndexOf('.')
@@ -21,48 +20,19 @@ function safeName(name: string) {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}${ext}`
 }
 
-export async function signedUrl(path: string, download?: string) {
-  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600, download ? { download } : undefined)
-  if (error || !data) {
-    toast(`Файл не открылся: ${error?.message ?? 'нет доступа'}`)
-    return null
-  }
-  return data.signedUrl
-}
+/** Документы как вложения для просмотра: ссылки на чужие сайты открываются в новой вкладке, их тут нет */
+export const viewItems = (docs: Doc[]): ViewItem[] => docs.filter((d) => d.storage_path).map((d) => ({ name: d.name, mime: d.mime, size: d.size, bucket: BUCKET, path: d.storage_path }))
 
-/** Просмотр картинки поверх страницы, без скачивания */
-export function ImageViewer({ url, name, onClose }: { url: string; name: string; onClose: () => void }) {
-  useEffect(() => {
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', k)
-    return () => window.removeEventListener('keydown', k)
-  }, [onClose])
-  return createPortal(
-    <div className="fade fixed inset-0 z-[90] flex items-center justify-center bg-ink/80 p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={name}>
-      <img src={url} alt={name} className="max-h-full max-w-full rounded-2xl" onClick={(e) => e.stopPropagation()} />
-      <IconButton label="Закрыть" onClick={onClose} className="absolute top-4 right-4 bg-surface">
-        <X className="size-[18px]" strokeWidth={1.5} />
-      </IconButton>
-    </div>,
-    document.body,
-  )
-}
-
-export function DocRow({ d, extra, onChanged }: { d: Doc; extra?: ReactNode; onChanged: () => void }) {
+/** gallery - соседние документы списка: в просмотре между ними можно листать */
+export function DocRow({ d, extra, onChanged, gallery }: { d: Doc; extra?: ReactNode; onChanged: () => void; gallery?: Doc[] }) {
   const { isAdmin, personName, profile } = useAuth()
-  const [view, setView] = useState<string | null>(null)
   const canDelete = isAdmin || d.uploaded_by === profile?.id
 
-  async function open() {
+  function open() {
     if (d.external_url) return void window.open(d.external_url, '_blank', 'noopener')
     if (!d.storage_path) return
-    if (isImage(d)) {
-      const u = await signedUrl(d.storage_path)
-      if (u) setView(u)
-    } else {
-      const u = await signedUrl(d.storage_path, d.name)
-      if (u) window.open(u, '_blank', 'noopener')
-    }
+    const list = gallery?.some((g) => g.id === d.id) ? gallery.filter((g) => g.storage_path) : [d]
+    openViewer(viewItems(list), list.findIndex((g) => g.id === d.id))
   }
 
   async function remove() {
@@ -115,7 +85,6 @@ export function DocRow({ d, extra, onChanged }: { d: Doc; extra?: ReactNode; onC
           ...(canDelete ? [{ id: 'delete', label: 'Удалить', danger: true, run: remove }] : []),
         ]}
       />
-      {view && <ImageViewer url={view} name={d.name} onClose={() => setView(null)} />}
     </li>
   )
 }
@@ -252,7 +221,7 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }
         <ul className="mt-2">
           {docs.map((d) => {
             const i = !integrationId && d.integration_id ? choices?.find((x) => x.id === d.integration_id) : undefined
-            return <DocRow key={d.id} d={d} extra={i ? targetLabel(i) : undefined} onChanged={changed} />
+            return <DocRow key={d.id} d={d} extra={i ? targetLabel(i) : undefined} onChanged={changed} gallery={docs} />
           })}
         </ul>
       )}

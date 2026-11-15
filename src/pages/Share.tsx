@@ -8,7 +8,7 @@ import type { AgeSplit, Platform } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Button, Card, Loading, PlatformTag, Skel, cx } from '../components/ui'
 import { AudienceBar } from '../components/bits'
-import { ImageViewer } from '../components/DocumentsPanel'
+import { openViewer, type ViewItem } from '../lib/viewer'
 
 interface Base {
   kind: 'shortlist' | 'report'
@@ -268,7 +268,6 @@ function Shortlist({ d, rows, token, reload, preview }: { d: Data; rows: ShortRo
 
 function Report({ d, rows }: { d: Data; rows: ReportRow[] }) {
   const [urls, setUrls] = useState<Record<string, string>>({})
-  const [view, setView] = useState<{ url: string; name: string } | null>(null)
   const reach = rows.reduce((a, r) => a + (r.fact_reach ?? 0), 0)
   const guarantee = rows.reduce((a, r) => a + (r.guaranteed_reach ?? 0), 0)
   const spent = rows.reduce((a, r) => a + (r.price ?? 0), 0)
@@ -283,6 +282,14 @@ function Report({ d, rows }: { d: Data; rows: ReportRow[] }) {
       setUrls(m)
     })
   }, [rows.length])
+
+  // все скрины отчёта в одном просмотре: листаются подряд
+  const gallery: ViewItem[] = rows.flatMap((r) =>
+    r.shots.flatMap((s) => {
+      const u = s.path ? urls[s.path] : undefined
+      return u && s.path ? [{ url: u, name: `${r.nick}, статистика.${s.path.split('.').pop()?.toLowerCase() ?? 'jpg'}` }] : []
+    }),
+  )
 
   const excel = () =>
     downloadXlsx(
@@ -416,7 +423,13 @@ function Report({ d, rows }: { d: Data; rows: ReportRow[] }) {
                     return (
                       <figure key={`${r.id}${i}`}>
                         {s.path ? (
-                          <button onClick={() => u && setView({ url: u, name: `${r.nick}, статистика` })} className="hatch block aspect-[3/4] w-full overflow-hidden rounded-inner">
+                          <button
+                            onClick={() => {
+                              const at = gallery.findIndex((g) => g.url === u)
+                              if (at >= 0) openViewer(gallery, at)
+                            }}
+                            className="hatch block aspect-[3/4] w-full overflow-hidden rounded-inner"
+                          >
                             {u && <img src={u} alt={`Статистика ${r.nick}`} className="size-full object-cover" />}
                           </button>
                         ) : (
@@ -434,7 +447,6 @@ function Report({ d, rows }: { d: Data; rows: ReportRow[] }) {
           )}
         </>
       )}
-      {view && <ImageViewer url={view.url} name={view.name} onClose={() => setView(null)} />}
     </Frame>
   )
 }

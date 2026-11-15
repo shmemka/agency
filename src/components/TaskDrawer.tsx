@@ -10,6 +10,7 @@ import { toast } from '../lib/toast'
 import { Avatar, Button, Drawer, DrawerClose, IconButton, Select, Spinner, cx } from './ui'
 import { RichEditor } from './RichEditor'
 import { FileMenu, FileThumb, downloadFrom } from './Files'
+import { openViewer } from '../lib/viewer'
 import { RichText } from './RichText'
 import { DateInput } from './DateInput'
 import { confirmDialog, confirmDiscard } from './dialogs'
@@ -17,7 +18,6 @@ import { confirmDialog, confirmDiscard } from './dialogs'
 export const TASK_BUCKET = 'task-files'
 
 const sizeLabel = (n: number | null) => (!n ? '' : n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} КБ` : `${(n / 1024 / 1024).toFixed(1).replace('.', ',')} МБ`)
-const isImage = (f: TaskFile) => f.mime?.startsWith('image/') || /\.(png|jpe?g|webp|gif|heic)$/i.test(f.name)
 
 function storageName(name: string) {
   const dot = name.lastIndexOf('.')
@@ -153,10 +153,12 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
     loadFiles()
   }
 
-  async function open(f: TaskFile) {
-    const { data, error } = await supabase.storage.from(TASK_BUCKET).createSignedUrl(f.storage_path, 3600, isImage(f) ? undefined : { download: f.name })
-    if (error || !data) return toast(`Файл не открылся: ${error?.message ?? 'нет доступа'}`)
-    window.open(data.signedUrl, '_blank', 'noopener')
+  function open(f: TaskFile) {
+    const list = files ?? [f]
+    openViewer(
+      list.map((x) => ({ name: x.name, mime: x.mime, size: x.size, bucket: TASK_BUCKET, path: x.storage_path })),
+      list.findIndex((x) => x.id === f.id),
+    )
   }
 
   async function dropFile(f: TaskFile) {

@@ -9,7 +9,7 @@ import { Avatar, Menu, cx } from './ui'
  * В правом нижнем углу — маленькая аватарка того, кто загрузил.
  */
 
-type Kind = 'image' | 'pdf' | 'word' | 'excel' | 'slides' | 'archive' | 'video' | 'audio' | 'link' | 'other'
+export type Kind = 'image' | 'pdf' | 'word' | 'excel' | 'slides' | 'archive' | 'video' | 'audio' | 'link' | 'other'
 
 export function fileKind(name: string, mime?: string | null, link?: boolean): Kind {
   if (link) return 'link'
@@ -27,7 +27,7 @@ export function fileKind(name: string, mime?: string | null, link?: boolean): Ki
 }
 
 // цвет иконки подсказывает тип ещё до того, как прочитали название: pdf — красный, Word — синий, Excel — зелёный
-const LOOK: Record<Kind, { icon: typeof File; cls: string }> = {
+export const LOOK: Record<Kind, { icon: typeof File; cls: string }> = {
   image: { icon: ImageIcon, cls: 'bg-soft text-muted' },
   pdf: { icon: FileText, cls: 'bg-red-50 text-red-600' },
   word: { icon: FileText, cls: 'bg-blue-50 text-blue-600' },
@@ -48,7 +48,7 @@ const cache = new Map<string, { url: string; until: number }>()
 const queue = new Map<string, Map<string, ((u: string | null) => void)[]>>()
 let timer: number | undefined
 
-function thumbUrl(bucket: string, path: string) {
+export function thumbUrl(bucket: string, path: string) {
   const key = `${bucket}/${path}`
   const hit = cache.get(key)
   if (hit && hit.until > Date.now()) return Promise.resolve(hit.url)

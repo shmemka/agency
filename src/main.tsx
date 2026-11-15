@@ -9,6 +9,7 @@ import { Layout, ShellSkeleton } from './components/Layout'
 import { ToastHost } from './components/ui'
 import { DialogHost } from './components/dialogs'
 import { TooltipHost } from './components/Tooltip'
+import { FileViewerHost } from './components/FileViewer'
 import { Login, NewPassword, NotConfigured, Offline } from './pages/Login'
 import { JoinInvite, Onboarding, WsPending } from './pages/Workspaces'
 import { readInvite, saveInvite } from './lib/invite'
@@ -96,6 +97,7 @@ createRoot(document.getElementById('root')!).render(
         <ToastHost />
         <DialogHost />
         <TooltipHost />
+        <FileViewerHost />
       </BrowserRouter>
     ) : (
       <NotConfigured />

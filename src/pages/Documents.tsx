@@ -65,6 +65,7 @@ export function Documents() {
                 <DocRow
                   key={d.id}
                   d={d}
+                  gallery={rows}
                   extra={
                     b ? (
                       <Link to={`/bloggers/${b.id}`} className="text-ink hover:underline">
