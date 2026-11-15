@@ -3,6 +3,7 @@ import { File, FileArchive, FileAudio, FileSpreadsheet, FileText, FileVideo, Ima
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { Avatar, Menu, cx } from './ui'
+import type { UploadItem } from '../lib/upload'
 
 /*
  * Превью файла в списках: картинка — сама картинка в квадрате, остальное — цветная иконка по типу.
@@ -155,4 +156,33 @@ export async function downloadFrom(bucket: string, path: string, name: string) {
   a.click()
   a.remove()
   return true
+}
+
+const mb = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} КБ` : `${(n / 1024 / 1024).toFixed(1).replace('.', ',')} МБ`)
+
+/** Файл, который сейчас загружается: превью, название и полоска прогресса */
+export function UploadRow({ item, className }: { item: UploadItem; className?: string }) {
+  const look = LOOK[fileKind(item.name, item.mime)]
+  const I = look.icon
+  const p = item.progress
+  const done = p !== null && p >= 1
+  return (
+    <li className={cx('fade flex min-h-14 items-center gap-3', className)}>
+      <span className={cx('relative flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl', look.cls)}>
+        {item.preview ? <img src={item.preview} alt="" className="size-full object-cover opacity-60" /> : <I className="size-5" strokeWidth={1.5} />}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate">{item.name}</div>
+        <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-ink/8">
+          <div
+            className={cx('upload-bar h-full rounded-full transition-[width,background-color] duration-300 ease-out', done ? 'bg-leaf' : 'bg-ink', p !== null && !done && 'is-moving')}
+            style={{ width: `${Math.round((p ?? 0) * 100)}%` }}
+          />
+        </div>
+        <div className="num mt-1 text-xs text-muted">
+          {p === null ? 'В очереди' : done ? 'Загружено' : p >= 0.99 ? 'Сохраняем…' : `${mb(item.size * p)} из ${mb(item.size)} · ${Math.round(p * 100)}%`}
+        </div>
+      </div>
+    </li>
+  )
 }

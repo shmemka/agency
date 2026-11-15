@@ -394,6 +394,19 @@ input[type='search']::-webkit-search-decoration {
 .skel-wrap {
   animation: fade 0.4s ease-out 0.3s both;
 }
+/* полоска загрузки файла: по ней бежит блик, пока файл отправляется */
+.upload-bar {
+  position: relative;
+  overflow: hidden;
+}
+.upload-bar.is-moving::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+  animation: shimmer 1.2s ease-in-out infinite;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .rise,
@@ -408,6 +421,7 @@ input[type='search']::-webkit-search-decoration {
   .grow,
   .stagger > *,
   .skel-wrap,
+  .upload-bar::after,
   .skel::after {
     animation: none !important;
   }

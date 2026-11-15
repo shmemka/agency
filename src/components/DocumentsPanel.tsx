@@ -9,7 +9,8 @@ import type { Doc, DocKind, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Button, Input, Select, Spinner, cx, submitOnEnter } from './ui'
 import { confirmDialog } from './dialogs'
-import { FileMenu, FileThumb, downloadFrom } from './Files'
+import { FileMenu, FileThumb, UploadRow, downloadFrom } from './Files'
+import { uploadFile, useUploads } from '../lib/upload'
 import { openViewer, type ViewItem } from '../lib/viewer'
 
 const BUCKET = 'documents'
@@ -98,7 +99,7 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }
   const [docs, setDocs] = useState<Doc[] | null>(null)
   const [kind, setKind] = useState<DocKind>(campaignId ? 'invoice' : 'contract')
   const [target, setTarget] = useState(integrationId ?? '')
-  const [busy, setBusy] = useState(false)
+  const uploads = useUploads()
   const [hover, setHover] = useState(false)
   const [linkMode, setLinkMode] = useState(false)
   const [link, setLink] = useState({ name: '', url: '' })
@@ -125,27 +126,40 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }
 
   async function upload(files: FileList | File[]) {
     const list = Array.from(files)
+    if (input.current) input.current.value = ''
     if (!list.length) return
-    setBusy(true)
+    // строки с прогрессом появляются сразу, файлы грузятся по очереди
+    const ids = uploads.add(list)
     let ok = 0
-    for (const f of list) {
+    for (const [n, f] of list.entries()) {
+      const id = ids[n]
+      uploads.set(id, 0)
       const path = `${bloggerId ? `bloggers/${bloggerId}` : `campaigns/${campaignId}`}/${safeName(f.name)}`
-      const up = await supabase.storage.from(BUCKET).upload(path, f, { contentType: f.type || undefined })
+      // 99%, пока не создана запись: полоска заполняется до конца, когда файл уже в списке документов
+      const up = await uploadFile(BUCKET, path, f, (part) => uploads.set(id, Math.min(part, 0.99)))
       if (up.error) {
-        toast(`«${f.name}» не загрузился: ${up.error.message}`)
+        toast(`«${f.name}» не загрузился: ${up.error}`)
+        uploads.clear([id])
         continue
       }
       const { error } = await supabase.from('documents').insert({ ...base(), name: f.name, storage_path: path, size: f.size, mime: f.type })
       if (error) {
         toast(`«${f.name}»: ${error.message}`)
+        uploads.clear([id])
         // запись не создалась — убираем файл, чтобы он не висел в хранилище без документа
         await supabase.storage.from(BUCKET).remove([path])
-      } else ok++
+      } else {
+        ok++
+        // полоска на миг заполняется зелёным, и строка сменяется готовым документом
+        uploads.set(id, 1)
+        await load()
+        uploads.clear([id])
+      }
     }
-    setBusy(false)
     if (ok) toast(ok === 1 ? 'Файл загружен' : `Загружено файлов: ${ok}`)
-    if (input.current) input.current.value = ''
-    changed()
+    await load()
+    reload('documents')
+    uploads.clear(ids)
   }
 
   async function addLink() {
@@ -194,7 +208,7 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }
             </Select>
           )}
           <input ref={input} type="file" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.zip" className="hidden" onChange={(e) => e.target.files && upload(e.target.files)} />
-          <Button variant="primary" loading={busy} onClick={() => input.current?.click()}>
+          <Button variant="primary" onClick={() => input.current?.click()}>
             <Upload className="size-4" strokeWidth={1.5} />
             Загрузить
           </Button>
@@ -215,10 +229,13 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }
       </div>
       {docs === null ? (
         <Spinner className="mt-4" />
-      ) : docs.length === 0 ? (
+      ) : docs.length === 0 && uploads.items.length === 0 ? (
         <p className="mt-4 text-muted">Документов пока нет. Перетащите сюда договор, чек или скрин статистики</p>
       ) : (
         <ul className="mt-2">
+          {uploads.items.map((u) => (
+            <UploadRow key={u.id} item={u} className="border-t border-line py-2.5 first:border-0" />
+          ))}
           {docs.map((d) => {
             const i = !integrationId && d.integration_id ? choices?.find((x) => x.id === d.integration_id) : undefined
             return <DocRow key={d.id} d={d} extra={i ? targetLabel(i) : undefined} onChanged={changed} gallery={docs} />

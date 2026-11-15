@@ -9,7 +9,8 @@ import type { Task, TaskComment, TaskFile } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Avatar, Button, Drawer, DrawerClose, IconButton, Select, Spinner, cx } from './ui'
 import { RichEditor } from './RichEditor'
-import { FileMenu, FileThumb, downloadFrom } from './Files'
+import { FileMenu, FileThumb, UploadRow, downloadFrom } from './Files'
+import { uploadFile, useUploads } from '../lib/upload'
 import { openViewer } from '../lib/viewer'
 import { RichText } from './RichText'
 import { DateInput } from './DateInput'
@@ -45,7 +46,7 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
   const [files, setFiles] = useState<TaskFile[] | null>(null)
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
-  const [uploading, setUploading] = useState(0)
+  const uploads = useUploads()
   const [drag, setDrag] = useState(false)
   const picker = useRef<HTMLInputElement>(null)
   const listEnd = useRef<HTMLDivElement>(null)
@@ -129,28 +130,38 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
   }
 
   async function upload(list: FileList | File[]) {
-    const arr = [...list]
+    const arr = [...list].filter((f) => {
+      if (f.size <= 50 * 1024 * 1024) return true
+      toast(`«${f.name}» больше 50 МБ`)
+      return false
+    })
     if (!arr.length) return
-    setUploading((n) => n + arr.length)
-    for (const f of arr) {
-      if (f.size > 50 * 1024 * 1024) {
-        toast(`«${f.name}» больше 50 МБ`)
-        setUploading((n) => n - 1)
+    // строки с прогрессом появляются сразу, файлы грузятся по очереди
+    const ids = uploads.add(arr)
+    for (const [n, f] of arr.entries()) {
+      const id = ids[n]
+      uploads.set(id, 0)
+      const path = `${task.id}/${storageName(f.name)}`
+      const up = await uploadFile(TASK_BUCKET, path, f, (part) => uploads.set(id, Math.min(part, 0.99)))
+      if (up.error) {
+        toast(`«${f.name}» не загрузился: ${/bucket|not found/i.test(up.error) ? 'запустите миграцию 008_task_board.sql' : up.error}`)
+        uploads.clear([id])
         continue
       }
-      const path = `${task.id}/${storageName(f.name)}`
-      const up = await supabase.storage.from(TASK_BUCKET).upload(path, f, { contentType: f.type || undefined })
-      if (up.error) toast(`«${f.name}» не загрузился: ${/bucket|not found/i.test(up.error.message) ? 'запустите миграцию 008_task_board.sql' : up.error.message}`)
-      else {
-        const { error } = await supabase.from('task_files').insert({ task_id: task.id, name: f.name, storage_path: path, size: f.size, mime: f.type || null })
-        if (error) {
-          toast(`«${f.name}»: ${error.message}`)
-          await supabase.storage.from(TASK_BUCKET).remove([path])
-        }
+      const { error } = await supabase.from('task_files').insert({ task_id: task.id, name: f.name, storage_path: path, size: f.size, mime: f.type || null })
+      if (error) {
+        toast(`«${f.name}»: ${error.message}`)
+        uploads.clear([id])
+        await supabase.storage.from(TASK_BUCKET).remove([path])
+      } else {
+        // полоска на миг заполняется зелёным, и строка сменяется готовым файлом
+        uploads.set(id, 1)
+        await loadFiles()
+        uploads.clear([id])
       }
-      setUploading((n) => n - 1)
     }
-    loadFiles()
+    await loadFiles()
+    uploads.clear(ids)
   }
 
   function open(f: TaskFile) {
@@ -302,8 +313,8 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
             <h3 className="text-base">
               Вложения {files && files.length > 0 && <span className="num text-muted">{files.length}</span>}
             </h3>
-            <Button size="sm" onClick={() => picker.current?.click()} loading={uploading > 0}>
-              {uploading === 0 && <Paperclip className="size-3.5" strokeWidth={1.5} />}
+            <Button size="sm" onClick={() => picker.current?.click()}>
+              <Paperclip className="size-3.5" strokeWidth={1.5} />
               Прикрепить
             </Button>
             <input
@@ -319,7 +330,7 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
           </div>
           {files === null ? (
             <Spinner />
-          ) : files.length === 0 ? (
+          ) : files.length === 0 && uploads.items.length === 0 ? (
             <p className="text-muted">Перетащите файлы сюда или нажмите «Прикрепить»</p>
           ) : (
             <ul className="-mx-2">
@@ -346,6 +357,9 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
                     ]}
                   />
                 </li>
+              ))}
+              {uploads.items.map((u) => (
+                <UploadRow key={u.id} item={u} className="rounded-2xl px-2 py-2" />
               ))}
             </ul>
           )}
