@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ChevronDown, ImageUp, TriangleAlert } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useData } from '../lib/data'
@@ -6,9 +7,10 @@ import { useAuth } from '../auth/AuthProvider'
 import { AGE_GROUPS, LEGAL, PLATFORMS, legalInfo, platformInfo } from '../lib/constants'
 import { nickFromUrl, parseNumber, platformFromUrl } from '../lib/format'
 import { removeAvatar, uploadAvatar } from '../lib/avatars'
-import type { Blogger, Integration } from '../lib/types'
+import type { Blogger, Campaign, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Button, Field, FieldGroup, Input, Modal, Select, cx } from './ui'
+import { Avatar, Button, Field, FieldGroup, Input, Modal, Segmented, Select, Toggle, cx } from './ui'
+import { CampaignModal } from './CampaignForm'
 import { RichEditor } from './RichEditor'
 
 export type BloggerDraft = Partial<Blogger>
@@ -95,6 +97,7 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         {collapsible ? (
+          <>
           <Field label="Ссылка на профиль или ник" className="sm:col-span-2">
             <Input
               autoFocus
@@ -119,6 +122,11 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
               </span>
             )}
           </Field>
+          {/* «наш» блогер - подписан в агентство; остальные просто найдены */}
+          <div className="-mt-2 sm:col-span-2">
+            <Toggle checked={!!d.signed} onChange={(v) => set('signed', v)} label="Подписан в агентство" />
+          </div>
+          </>
         ) : (
           <Field label="Ссылка на профиль" className="sm:col-span-2">
             <Input
@@ -285,7 +293,7 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
   )
 }
 
-const EDITABLE = ['nick', 'name', 'platform', 'url', 'topic', 'audience', 'content_type', 'city', 'age', 'avatar_url', 'followers', 'avg_reach', 'clip_views', 'audience_female_pct', 'audience_age', 'price', 'contact', 'email', 'phone', 'legal_status', 'rkn_registered', 'owner_id', 'notes'] as const
+const EDITABLE = ['nick', 'name', 'platform', 'url', 'topic', 'audience', 'content_type', 'city', 'age', 'avatar_url', 'followers', 'avg_reach', 'clip_views', 'audience_female_pct', 'audience_age', 'price', 'contact', 'email', 'phone', 'legal_status', 'rkn_registered', 'owner_id', 'notes', 'signed'] as const
 
 export function cleanBlogger(d: BloggerDraft): BloggerDraft {
   const out: Record<string, unknown> = {}
@@ -340,7 +348,7 @@ export function BloggerFormModal({ open, onClose, onCreated }: { open: boolean; 
     }
     const { data, error } = await supabase.from('bloggers').insert(cleanBlogger(d)).select().single()
     setBusy(false)
-    if (error) return toast(error.code === '23505' ? 'Такой блогер уже есть в базе' : error.message)
+    if (error) return toast(error.code === '23505' ? 'Такой блогер уже есть в базе' : /signed/.test(error.message) ? 'Нужно запустить миграцию 023_signed_bloggers.sql в Supabase' : error.message)
     await reload('bloggers')
     toast('Блогер добавлен')
     onClose()
@@ -390,80 +398,101 @@ export function BloggerFormModal({ open, onClose, onCreated }: { open: boolean; 
 }
 
 /** Новая интеграция: блогер + (необязательно) кампания. Остальное заполняется в панели */
-export function NewIntegrationModal({ open, onClose, bloggerId, onCreated }: { open: boolean; onClose: () => void; bloggerId?: string; onCreated: (i: Integration) => void }) {
-  const { bloggers, campaigns, integrations, blogger, reload } = useData()
-  const [bid, setBid] = useState('')
+/**
+ * Блогер в сделку: в открытую сделку или в новую. Работа с блогером всегда идёт с клиентом.
+ * Сразу в работу - когда с клиентом уже договорились, в подборку - когда клиент выберет сам
+ */
+export function AddToDealModal({ open, onClose, bloggerId, onCreated }: { open: boolean; onClose: () => void; bloggerId: string; onCreated: (i: Integration) => void }) {
+  const { campaigns, integrations, blogger, reload } = useData()
+  const { isAdmin, profile } = useAuth()
+  const nav = useNavigate()
   const [cid, setCid] = useState('')
+  const [mode, setMode] = useState<'work' | 'shortlist'>('work')
   const [busy, setBusy] = useState(false)
+  const [newDeal, setNewDeal] = useState<Partial<Campaign> | null>(null)
+  const deals = campaigns.filter((c) => c.status !== 'done' && c.status !== 'cancelled')
 
   useEffect(() => {
-    if (open) {
-      setBid(bloggerId ?? '')
-      setCid('')
-    }
-  }, [open, bloggerId])
+    if (!open) return
+    setCid('')
+    setMode('work')
+  }, [open])
 
   async function create() {
-    if (!bid) return toast('Выберите блогера')
-    if (cid && integrations.some((i) => i.blogger_id === bid && i.campaign_id === cid)) return toast('Этот блогер уже есть в кампании')
+    if (!cid) return toast('Выберите сделку')
+    if (integrations.some((i) => i.blogger_id === bloggerId && i.campaign_id === cid)) return toast('Этот блогер уже есть в сделке')
     setBusy(true)
     const { data, error } = await supabase
       .from('integrations')
-      .insert({ blogger_id: bid, campaign_id: cid || null, price: blogger(bid)?.price ?? null, status: 'new' })
+      .insert({ blogger_id: bloggerId, campaign_id: cid, price: blogger(bloggerId)?.price ?? null, status: 'new', client_decision: mode === 'work' ? 'approved' : 'none' })
       .select()
       .single()
     setBusy(false)
-    if (error) return toast(error.code === '23505' ? 'Этот блогер уже есть в кампании' : error.message)
+    if (error) return toast(error.code === '23505' ? 'Этот блогер уже есть в сделке' : error.message)
     await reload('integrations')
     onClose()
-    onCreated(data as Integration)
+    if (mode === 'work') onCreated(data as Integration)
+    else toast('Блогер добавлен в подборку сделки')
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Новая интеграция"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Отмена
-          </Button>
-          <Button variant="primary" loading={busy} onClick={create}>
-            Создать интеграцию
-          </Button>
-        </>
-      }
-    >
-      <div className="grid gap-4">
-        {!bloggerId && (
-          <Field label="Блогер">
-            <Select value={bid} onChange={(e) => setBid(e.target.value)}>
-              <option value="">Выберите блогера</option>
-              {[...bloggers]
-                .filter((b) => b.status !== 'blacklist')
-                .sort((a, b) => a.nick.localeCompare(b.nick))
-                .map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.nick}
-                  </option>
-                ))}
-            </Select>
-          </Field>
-        )}
-        <Field label="Кампания" hint={cid ? 'Блогер попадёт в подборку и будет ждать решения клиента' : 'Без клиента блогер сразу идёт в работу'}>
-          <Select value={cid} onChange={(e) => setCid(e.target.value)}>
-            <option value="">Без клиента</option>
-            {campaigns
-              .filter((c) => c.status === 'planning' || c.status === 'active')
-              .map((c) => (
+    <>
+      <Modal
+        open={open && !newDeal}
+        onClose={onClose}
+        title="В сделку"
+        footer={
+          <>
+            <Button variant="ghost" onClick={onClose}>
+              Отмена
+            </Button>
+            <Button variant="primary" loading={busy} onClick={create}>
+              Добавить
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4">
+          <Field label="Сделка" hint={deals.length ? undefined : 'Открытых сделок нет - создайте новую'}>
+            <Select
+              value={cid}
+              onChange={(e) => {
+                if (e.target.value === 'new') return setNewDeal({ owner_id: profile?.id ?? null })
+                setCid(e.target.value)
+              }}
+            >
+              <option value="" disabled>
+                Выберите сделку
+              </option>
+              {deals.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
-          </Select>
-        </Field>
-      </div>
-    </Modal>
+              {isAdmin && <option value="new">+ Новая сделка</option>}
+            </Select>
+          </Field>
+          <Field as="div" label="Как добавить" hint={mode === 'work' ? 'С клиентом уже договорились: блогер встанет на доску' : 'Клиент увидит блогера в подборке по ссылке и решит сам'}>
+            <Segmented
+              value={mode}
+              onChange={setMode}
+              options={[
+                { id: 'work', label: 'Сразу в работу' },
+                { id: 'shortlist', label: 'В подборку' },
+              ]}
+            />
+          </Field>
+        </div>
+      </Modal>
+      <CampaignModal
+        value={newDeal}
+        bloggerIds={[bloggerId]}
+        onClose={() => setNewDeal(null)}
+        onSaved={(id) => {
+          onClose()
+          nav(`/work/${id}?tab=work`)
+        }}
+      />
+    </>
   )
 }

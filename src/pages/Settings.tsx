@@ -595,8 +595,8 @@ function BrandSection() {
             </div>
           </div>
           <div className="min-w-0 flex-1 rounded-[20px] bg-surface p-4">
-            <div className="text-xs text-muted">Кампания</div>
-            <div className="truncate text-[15px]">Весенний запуск</div>
+            <div className="text-xs text-muted">Сделка</div>
+            <div className="truncate text-[15px]">Чай Утро, ноябрь</div>
             <div className="mt-4 flex h-1.5 overflow-hidden rounded-full bg-ink/6">
               <span className="bar-lime w-[62%] rounded-full" />
             </div>
@@ -773,9 +773,9 @@ function MoneyCard({ s }: { s: SettingsRow }) {
   return (
     <Card>
       <div onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')}>
-        <Group title="Кампании">
+        <Group title="Сделки">
           <div className="grid gap-4 sm:grid-cols-2">
-            {num('default_markup_pct', 'Наценка по умолчанию', '%', 'Подставляется в новые кампании')}
+            {num('default_markup_pct', 'Наценка по умолчанию', '%', 'Подставляется в новые сделки')}
             {num('ord_deadline_days', 'Срок сдачи статистики в ОРД', 'дн.', 'Считается от конца месяца первого показа')}
           </div>
         </Group>
@@ -887,7 +887,7 @@ function DeleteRow() {
   // что пропадёт - числами, чтобы было понятно, о каком объёме речь
   const lost = [
     count(d.bloggers.length, 'блогер', 'блогера', 'блогеров'),
-    count(d.campaigns.length, 'кампания', 'кампании', 'кампаний'),
+    count(d.campaigns.length, 'сделка', 'сделки', 'сделок'),
     count(d.integrations.length, 'интеграция', 'интеграции', 'интеграций'),
     count(d.tasks.length, 'задача', 'задачи', 'задач'),
     count(d.docs.length, 'документ', 'документа', 'документов'),

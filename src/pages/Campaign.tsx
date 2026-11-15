@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { CalendarDays, ChevronLeft, Download, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { CalendarDays, Download, Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -8,11 +8,11 @@ import { AGE_GROUPS, DECISIONS, PLATFORMS, campaignStatusLabel, platformLabel } 
 import { addToCampaign, removeStoredFiles } from '../lib/actions'
 import { commission, isLive } from '../lib/rules'
 import { count, cpm, dateRange, downloadXlsx, money, parseNumber, plural } from '../lib/format'
-import type { Blogger, Campaign, Decision, Income, Integration } from '../lib/types'
+import type { Blogger, Campaign, Client, Decision, Income, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Card, Chip, Empty, Field, IconButton, Input, Loading, Menu, Modal, PageHeader, Progress, Segmented, Select, Skel, SkelTable, StatusBadge, Table, Toggle, cx, submitOnEnter } from '../components/ui'
+import { Button, Card, Chip, Empty, Field, IconButton, Input, Loading, Menu, Modal, Progress, Segmented, Select, Skel, SkelTable, StatusBadge, Table, Toggle, cx, submitOnEnter } from '../components/ui'
 import { AudienceBar, BloggerName, useIntegrationPanel } from '../components/bits'
-import { CampaignModal, ShareBox } from '../components/CampaignForm'
+import { CampaignModal, ClientModal, ShareBox } from '../components/CampaignForm'
 import { DocumentsPanel } from '../components/DocumentsPanel'
 import { confirmDialog } from '../components/dialogs'
 import { IntegrationBoard } from '../components/IntegrationBoard'
@@ -20,13 +20,14 @@ import { IntegrationBoard } from '../components/IntegrationBoard'
 type Tab = 'shortlist' | 'work' | 'docs' | 'report' | 'money'
 const ORDER: Record<Decision, number> = { pending: 0, none: 1, approved: 2, rejected: 3 }
 
-export function CampaignPage() {
-  const { id = '' } = useParams()
+/** Сделка на экране «Работа»: шапка с клиентом и вкладки - подборка, работа, документы, отчёт, деньги */
+export function DealView({ id }: { id: string }) {
   const { campaign, clients, integrations, tasks, docs, loading, reload } = useData()
   const { isAdmin, personName, profile } = useAuth()
   const nav = useNavigate()
   const [sp, setSp] = useSearchParams()
   const [edit, setEdit] = useState<Partial<Campaign> | null>(null)
+  const [editClient, setEditClient] = useState<Partial<Client> | null>(null)
   const c = campaign(id)
   const rows = useMemo(() => integrations.filter((i) => i.campaign_id === id), [integrations, id])
   const approved = rows.filter((i) => i.client_decision === 'approved' && i.status !== 'declined')
@@ -53,25 +54,25 @@ export function CampaignPage() {
         <SkelTable rows={6} cols={[3, 1.4, 1, 1, 1]} />
       </Loading>
     ) : (
-      <Empty title="Кампания не найдена">Возможно, её удалили или у вас нет к ней доступа</Empty>
+      <Empty title="Сделка не найдена">Возможно, её удалили или у вас нет к ней доступа</Empty>
     )
   const canEdit = isAdmin || c.owner_id === profile?.id
 
   async function remove() {
-    // кандидаты из подборки без кампании никому не нужны: удаляем их, а одобренные интеграции оставляем
+    // кандидаты из подборки без сделки никому не нужны: удаляем их, а одобренные интеграции оставляем
     const drafts = rows.filter((i) => i.client_decision !== 'approved')
     const kept = rows.length - drafts.length
-    // вместе с кампанией база удаляет её документы, задачи и ссылки для клиента - говорим об этом заранее
+    // вместе со сделкой база удаляет её документы, задачи и ссылки для клиента - говорим об этом заранее
     const draftIds = new Set(drafts.map((i) => i.id))
     const docCount = docs.filter((d) => d.campaign_id === c!.id).length
     const taskCount = tasks.filter((t) => t.campaign_id === c!.id || (t.integration_id && draftIds.has(t.integration_id))).length
     const items = [
       drafts.length ? `Кандидаты из подборки: ${drafts.length}` : '',
-      docCount ? `Документы кампании: ${docCount}` : '',
-      taskCount ? `Задачи по кампании: ${taskCount}` : '',
+      docCount ? `Документы сделки: ${docCount}` : '',
+      taskCount ? `Задачи по сделке: ${taskCount}` : '',
     ].filter(Boolean)
-    const body = [items.length ? 'Удалятся навсегда' : 'В кампании нет блогеров, документов и задач', kept ? `Одобренные интеграции останутся у блогеров, но без кампании: ${kept}` : ''].filter(Boolean).join('. ')
-    if (!(await confirmDialog({ title: `Удалить кампанию «${c!.name}»?`, body, items, ok: 'Удалить', danger: true }))) return
+    const body = [items.length ? 'Удалятся навсегда' : 'В сделке нет блогеров, документов и задач', kept ? `Интеграции в работе останутся у блогеров, но без сделки: ${kept}` : ''].filter(Boolean).join('. ')
+    if (!(await confirmDialog({ title: `Удалить сделку «${c!.name}»?`, body, items, ok: 'Удалить', danger: true }))) return
     const fileErr = await removeStoredFiles({ campaignId: c!.id, integrationIds: [...draftIds] })
     if (fileErr) return toast(fileErr)
     if (drafts.length) {
@@ -81,51 +82,55 @@ export function CampaignPage() {
     const { error } = await supabase.from('campaigns').delete().eq('id', c!.id)
     if (error) return toast(error.message)
     await reload('campaigns', 'integrations', 'documents', 'tasks')
-    nav('/campaigns')
+    nav('/work')
   }
 
+  const client = clients.find((x) => x.id === c.client_id)
   return (
     <>
-      <Link to="/campaigns" className="mb-2 inline-flex items-center gap-1 text-[13px] text-muted hover:text-ink">
-        <ChevronLeft className="size-4" strokeWidth={1.5} />
-        Кампании
-      </Link>
-      <PageHeader
-        title={c.name}
-        sub={
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          {/* отдельного экрана клиентов нет: клиента правят прямо из сделки */}
+          {client && isAdmin ? (
+            <button type="button" onClick={() => setEditClient(client)} className="text-[13px] text-muted transition-colors duration-150 hover:text-ink">
+              {client.name}
+            </button>
+          ) : (
+            <div className="text-[13px] text-muted">{client?.name ?? 'Клиент не указан'}</div>
+          )}
+          <h2 className="mt-0.5 text-2xl leading-8">{c.name}</h2>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
             <Chip tone={c.status === 'active' ? 'dark' : undefined}>{campaignStatusLabel(c.status)}</Chip>
-            <span>{clients.find((x) => x.id === c.client_id)?.name ?? 'Клиент не указан'}</span>
             {(c.start_date || c.end_date) && <span className="num">{dateRange(c.start_date, c.end_date)}</span>}
             {c.owner_id && <span>ведёт {personName(c.owner_id).split(' ')[0]}</span>}
-          </span>
-        }
-        actions={
-          <>
-            <Link to={`/calendar?campaign=${c.id}`} className="inline-flex h-10 items-center gap-2 rounded-full bg-surface px-4 text-sm font-medium hover:bg-white/70">
-              <CalendarDays className="size-4" strokeWidth={1.5} />
-              Календарь
-            </Link>
-            {canEdit && (
-              <Button onClick={() => setEdit(c)}>
-                <Pencil className="size-4" strokeWidth={1.5} />
-                Изменить
-              </Button>
-            )}
-            {isAdmin && (
-              <IconButton label="Удалить кампанию" onClick={remove} className="bg-surface hover:text-bad">
-                <Trash2 className="size-[18px]" strokeWidth={1.5} />
-              </IconButton>
-            )}
-          </>
-        }
-      />
+          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* на телефоне - только иконки: шапка сделки не должна занимать пол-экрана */}
+          <Link to={`/calendar?campaign=${c.id}`} aria-label="Календарь" title="Календарь" className="inline-flex h-10 items-center gap-2 rounded-full bg-surface px-4 text-sm font-medium transition-colors duration-150 hover:bg-white/70 max-sm:w-10 max-sm:justify-center max-sm:px-0">
+            <CalendarDays className="size-4" strokeWidth={1.5} />
+            <span className="max-sm:hidden">Календарь</span>
+          </Link>
+          {canEdit && (
+            <Button onClick={() => setEdit(c)} aria-label="Изменить сделку" className="max-sm:w-10 max-sm:px-0">
+              <Pencil className="size-4" strokeWidth={1.5} />
+              <span className="max-sm:hidden">Изменить</span>
+            </Button>
+          )}
+          {isAdmin && (
+            <IconButton label="Удалить сделку" onClick={remove} className="bg-surface hover:text-bad">
+              <Trash2 className="size-[18px]" strokeWidth={1.5} />
+            </IconButton>
+          )}
+        </div>
+      </div>
       <Segmented<Tab>
         className="mb-4"
         value={tab}
         onChange={setTab}
         options={[
-          { id: 'shortlist', label: `Подборка ${rows.length || ''}` },
+          // в подборке считаем тех, о ком клиент ещё не решил: взятых сразу в работу здесь не ждут
+          { id: 'shortlist', label: `Подборка ${rows.filter((i) => i.client_decision === 'none' || i.client_decision === 'pending').length || ''}` },
           { id: 'work', label: `В работе ${approved.length || ''}` },
           { id: 'docs', label: 'Документы' },
           { id: 'report', label: 'Отчёт' },
@@ -133,7 +138,7 @@ export function CampaignPage() {
         ]}
       />
       {tab === 'shortlist' && <Shortlist c={c} rows={rows} />}
-      {tab === 'work' && <Work rows={approved} />}
+      {tab === 'work' && <Work c={c} rows={approved} />}
       {tab === 'docs' && (
         <Card className="max-w-3xl">
           <DocumentsPanel campaignId={c.id} />
@@ -142,6 +147,7 @@ export function CampaignPage() {
       {tab === 'report' && <Report c={c} rows={approved} />}
       {tab === 'money' && isAdmin && <Money c={c} rows={approved} />}
       <CampaignModal value={edit} onClose={() => setEdit(null)} />
+      <ClientModal value={editClient} onClose={() => setEditClient(null)} />
     </>
   )
 }
@@ -312,7 +318,7 @@ function Shortlist({ c, rows }: { c: Campaign; rows: Integration[] }) {
               ['Сумма для клиента', money(sum(chosen, 'price_client'))],
               ['Охват одобренных', count(reach(chosen))],
               ['Средний CPM', chosen.length && reach(chosen) ? money(cpm(sum(chosen, 'price_client'), reach(chosen))) : '—'],
-              ...(isAdmin ? [['Блогерам', money(sum(chosen, 'price'))], ['Наша комиссия', money(commission(chosen))], ['Наценка кампании', `${c.markup_pct}\u00a0%`]] : []),
+              ...(isAdmin ? [['Блогерам', money(sum(chosen, 'price'))], ['Наша комиссия', money(commission(chosen))], ['Наценка сделки', `${c.markup_pct}\u00a0%`]] : []),
             ].map(([k, v]) => (
               <div key={k}>
                 <div className="text-[13px] text-muted">{k}</div>
@@ -359,7 +365,11 @@ function DecisionMenu({ i }: { i: Integration }) {
   )
 }
 
-function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => void; campaignId: string }) {
+/**
+ * Выбор блогеров для сделки. Сразу в работу - когда с клиентом уже договорились (например, о своём блогере).
+ * В подборку - когда клиент выбирает сам по ссылке
+ */
+function Picker({ open, onClose, campaignId, direct }: { open: boolean; onClose: () => void; campaignId: string; direct?: boolean }) {
   const { bloggers, integrations, reload } = useData()
   const [q, setQ] = useState('')
   const [platform, setPlatform] = useState('')
@@ -369,10 +379,14 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
   const [minReach, setMinReach] = useState('')
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
+  const [mode, setMode] = useState<'work' | 'shortlist'>(direct ? 'work' : 'shortlist')
+  const [mine, setMine] = useState(false)
 
   useEffect(() => {
-    if (open) setPicked(new Set())
-  }, [open])
+    if (!open) return
+    setPicked(new Set())
+    setMode(direct ? 'work' : 'shortlist')
+  }, [open, direct])
 
   const list = useMemo(() => {
     const have = new Set(integrations.filter((i) => i.campaign_id === campaignId).map((i) => i.blogger_id))
@@ -383,6 +397,7 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
     return bloggers
       .filter((b) => {
         if (have.has(b.id) || b.status === 'blacklist') return false
+        if (mine && !b.signed) return false
         if (platform && b.platform !== platform) return false
         if (n && ![b.nick, b.name, b.topic, b.content_type].join(' ').toLowerCase().includes(n)) return false
         if (female === 'f' && !((b.audience_female_pct ?? 0) >= 60)) return false
@@ -393,15 +408,15 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
         return true
       })
       .sort((a, z) => (z.avg_reach ?? 0) - (a.avg_reach ?? 0))
-  }, [bloggers, integrations, campaignId, q, platform, female, age, maxPrice, minReach])
+  }, [bloggers, integrations, campaignId, q, platform, female, age, maxPrice, minReach, mine])
 
   async function add() {
     setBusy(true)
-    const { added, error } = await addToCampaign(campaignId, bloggers.filter((b) => picked.has(b.id)), integrations)
+    const { added, error } = await addToCampaign(campaignId, bloggers.filter((b) => picked.has(b.id)), integrations, mode === 'work' ? 'approved' : 'none')
     setBusy(false)
     if (error) return toast(error)
     await reload('integrations')
-    toast(`В подборку добавлено: ${added}`)
+    toast(mode === 'work' ? `В работу добавлено: ${added}` : `В подборку добавлено: ${added}`)
     onClose()
   }
 
@@ -410,7 +425,7 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
       open={open}
       onClose={onClose}
       wide
-      title="Добавить блогеров в подборку"
+      title="Добавить блогеров"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
@@ -422,6 +437,16 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
         </>
       }
     >
+      <Segmented
+        className="mb-1"
+        value={mode}
+        onChange={setMode}
+        options={[
+          { id: 'work', label: 'Сразу в работу' },
+          { id: 'shortlist', label: 'В подборку для клиента' },
+        ]}
+      />
+      <p className="mb-4 text-[13px] text-muted">{mode === 'work' ? 'С клиентом уже договорились: блогеры встанут на доску и пойдут по этапам' : 'Клиент выберет сам по ссылке, кого берёт'}</p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         <div className="relative col-span-2 sm:col-span-1">
           <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-faint" strokeWidth={1.5} />
@@ -451,8 +476,11 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
         <Input inputMode="numeric" placeholder="Цена до, ₽" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} aria-label="Цена до" />
         <Input inputMode="numeric" placeholder="Охват от" value={minReach} onChange={(e) => setMinReach(e.target.value)} aria-label="Охват от" />
       </div>
-      <div className="mt-3 flex items-center justify-between text-[13px] text-muted">
-        <span>Подходит: {list.length}</span>
+      <div className="mt-3 flex items-center justify-between gap-3 text-[13px] text-muted">
+        <span className="flex items-center gap-4">
+          Подходит: {list.length}
+          <Toggle checked={mine} onChange={setMine} label="Только наши" />
+        </span>
         <button className="hover:text-ink" onClick={() => setPicked(new Set(picked.size === list.length ? [] : list.map((b) => b.id)))}>
           {picked.size === list.length && list.length ? 'Снять выбор' : `Выбрать всех: ${list.length}`}
         </button>
@@ -492,10 +520,40 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
   )
 }
 
-/** Одобренные клиентом блогеры идут по этапам на доске - той же, что на экране «Выходы» */
-function Work({ rows }: { rows: Integration[] }) {
-  if (!rows.length) return <Empty title="Клиент пока никого не одобрил">Одобренные в подборке блогеры появятся здесь и пойдут по этапам: от переговоров до выхода</Empty>
-  return <IntegrationBoard rows={rows} />
+/** Блогеры, с которыми договорились, идут по этапам на доске - той же, что на экране «Работа» во вкладке «Все» */
+function Work({ c, rows }: { c: Campaign; rows: Integration[] }) {
+  const { isAdmin, profile } = useAuth()
+  const [sp, setSp] = useSearchParams()
+  // новая сделка открывается сразу с выбором блогеров
+  const [picking, setPicking] = useState(() => sp.get('pick') === '1')
+  useEffect(() => {
+    if (!sp.has('pick')) return
+    const p = new URLSearchParams(sp)
+    p.delete('pick')
+    setSp(p, { replace: true })
+  }, [sp, setSp])
+  const canAdd = isAdmin || c.owner_id === profile?.id
+  const add = (
+    <Button variant="primary" onClick={() => setPicking(true)}>
+      <Plus className="size-4" strokeWidth={1.5} />
+      Добавить блогеров
+    </Button>
+  )
+  return (
+    <>
+      {!rows.length ? (
+        <Empty title="В работе пока никого" action={canAdd && add}>
+          Добавьте блогеров, о которых договорились с клиентом, или отправьте клиенту подборку во вкладке «Подборка»
+        </Empty>
+      ) : (
+        <>
+          {canAdd && <div className="mb-3">{add}</div>}
+          <IntegrationBoard rows={rows} />
+        </>
+      )}
+      <Picker open={picking} onClose={() => setPicking(false)} campaignId={c.id} direct />
+    </>
+  )
 }
 
 function Report({ c, rows }: { c: Campaign; rows: Integration[] }) {

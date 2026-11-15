@@ -103,11 +103,11 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
             <div className="min-w-0 flex-1">
               <div className="mb-1 text-[13px] text-muted">
                 {c ? (
-                  <Link to={`/campaigns/${c.id}`} className="hover:underline">
+                  <Link to={`/work/${c.id}`} className="hover:underline">
                     {c.name}
                   </Link>
                 ) : (
-                  'Без клиента'
+                  'Без сделки'
                 )}
                 {c && i.client_decision !== 'approved' && <span>, клиент: {DECISIONS[i.client_decision].toLowerCase()}</span>}
               </div>
@@ -199,7 +199,7 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
         {tab === 'terms' && (
           <Card className="pb-20">
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Кампания">
+              <Field label="Сделка">
                 <Select
                   value={v.campaign_id ?? ''}
                   onChange={(e) =>
@@ -207,7 +207,9 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
                     setD((x) => ({ ...x, campaign_id: e.target.value || null, ...(e.target.value && !i.campaign_id ? { client_decision: 'approved' as Decision } : {}) }))
                   }
                 >
-                  <option value="">Без клиента</option>
+                  <option value="" disabled>
+                    Выберите сделку
+                  </option>
                   {campaigns.filter((x) => x.status === 'planning' || x.status === 'active' || x.id === i.campaign_id).map((x) => (
                     <option key={x.id} value={x.id}>
                       {x.name}

@@ -1,6 +1,6 @@
 import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import './index.css'
 import { isConfigured } from './lib/supabase'
 import { AuthProvider, useAuth } from './auth/AuthProvider'
@@ -16,9 +16,7 @@ import { JoinInvite, Onboarding, WsPending } from './pages/Workspaces'
 import { readInvite, saveInvite } from './lib/invite'
 import { Dashboard } from './pages/Dashboard'
 import { Bloggers } from './pages/Bloggers'
-import { Integrations } from './pages/Integrations'
-import { Campaigns } from './pages/Campaigns'
-import { CampaignPage } from './pages/Campaign'
+import { Work } from './pages/Work'
 import { Tasks } from './pages/Tasks'
 import { Calendar } from './pages/Calendar'
 import { Documents } from './pages/Documents'
@@ -37,6 +35,22 @@ function JoinRoute() {
   // до перехода: главная сразу прочитает приглашение
   if (t) saveInvite(t)
   return <Navigate to="/" replace />
+}
+
+/** Старые адреса «Кампании» и «Выходы» ведут на «Работу»: закладки и ссылки из уведомлений не ломаются */
+function OldDeal() {
+  const { id } = useParams()
+  const loc = useLocation()
+  return <Navigate to={`/work/${id}${loc.search}`} replace />
+}
+function OldOutputs() {
+  const [p] = useSearchParams()
+  const c = p.get('campaign')
+  p.delete('campaign')
+  if (c && c !== 'none') return <Navigate to={`/work/${c}`} replace />
+  if (c === 'none') p.set('deal', 'none')
+  const q = p.toString()
+  return <Navigate to={`/work${q ? `?${q}` : ''}`} replace />
 }
 
 function Gate() {
@@ -61,9 +75,11 @@ function Gate() {
           <Route index element={<Dashboard />} />
           <Route path="bloggers" element={<Bloggers />} />
           <Route path="bloggers/:id" element={<Bloggers />} />
-          <Route path="integrations" element={<Integrations />} />
-          <Route path="campaigns" element={<Campaigns />} />
-          <Route path="campaigns/:id" element={<CampaignPage />} />
+          <Route path="work" element={<Work />} />
+          <Route path="work/:id" element={<Work />} />
+          <Route path="integrations" element={<OldOutputs />} />
+          <Route path="campaigns" element={<Navigate to="/work" replace />} />
+          <Route path="campaigns/:id" element={<OldDeal />} />
           <Route path="tasks" element={<Tasks />} />
           <Route path="tasks/:id" element={<Tasks />} />
           <Route path="calendar" element={<Calendar />} />

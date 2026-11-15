@@ -32,7 +32,7 @@ export function Team() {
 
   async function close() {
     if (!closing) return
-    // передаём всё, что вёл человек: блогеров, интеграции, кампании и открытые задачи. Без наследника — снимаем ответственного
+    // передаём всё, что вёл человек: блогеров, интеграции, сделки и открытые задачи. Без наследника — снимаем ответственного
     const to = heir || null
     const res = await Promise.all([
       supabase.from('bloggers').update({ owner_id: to }).eq('owner_id', closing.id),
@@ -51,7 +51,7 @@ export function Team() {
 
   return (
     <>
-      <PageHeader title="Команда" sub={isAdmin ? 'Учредители видят всё. Специалисты видят своих блогеров и свои кампании' : 'Вы видите своих блогеров и кампании, в которые вас добавили'} actions={isAdmin && <InviteButton />} />
+      <PageHeader title="Команда" sub={isAdmin ? 'Учредители видят всё. Специалисты видят своих блогеров и свои сделки' : 'Вы видите своих блогеров и сделки, в которые вас добавили'} actions={isAdmin && <InviteButton />} />
 
       {isAdmin && pending.length > 0 && (
         <Card className="mb-3">
@@ -232,7 +232,7 @@ export function Team() {
       >
         <p className="mb-4 text-muted">Человек больше не войдёт в кабинет. Его данные останутся</p>
         {closing && (
-          <Field label={`Кому передать блогеров (${count(closing.id)}), интеграции, кампании и открытые задачи`}>
+          <Field label={`Кому передать блогеров (${count(closing.id)}), интеграции, сделки и открытые задачи`}>
             <Select value={heir} onChange={(e) => setHeir(e.target.value)}>
               <option value="">Оставить без ответственного (видны только учредителям)</option>
               {active

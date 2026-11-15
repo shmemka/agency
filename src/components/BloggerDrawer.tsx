@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ArrowUpRight, MessageCircle, Plus, Trash2 } from 'lucide-react'
+import { ArrowUpRight, Check, MessageCircle, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -8,16 +8,41 @@ import { isActive } from '../lib/rules'
 import { count, cpm, date, money } from '../lib/format'
 import type { Blogger } from '../lib/types'
 import { toast } from '../lib/toast'
-import { BloggerStatusSelect, Button, Card, Chip, Drawer, DrawerClose, IconButton, Segmented, SkelDrawer, StatusBadge, StatusRail } from './ui'
+import { BloggerStatusSelect, Button, Card, Chip, Drawer, DrawerClose, IconButton, Segmented, SkelDrawer, StatusBadge, StatusRail, cx } from './ui'
+import { NO_DEAL } from './IntegrationBoard'
 import { RichText } from './RichText'
 import { AudienceBar, BloggerName, TaskList, statsStale, useIntegrationPanel } from './bits'
-import { BloggerFields, NewIntegrationModal, cleanBlogger, type BloggerDraft } from './BloggerForm'
+import { AddToDealModal, BloggerFields, cleanBlogger, type BloggerDraft } from './BloggerForm'
 import { DocumentsPanel } from './DocumentsPanel'
 import { Feed } from './Feed'
 import { tgUsername } from '../lib/contact'
 import { confirmDialog, confirmDiscard, promptDialog } from './dialogs'
 
 type Tab = 'work' | 'data' | 'docs'
+
+/** «Наш» - блогер подписан в агентство. Переключается одним нажатием, сохраняется сразу */
+function SignedChip({ b }: { b: Blogger }) {
+  const { patchBlogger } = useData()
+  const [busy, setBusy] = useState(false)
+  return (
+    <button
+      type="button"
+      aria-pressed={!!b.signed}
+      disabled={busy}
+      title={b.signed ? 'Блогер подписан в агентство. Нажмите, чтобы снять отметку' : 'Отметить, что блогер подписан в агентство'}
+      onClick={async () => {
+        setBusy(true)
+        const err = await patchBlogger(b.id, { signed: !b.signed })
+        setBusy(false)
+        if (err) toast(/signed|schema cache/i.test(err) ? 'Нужно запустить миграцию 023_signed_bloggers.sql в Supabase' : err)
+      }}
+      className={cx('inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition-colors duration-150', b.signed ? 'bg-ink text-white' : 'bg-soft text-muted hover:text-ink')}
+    >
+      {b.signed ? <Check className="size-3.5" strokeWidth={2} /> : <Plus className="size-3.5" strokeWidth={1.5} />}
+      {b.signed ? 'Наш блогер' : 'Наш'}
+    </button>
+  )
+}
 
 export function useBloggerStatus() {
   const { patchBlogger } = useData()
@@ -106,6 +131,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <BloggerStatusSelect value={b.status} onChange={(s) => setStatus(b, s)} />
+            <SignedChip b={b} />
             <Chip>{legalInfo(b.legal_status).label}</Chip>
             {(b.followers ?? 0) >= 10_000 && <Chip tone={b.rkn_registered ? undefined : 'warn'}>{b.rkn_registered ? 'В перечне РКН' : 'РКН не отмечен'}</Chip>}
             {statsStale(b) && <Chip tone="warn">Статистика старше 60 дней</Chip>}
@@ -142,21 +168,21 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
           <>
             <Card>
               <div className="mb-3 flex items-center justify-between gap-2">
-                <h3 className="text-base">Кампании</h3>
+                <h3 className="text-base">Сделки</h3>
                 <Button size="sm" variant="primary" disabled={b.status === 'blacklist'} onClick={() => setAdding(true)}>
                   <Plus className="size-4" strokeWidth={1.5} />
-                  В кампанию
+                  В сделку
                 </Button>
               </div>
               {active.length === 0 ? (
-                <p className="text-muted">{b.status === 'blacklist' ? 'Блогер в чёрном списке, новые интеграции закрыты' : 'Блогер сейчас не в работе. Добавьте его в подборку кампании или возьмите в работу без клиента'}</p>
+                <p className="text-muted">{b.status === 'blacklist' ? 'Блогер в чёрном списке, новые интеграции закрыты' : 'Блогер сейчас не в работе. Добавьте его в сделку с клиентом'}</p>
               ) : (
                 <div className="space-y-3">
                   {active.map((i) => (
                     <div key={i.id} className="rounded-inner bg-soft p-4">
                       <button onClick={() => open(i.id)} className="mb-3 flex w-full items-center gap-2 text-left">
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate">{campaign(i.campaign_id)?.name ?? 'Без клиента'}</span>
+                          <span className="block truncate">{campaign(i.campaign_id)?.name ?? NO_DEAL}</span>
                           <span className="num block text-xs text-muted">
                             {i.publish_date ? `выход ${date(i.publish_date)}, ` : ''}
                             {money(i.price)}
@@ -177,7 +203,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
                     <li key={i.id}>
                       <button onClick={() => open(i.id)} className="flex min-h-11 w-full items-center gap-3 border-t border-line py-2 text-left hover:bg-soft">
                         <span className="num w-20 shrink-0 text-muted">{date(i.publish_date)}</span>
-                        <span className="min-w-0 flex-1 truncate">{campaign(i.campaign_id)?.name ?? 'Без клиента'}</span>
+                        <span className="min-w-0 flex-1 truncate">{campaign(i.campaign_id)?.name ?? NO_DEAL}</span>
                         <span className="num hidden sm:inline">{money(i.price)}</span>
                         {i.campaign_id && i.client_decision !== 'approved' ? <Chip>В подборке</Chip> : <StatusBadge status={i.status} />}
                       </button>
@@ -220,7 +246,7 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
           </Card>
         )}
       </div>
-      <NewIntegrationModal open={adding} onClose={() => setAdding(false)} bloggerId={b.id} onCreated={(i) => open(i.id)} />
+      <AddToDealModal open={adding} onClose={() => setAdding(false)} bloggerId={b.id} onCreated={(i) => open(i.id)} />
     </Drawer>
   )
 }

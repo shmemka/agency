@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, CalendarDays, ChevronDown, Clapperboard, Ellipsis, Plus, FileText, LayoutGrid, ListTodo, LogOut, Megaphone, Settings, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
+import { Bell, CalendarDays, ChevronDown, Ellipsis, Plus, FileText, LayoutGrid, Handshake, ListTodo, LogOut, Settings, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -20,9 +20,8 @@ import { isSettings, useSettingsBackground } from '../lib/settingsNav'
 const NAV = [
   { to: '/', label: 'Обзор', icon: LayoutGrid, end: true, phone: true },
   { to: '/bloggers', label: 'Блогеры', icon: Users, phone: true },
-  // кампании - главный рабочий экран, «Выходы» - все интеграции всех кампаний на одной доске
-  { to: '/campaigns', label: 'Кампании', icon: Megaphone, phone: true },
-  { to: '/integrations', label: 'Выходы', icon: Clapperboard },
+  // «Работа» - сделки с клиентами и доска интеграций по этапам
+  { to: '/work', label: 'Работа', icon: Handshake, phone: true },
   { to: '/tasks', label: 'Задачи', icon: ListTodo, phone: true },
   { to: '/calendar', label: 'Календарь', icon: CalendarDays },
   { to: '/documents', label: 'Документы', icon: FileText },
@@ -57,7 +56,7 @@ export function Mark({ src }: { src?: string | null }) {
 async function newWorkspace(create: (name: string) => Promise<string | null>) {
   const name = await promptDialog({
     title: 'Новый кабинет',
-    body: 'Отдельное агентство со своими блогерами, кампаниями и командой. Вы будете в нём учредителем',
+    body: 'Отдельное агентство со своими блогерами, сделками и командой. Вы будете в нём учредителем',
     label: 'Название агентства',
     ok: 'Создать',
     required: true,

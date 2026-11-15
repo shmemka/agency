@@ -93,8 +93,8 @@ export function Calendar() {
 
   const filters = (
     <>
-        <Select value={cid} onChange={(e) => set('campaign', e.target.value)} aria-label="Кампания" tone="surface" className="w-56">
-          <option value="">Все кампании</option>
+        <Select value={cid} onChange={(e) => set('campaign', e.target.value)} aria-label="Сделка" tone="surface" className="w-56">
+          <option value="">Все сделки</option>
           {campaigns.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}

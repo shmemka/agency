@@ -41,14 +41,14 @@ export function Dashboard() {
 
   return (
     <>
-      <PageHeader title={new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, (c) => c.toUpperCase())} sub={isAdmin ? 'Все блогеры и кампании агентства' : 'Ваши блогеры и кампании'} />
+      <PageHeader title={new Date().toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' }).replace(/^./, (c) => c.toUpperCase())} sub={isAdmin ? 'Все блогеры и сделки агентства' : 'Ваши блогеры и сделки'} />
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
         <Card className="rise lg:col-span-2">
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="text-base">В работе сейчас</h2>
-            <Link to="/integrations" className="text-[13px] text-muted hover:text-ink">
-              Все выходы
+            <Link to="/work" className="text-[13px] text-muted hover:text-ink">
+              Открыть доску
             </Link>
           </div>
           {loading ? (
@@ -63,7 +63,7 @@ export function Dashboard() {
             {flow.map((p, idx) => {
               const n = byPhase(p.id).length
               return (
-                <Link key={p.id} to={`/integrations?phase=${p.id}`} className="group min-w-12 sm:min-w-24" style={{ flex: `${Math.max(n / total, 0.08)} 1 0` }}>
+                <Link key={p.id} to={`/work?phase=${p.id}`} className="group min-w-12 sm:min-w-24" style={{ flex: `${Math.max(n / total, 0.08)} 1 0` }}>
                   {loading ? (
                     <Skel className="h-10 w-full" />
                   ) : (
@@ -96,14 +96,14 @@ export function Dashboard() {
           </Card>
           {isAdmin ? (
             <Card>
-              <div className="text-[13px] text-muted">Комиссия по текущим кампаниям</div>
+              <div className="text-[13px] text-muted">Комиссия по текущим сделкам</div>
               {loading ? (
                 <Big />
               ) : (
                 <div className="appear">
                   <div className="num mt-1 text-[28px] leading-8">{money(commission)}</div>
                   <div className="mt-1 text-xs text-muted">
-                    {running.length} {plural(running.length, 'кампания', 'кампании', 'кампаний')}, по одобренным интеграциям
+                    {running.length} {plural(running.length, 'сделка', 'сделки', 'сделок')}, по одобренным интеграциям
                   </div>
                 </div>
               )}
@@ -196,7 +196,7 @@ export function Dashboard() {
           <div className="mb-2 flex items-baseline justify-between gap-3">
             <h2 className="min-w-0 text-base">Сдать статистику в ОРД</h2>
             {ord.length > 0 && (
-              <Link to="/integrations?tab=ord" className="inline-flex shrink-0 items-center gap-1 text-[13px] whitespace-nowrap text-muted hover:text-ink">
+              <Link to="/work?tab=ord" className="inline-flex shrink-0 items-center gap-1 text-[13px] whitespace-nowrap text-muted hover:text-ink">
                 Отметить <span className="max-sm:hidden">сданные</span> <ArrowUpRight className="size-3.5" strokeWidth={1.5} />
               </Link>
             )}

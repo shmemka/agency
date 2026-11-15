@@ -77,7 +77,7 @@ function PlanModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           <span className="rounded-full bg-surface px-2.5 py-1 text-xs text-muted">сейчас</span>
         </div>
         <ul className="mt-3 space-y-1.5 text-[13px] text-muted">
-          {['Все разделы: блогеры, кампании, задачи, финансы', 'Команда без ограничений', 'Страницы и отчёты для клиентов'].map((t) => (
+          {['Все разделы: блогеры, сделки, задачи, финансы', 'Команда без ограничений', 'Страницы и отчёты для клиентов'].map((t) => (
             <li key={t} className="flex gap-2">
               <Check className="mt-0.5 size-4 shrink-0 text-leaf" strokeWidth={2} />
               {t}

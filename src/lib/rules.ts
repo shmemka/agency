@@ -109,7 +109,7 @@ export function attention(opts: {
   }
   if (isAdmin) {
     for (const c of campaigns) {
-      if (c.status === 'active' && !c.prepaid) out.push({ key: `p${c.id}`, text: `Кампания «${c.name}» идёт без предоплаты`, link: `/campaigns/${c.id}`, tone: 'bad' })
+      if (c.status === 'active' && !c.prepaid) out.push({ key: `p${c.id}`, text: `Сделка «${c.name}» идёт без предоплаты`, link: `/work/${c.id}`, tone: 'bad' })
     }
   }
   return out

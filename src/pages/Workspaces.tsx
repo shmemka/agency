@@ -49,7 +49,7 @@ export function Onboarding() {
       <div key={step} className="rise flex w-full flex-col items-center">
         {step === 'choose' && (
           <>
-            <ArtTitle title="Привет! С чего начнём?" sub="Кабинет - это пространство агентства: блогеры, кампании, задачи и команда" />
+            <ArtTitle title="Привет! С чего начнём?" sub="Кабинет - это пространство агентства: блогеры, сделки, задачи и команда" />
             <div className="mt-8 flex w-full max-w-sm flex-col gap-3 md:mt-10 md:w-auto md:max-w-none md:flex-row md:gap-4">
               <Choice icon={<Plus className="size-5" strokeWidth={1.5} />} onClick={() => setStep('create')}>
                 Создать свой кабинет

@@ -11,17 +11,25 @@ import { CopyLink } from './bits'
 import { confirmDialog } from './dialogs'
 import { DateInput } from './DateInput'
 
-export function CampaignModal({ value, onClose, onSaved }: { value: Partial<Campaign> | null; onClose: () => void; onSaved?: (id: string) => void }) {
-  const { clients, members, settings, reload } = useData()
-  const { team } = useAuth()
+/** Название сделки, если его не ввели: «Клиент, месяц» */
+const autoName = (client?: string) => [client, new Date().toLocaleDateString('ru-RU', { month: 'long' })].filter(Boolean).join(', ')
+
+/**
+ * Новая сделка или её настройки. Клиент обязателен: работа с блогером всегда идёт с клиентом.
+ * bloggerIds - блогеры, с которыми уже договорились: попадут в сделку сразу в работу
+ */
+export function CampaignModal({ value, onClose, onSaved, bloggerIds }: { value: Partial<Campaign> | null; onClose: () => void; onSaved?: (id: string) => void; bloggerIds?: string[] }) {
+  const { clients, members, settings, blogger, reload } = useData()
+  const { team, profile } = useAuth()
   const [d, setD] = useState<Partial<Campaign>>({})
   const [crew, setCrew] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
+  const [newClient, setNewClient] = useState<Partial<Client> | null>(null)
   const people = team.filter((t) => t.is_active)
 
   useEffect(() => {
     if (!value) return
-    setD(value.id ? value : { status: 'planning', markup_pct: settings?.default_markup_pct ?? 20, ...value })
+    setD(value.id ? value : { status: 'planning', markup_pct: settings?.default_markup_pct ?? 20, owner_id: profile?.id ?? null, ...value })
     setCrew(new Set(members.filter((m) => m.campaign_id === value.id).map((m) => m.profile_id)))
   }, [value])
   // «На паузе», «Завершена» и «Отменена» автоматика не меняет, остальное база считает сама по интеграциям
@@ -29,9 +37,10 @@ export function CampaignModal({ value, onClose, onSaved }: { value: Partial<Camp
   const set = <K extends keyof Campaign>(k: K, v: Campaign[K] | null) => setD((x) => ({ ...x, [k]: v }))
 
   async function save() {
-    if (!d.name?.trim()) return toast('Назовите кампанию')
+    if (!d.client_id) return toast('Выберите клиента')
+    const clientName = clients.find((c) => c.id === d.client_id)?.name
     setBusy(true)
-    const payload = { name: d.name.trim(), client_id: d.client_id ?? null, status: d.status, start_date: d.start_date ?? null, end_date: d.end_date ?? null, owner_id: d.owner_id ?? null, brief: d.brief?.trim() || null, markup_pct: d.markup_pct ?? 20 }
+    const payload = { name: d.name?.trim() || autoName(clientName), client_id: d.client_id ?? null, status: d.status, start_date: d.start_date ?? null, end_date: d.end_date ?? null, owner_id: d.owner_id ?? null, brief: d.brief?.trim() || null, markup_pct: d.markup_pct ?? 20 }
     const res = d.id ? await supabase.from('campaigns').update(payload).eq('id', d.id).select().single() : await supabase.from('campaigns').insert(payload).select().single()
     if (res.error) {
       setBusy(false)
@@ -43,10 +52,16 @@ export function CampaignModal({ value, onClose, onSaved }: { value: Partial<Camp
     const drop = [...before].filter((p) => !crew.has(p))
     const r1 = add.length ? await supabase.from('campaign_members').insert(add) : { error: null }
     const r2 = drop.length ? await supabase.from('campaign_members').delete().eq('campaign_id', id).in('profile_id', drop) : { error: null }
-    if (r1.error || r2.error) toast(`Кампания сохранена, но команда не обновилась: ${(r1.error ?? r2.error)!.message}`)
+    if (r1.error || r2.error) toast(`Сделка сохранена, но команда не обновилась: ${(r1.error ?? r2.error)!.message}`)
+    // блогер, с которым уже договорились, сразу встаёт в работу
+    if (!d.id && bloggerIds?.length) {
+      const rows = bloggerIds.map((b) => ({ blogger_id: b, campaign_id: id, price: blogger(b)?.price ?? null, status: 'new', client_decision: 'approved' }))
+      const r3 = await supabase.from('integrations').insert(rows)
+      if (r3.error) toast(`Сделка создана, но блогер не добавился: ${r3.error.message}`)
+    }
     await reload('campaigns', 'campaign_members', 'integrations')
     setBusy(false)
-    toast(d.id ? 'Кампания сохранена' : 'Кампания создана')
+    toast(d.id ? 'Сделка сохранена' : 'Сделка создана')
     onClose()
     onSaved?.(id)
   }
@@ -56,40 +71,57 @@ export function CampaignModal({ value, onClose, onSaved }: { value: Partial<Camp
       open={!!value}
       onClose={onClose}
       wide
-      title={d.id ? 'Кампания' : 'Новая кампания'}
+      title={d.id ? 'Сделка' : 'Новая сделка'}
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
             Отмена
           </Button>
           <Button variant="primary" loading={busy} onClick={save}>
-            {d.id ? 'Сохранить' : 'Создать кампанию'}
+            {d.id ? 'Сохранить' : 'Создать сделку'}
           </Button>
         </>
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Название" className="sm:col-span-2">
-          <Input value={d.name ?? ''} onChange={(e) => set('name', e.target.value)} placeholder="Онлайн-школа, запуск курса ЕГЭ" />
-        </Field>
-        <Field label="Клиент">
-          <Select value={d.client_id ?? ''} onChange={(e) => set('client_id', e.target.value || null)}>
-            <option value="">Не указан</option>
+        <Field label="Клиент" className="sm:col-span-2">
+          <Select
+            value={d.client_id ?? ''}
+            onChange={(e) => {
+              if (e.target.value === 'new') return setNewClient({})
+              set('client_id', e.target.value || null)
+            }}
+          >
+            <option value="" disabled>
+              Выберите клиента
+            </option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
+            <option value="new">+ Новый клиент</option>
           </Select>
         </Field>
+        {bloggerIds?.length ? (
+          <div className="rounded-inner bg-soft p-4 text-[13px] text-muted sm:col-span-2">
+            Сразу в работу: <span className="text-ink">{bloggerIds.map((b) => blogger(b)?.nick).filter(Boolean).join(', ')}</span>
+          </div>
+        ) : null}
+        <Field label="Название" hint="Можно не заполнять: подставится клиент и месяц" className="sm:col-span-2">
+          <Input value={d.name ?? ''} onChange={(e) => set('name', e.target.value)} placeholder={autoName(clients.find((c) => c.id === d.client_id)?.name ?? 'Клиент')} />
+        </Field>
+        {/* статус новой сделки ставится сам; вручную - только пауза, завершение и отмена */}
+        {d.id && (
         <Field label="Статус" hint={manual ? undefined : 'Идёт после первого «Берём» клиента, завершается, когда все интеграции закрыты'}>
-          <Select value={manual ? d.status! : 'auto'} onChange={(e) => set('status', (e.target.value === 'auto' ? 'planning' : e.target.value) as Campaign['status'])}>
-            <option value="auto">{d.id && !manual && value?.status ? `Автоматически: ${campaignStatusLabel(value.status).toLowerCase()}` : 'Автоматически'}</option>
-            <option value="paused">На паузе</option>
-            <option value="done">Завершена</option>
-            <option value="cancelled">Отменена</option>
-          </Select>
-        </Field>
+            <Select value={manual ? d.status! : 'auto'} onChange={(e) => set('status', (e.target.value === 'auto' ? 'planning' : e.target.value) as Campaign['status'])}>
+              <option value="auto">{d.id && !manual && value?.status ? `Автоматически: ${campaignStatusLabel(value.status).toLowerCase()}` : 'Автоматически'}</option>
+              <option value="paused">На паузе</option>
+              <option value="done">Завершена</option>
+              <option value="cancelled">Отменена</option>
+            </Select>
+          </Field>
+        )}
         <Field label="Начало">
           <DateInput value={d.start_date} onChange={(v) => set('start_date', v)} aria-label="Начало" />
         </Field>
@@ -110,7 +142,7 @@ export function CampaignModal({ value, onClose, onSaved }: { value: Partial<Camp
           <Input inputMode="numeric" className="num" value={d.markup_pct ?? ''} onChange={(e) => set('markup_pct', Number(e.target.value.replace(',', '.')) || 0)} />
         </Field>
         <div className="sm:col-span-2">
-          <div className="mb-1 text-[13px] text-muted">Кто ещё работает над кампанией</div>
+          <div className="mb-1 text-[13px] text-muted">Кто ещё работает над сделкой</div>
           <div className="flex flex-wrap gap-1.5">
             {people
               .filter((t) => t.id !== d.owner_id && t.role !== 'admin')
@@ -135,18 +167,19 @@ export function CampaignModal({ value, onClose, onSaved }: { value: Partial<Camp
                   </button>
                 )
               })}
-            {people.filter((t) => t.id !== d.owner_id && t.role !== 'admin').length === 0 && <span className="text-muted">Учредители видят все кампании. Специалистов можно добавить, когда они появятся в команде</span>}
+            {people.filter((t) => t.id !== d.owner_id && t.role !== 'admin').length === 0 && <span className="text-muted">Учредители видят все сделки. Специалистов можно добавить, когда они появятся в команде</span>}
           </div>
         </div>
         <Field as="div" label="Бриф" className="sm:col-span-2">
           <RichEditor value={d.brief} onChange={(v) => set('brief', v)} placeholder="Продукт, аудитория, ключевые сообщения, ограничения" label="Бриф" className="min-h-24" />
         </Field>
       </div>
+      <ClientModal value={newClient} onClose={() => setNewClient(null)} onSaved={(id) => set('client_id', id)} />
     </Modal>
   )
 }
 
-export function ClientModal({ value, onClose }: { value: Partial<Client> | null; onClose: () => void }) {
+export function ClientModal({ value, onClose, onSaved }: { value: Partial<Client> | null; onClose: () => void; onSaved?: (id: string) => void }) {
   const { reload } = useData()
   const [d, setD] = useState<Partial<Client>>({})
   const [busy, setBusy] = useState(false)
@@ -159,10 +192,11 @@ export function ClientModal({ value, onClose }: { value: Partial<Client> | null;
     if (!d.name?.trim()) return toast('Укажите название компании')
     setBusy(true)
     const payload = { name: d.name.trim(), contact_name: d.contact_name || null, contact: d.contact || null, inn: d.inn || null, niche: d.niche || null, notes: d.notes || null }
-    const res = d.id ? await supabase.from('clients').update(payload).eq('id', d.id) : await supabase.from('clients').insert(payload)
+    const res = d.id ? await supabase.from('clients').update(payload).eq('id', d.id).select('id').single() : await supabase.from('clients').insert(payload).select('id').single()
     setBusy(false)
     if (res.error) return toast(res.error.message)
     await reload('clients')
+    onSaved?.((res.data as { id: string }).id)
     toast(d.id ? 'Клиент сохранён' : 'Клиент добавлен')
     onClose()
   }

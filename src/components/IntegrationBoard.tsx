@@ -6,8 +6,8 @@ import type { Integration } from '../lib/types'
 import { cx } from './ui'
 import { useIntegrationPanel } from './bits'
 
-/** Подпись кампании на карточке: интеграция без кампании - это работа «без клиента» */
-export const NO_CLIENT = 'Без клиента'
+/** Подпись на карточке для интеграций, заведённых раньше без сделки. Новые без сделки не создаются */
+export const NO_DEAL = 'Без сделки'
 
 const byDate = (a: Integration, b: Integration) => (a.publish_date ?? '9999').localeCompare(b.publish_date ?? '9999') || STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
 
@@ -15,7 +15,7 @@ const byDate = (a: Integration, b: Integration) => (a.publish_date ?? '9999').lo
  * Доска интеграций по этапам: Поиск → Переговоры → Документы → Оплата → Выход.
  * Карточку можно перетащить в другой этап (встанет на первый шаг этапа) или открыть и выбрать точный шаг.
  * На телефоне этапы листаются вбок, шаг меняется в карточке интеграции.
- * Та же доска - во вкладке кампании и на экране «Выходы», где на карточке видно и кампанию
+ * Та же доска - во вкладке сделки и на экране «Работа» во вкладке «Все», где на карточке видно и сделку
  */
 export function IntegrationBoard({ rows, showCampaign }: { rows: Integration[]; showCampaign?: boolean }) {
   const { blogger, campaign, moveIntegration } = useData()
@@ -34,7 +34,7 @@ export function IntegrationBoard({ rows, showCampaign }: { rows: Integration[]; 
     if (first) moveIntegration(i, first.id)
   }
 
-  const where = (i: Integration) => (i.campaign_id ? (campaign(i.campaign_id)?.name ?? '') : NO_CLIENT)
+  const where = (i: Integration) => (i.campaign_id ? (campaign(i.campaign_id)?.name ?? '') : NO_DEAL)
 
   return (
     <>

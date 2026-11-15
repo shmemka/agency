@@ -902,6 +902,7 @@ export function submitOnEnter(e: React.KeyboardEvent, scope: HTMLElement | null,
 
 export function Modal({ open, onClose, title, children, footer, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const footerRef = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLDivElement>(null)
   // пока окно уходит, показываем его последнее содержимое: данные формы к этому времени уже сброшены
   const { mounted, leaving } = usePresence(open, 220)
   useScrollLock(open)
@@ -911,7 +912,13 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
   const v = open ? { title, children, footer } : last.current
   useEffect(() => {
     if (!open) return
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const k = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      // окно поверх окна (новый клиент внутри новой сделки): Esc закрывает только верхнее
+      const all = document.querySelectorAll('[role="dialog"][aria-modal="true"], [role="alertdialog"]')
+      if (all.length && all[all.length - 1] !== box.current) return
+      onClose()
+    }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
   }, [open, onClose])
@@ -923,6 +930,7 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
       onMouseDown={leaving ? undefined : onClose}
     >
       <div
+        ref={box}
         role="dialog"
         aria-modal={leaving ? undefined : 'true'}
         aria-label={v.title}

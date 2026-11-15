@@ -186,13 +186,13 @@ export function Finance() {
         actions={
           <>
             {tab === 'incomes' && (
-              <Button onClick={() => downloadXlsx('Поступления', incomes.map((i) => ({ Дата: i.paid_on, Сумма: i.amount, Клиент: clients.find((c) => c.id === i.client_id)?.name, Кампания: campaign(i.campaign_id)?.name, Получил: personName(i.receiver_id), Плательщик: i.payer_type === 'org' ? 'Организация или ИП' : 'Физлицо', Налог: Math.round(i.amount * rate(i)), Чек: i.has_receipt ? 'да' : 'нет', Заметка: i.note })))}>
+              <Button onClick={() => downloadXlsx('Поступления', incomes.map((i) => ({ Дата: i.paid_on, Сумма: i.amount, Клиент: clients.find((c) => c.id === i.client_id)?.name, Сделка: campaign(i.campaign_id)?.name, Получил: personName(i.receiver_id), Плательщик: i.payer_type === 'org' ? 'Организация или ИП' : 'Физлицо', Налог: Math.round(i.amount * rate(i)), Чек: i.has_receipt ? 'да' : 'нет', Заметка: i.note })))}>
                 <Download className="size-4" strokeWidth={1.5} />
                 Excel
               </Button>
             )}
             {tab === 'payouts' && (
-              <Button onClick={() => downloadXlsx('Выплаты блогерам', payoutRows.map(({ i, receipt }) => ({ Выход: i.publish_date, Блогер: blogger(i.blogger_id)?.nick, Кампания: campaign(i.campaign_id)?.name, Сумма: i.price, Оплачено: i.status === 'waiting_payment' ? 'нет' : 'да', Чек: receipt ? 'да' : 'нет' })))}>
+              <Button onClick={() => downloadXlsx('Выплаты блогерам', payoutRows.map(({ i, receipt }) => ({ Выход: i.publish_date, Блогер: blogger(i.blogger_id)?.nick, Сделка: campaign(i.campaign_id)?.name, Сумма: i.price, Оплачено: i.status === 'waiting_payment' ? 'нет' : 'да', Чек: receipt ? 'да' : 'нет' })))}>
                 <Download className="size-4" strokeWidth={1.5} />
                 Excel
               </Button>
@@ -275,7 +275,7 @@ export function Finance() {
               </ul>
             </Card>
             <Card>
-              <h2 className="text-base">Комиссия по кампаниям</h2>
+              <h2 className="text-base">Комиссия по сделкам</h2>
               <p className="mt-1 text-[13px] text-muted">Наценка по одобренным интеграциям и сколько из неё уже получено</p>
               {busy ? (
                 <SkelList rows={2} className="mt-3" />
@@ -313,7 +313,7 @@ export function Finance() {
               <tr>
                 <th>Дата</th>
                 <th className="text-right">Сумма</th>
-                <th>Клиент и кампания</th>
+                <th>Клиент и сделка</th>
                 <th>Получил</th>
                 <th>Плательщик</th>
                 <th className="text-right">Налог</th>
@@ -359,7 +359,7 @@ export function Finance() {
                 <tr>
                   <th>Выход</th>
                   <th>Блогер</th>
-                  <th>Кампания</th>
+                  <th>Сделка</th>
                   <th className="text-right">Сумма</th>
                   <th>Этап</th>
                   <th>Чек или акт</th>
@@ -470,7 +470,7 @@ function IncomeModal({ value, onClose, onSaved, founders }: { value: Partial<Inc
         <Field label="Дата">
           <DateInput clearable={false} value={d.paid_on} onChange={(v) => v && set('paid_on', v)} aria-label="Дата" />
         </Field>
-        <Field label="Кампания">
+        <Field label="Сделка">
           <Select
             value={d.campaign_id ?? ''}
             onChange={(e) => {
@@ -478,7 +478,7 @@ function IncomeModal({ value, onClose, onSaved, founders }: { value: Partial<Inc
               setD((x) => ({ ...x, campaign_id: e.target.value || null, client_id: c?.client_id ?? x.client_id }))
             }}
           >
-            <option value="">Без кампании</option>
+            <option value="">Без сделки</option>
             {campaigns.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}

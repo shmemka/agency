@@ -1,17 +1,20 @@
 import { supabase } from './supabase'
-import type { Blogger, Integration } from './types'
+import type { Blogger, Decision, Integration } from './types'
 
-/** Кладёт блогеров в подборку кампании. Чёрный список и уже добавленных пропускает */
-export async function addToCampaign(campaignId: string, bloggers: Blogger[], integrations: Integration[]) {
+/**
+ * Добавляет блогеров в сделку: в подборку для клиента (decision 'none') или сразу в работу ('approved').
+ * Чёрный список и уже добавленных пропускает
+ */
+export async function addToCampaign(campaignId: string, bloggers: Blogger[], integrations: Integration[], decision: Decision = 'none') {
   const have = new Set(integrations.filter((i) => i.campaign_id === campaignId).map((i) => i.blogger_id))
-  const rows = bloggers.filter((b) => b.status !== 'blacklist' && !have.has(b.id)).map((b) => ({ blogger_id: b.id, campaign_id: campaignId, price: b.price, status: 'new' }))
+  const rows = bloggers.filter((b) => b.status !== 'blacklist' && !have.has(b.id)).map((b) => ({ blogger_id: b.id, campaign_id: campaignId, price: b.price, status: 'new', client_decision: decision }))
   if (!rows.length) return { added: 0, error: null as string | null }
   const { error } = await supabase.from('integrations').insert(rows)
   return { added: error ? 0 : rows.length, error: error?.message ?? null }
 }
 
 /**
- * Перед удалением кампании или интеграции убирает их файлы из хранилища: документы кампании и вложения задач.
+ * Перед удалением сделки или интеграции убирает их файлы из хранилища: документы кампании и вложения задач.
  * Записи о файлах база удалит каскадом, а сами файлы остались бы навсегда - хранилище разрешает удалить файл,
  * только пока есть запись о нём
  */

@@ -10,12 +10,15 @@ import { count, cpm, money, plural } from '../lib/format'
 import type { Blogger } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Avatar, BloggerStatusBadge, BloggerStatusSelect, Button, Empty, Filters, Input, Menu, PageHeader, Select, Skel, SkelTable, Table, cx, useEntrance } from '../components/ui'
-import { NO_CLIENT } from '../components/IntegrationBoard'
+import { NO_DEAL } from '../components/IntegrationBoard'
 import { confirmDialog, promptDialog } from '../components/dialogs'
 import { AudienceBar, BloggerName, statsStale } from '../components/bits'
 import { BloggerDrawer, useBloggerStatus } from '../components/BloggerDrawer'
 import { BloggerFormModal } from '../components/BloggerForm'
 import { ImportModal } from '../components/ImportModal'
+
+/** вкладка «Наши» в адресе: ?list=ours */
+const OURS = 'ours'
 
 type SortKey = 'nick' | 'followers' | 'avg_reach' | 'price' | 'cpm' | 'updated_at'
 
@@ -72,7 +75,9 @@ export function Bloggers() {
     return m
   }, [listItems])
   const current = lists.find((l) => l.id === list)
-  const inList = useMemo(() => (current ? base.filter((b) => members.get(current.id)?.has(b.id)) : base), [base, current, members])
+  // «Наши» - подписанные в агентство; встроенная вкладка рядом с «Все»
+  const ours = list === OURS
+  const inList = useMemo(() => (current ? base.filter((b) => members.get(current.id)?.has(b.id)) : ours ? base.filter((b) => b.signed) : base), [base, current, members, ours])
   const byStatus = (b: Blogger, st: string) => (st === 'active' ? activeBy.has(b.id) : st === 'stale' ? statsStale(b) : b.status === st)
 
   const rows = useMemo(() => {
@@ -93,8 +98,8 @@ export function Bloggers() {
 
   // список удалили (или ссылка старая) — убираем его из адреса, чтобы не путал
   useEffect(() => {
-    if (!loading && list && !current) set('list', null)
-  }, [loading, list, current])
+    if (!loading && list && !current && !ours) set('list', null)
+  }, [loading, list, current, ours])
 
   const open = (b: Blogger) => nav({ pathname: `/bloggers/${b.id}`, search: params.toString() })
   // Shift+клик по галочке выделяет всех между прошлой отмеченной и этой
@@ -206,7 +211,7 @@ export function Bloggers() {
   const work = (b: Blogger) => {
     const list = busyBy.get(b.id)
     if (!list) return <span className="text-faint">—</span>
-    const names = [...new Set(list.map((i) => (i.campaign_id ? (campaign(i.campaign_id)?.name ?? '') : NO_CLIENT)))]
+    const names = [...new Set(list.map((i) => (i.campaign_id ? (campaign(i.campaign_id)?.name ?? '') : NO_DEAL)))]
     return (
       <span className="flex min-w-0 items-center gap-1.5" title={names.join(', ')}>
         <span className="truncate">{names[0]}</span>
@@ -292,19 +297,19 @@ export function Bloggers() {
       {/* вкладки: «Все» и списки, которые создают учредители */}
       <div className="mb-4 flex items-center gap-2">
         <div role="tablist" aria-label="Списки блогеров" className="no-scrollbar inline-flex max-w-full gap-1 overflow-x-auto overscroll-x-contain rounded-full bg-surface p-1">
-          {[{ id: '', name: 'Все', n: base.length }, ...lists.map((l) => ({ id: l.id, name: l.name, n: base.filter((b) => members.get(l.id)?.has(b.id)).length }))].map((t) => (
+          {[{ id: '', name: 'Все', n: base.length }, { id: OURS, name: 'Наши', n: base.filter((b) => b.signed).length }, ...lists.map((l) => ({ id: l.id, name: l.name, n: base.filter((b) => members.get(l.id)?.has(b.id)).length }))].map((t) => (
             <button
               key={t.id || 'all'}
               role="tab"
-              aria-selected={list === t.id || (!current && !t.id)}
+              aria-selected={list === t.id || (!list && !t.id)}
               onClick={() => {
                 set('list', t.id || null)
                 setPicked(new Set())
               }}
-              className={cx('inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] whitespace-nowrap transition-colors duration-150', list === t.id || (!current && !t.id) ? 'bg-ink text-white' : 'text-muted hover:text-ink')}
+              className={cx('inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] whitespace-nowrap transition-colors duration-150', list === t.id || (!list && !t.id) ? 'bg-ink text-white' : 'text-muted hover:text-ink')}
             >
               {t.name}
-              {!loading && <span className={cx('appear num', list === t.id || (!current && !t.id) ? 'text-white/60' : 'text-faint')}>{t.n}</span>}
+              {!loading && <span className={cx('appear num', list === t.id || (!list && !t.id) ? 'text-white/60' : 'text-faint')}>{t.n}</span>}
             </button>
           ))}
           {isAdmin && (
@@ -359,6 +364,8 @@ export function Bloggers() {
         </Empty>
       ) : current && !members.get(current.id)?.size ? (
         <Empty title={`В списке «${current.name}» пока никого`}>Откройте вкладку «Все», отметьте блогеров галочками и выберите «В список…» внизу экрана</Empty>
+      ) : ours && !bloggers.some((b) => b.signed) ? (
+        <Empty title="Своих блогеров пока не отметили">Откройте карточку блогера и нажмите «Наш» рядом со статусом, если он подписан в агентство</Empty>
       ) : rows.length === 0 ? (
         <Empty title="Никого не нашли">Измените поиск или фильтры</Empty>
       ) : (
@@ -372,7 +379,7 @@ export function Bloggers() {
                   <th className="w-10" />
                   <Th k="nick">Блогер</Th>
                   <th>Статус</th>
-                  <th>В кампаниях</th>
+                  <th>В сделках</th>
                   <Th k="followers" right>
                     Подписчики
                   </Th>

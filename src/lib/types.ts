@@ -58,6 +58,8 @@ export interface Blogger {
   legal_status: LegalStatus
   rkn_registered: boolean | null
   status: BloggerStatus
+  /** подписан в агентство - «наш» блогер (миграция 023). До миграции поля нет */
+  signed?: boolean
   blacklist_reason: string | null
   owner_id: string | null
   tags: string[]

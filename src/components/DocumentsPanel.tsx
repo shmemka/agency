@@ -175,7 +175,7 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }
     changed()
   }
 
-  const targetLabel = (i: Integration) => `${date(i.publish_date) === '—' ? 'без даты' : date(i.publish_date)}, ${campaign(i.campaign_id)?.name ?? 'без кампании'}`
+  const targetLabel = (i: Integration) => `${date(i.publish_date) === '—' ? 'без даты' : date(i.publish_date)}, ${campaign(i.campaign_id)?.name ?? 'без сделки'}`
 
   return (
     <div>

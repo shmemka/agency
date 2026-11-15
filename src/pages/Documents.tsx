@@ -35,7 +35,7 @@ export function Documents() {
 
   return (
     <>
-      <PageHeader title="Документы" sub="Договоры, акты, чеки и скрины со всех карточек. Загружают их в интеграции, карточке блогера или кампании" />
+      <PageHeader title="Документы" sub="Договоры, акты, чеки и скрины со всех карточек. Загружают их в интеграции, карточке блогера или сделки" />
       <div className="mb-4 flex gap-2 md:flex-wrap">
         <div className="relative min-w-0 flex-1 md:min-w-52 md:max-w-xs">
           <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-faint" strokeWidth={1.5} />
