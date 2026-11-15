@@ -1049,9 +1049,11 @@ export function ToastHost() {
   const { mounted, leaving } = usePresence(open, 220)
   if (!mounted || !msg) return null
   return createPortal(
-    <div role="status" className="fixed bottom-24 left-1/2 z-[80] max-w-[90vw] -translate-x-1/2 md:bottom-6">
-      {/* новое сообщение заново въезжает, даже если старое ещё на экране */}
-      <div key={msg.n} className={cx('rise rounded-full bg-ink px-5 py-3 text-sm text-white shadow-[0_8px_24px_rgba(21,23,28,0.18)]', leaving && 'leaving')}>
+    // w-max: ширина по тексту, но не шире экрана. Иначе у left-1/2 остаётся половина экрана и длинный текст сжимается в столбик
+    <div role="status" className="fixed bottom-24 left-1/2 z-[80] w-max max-w-[min(calc(100vw-32px),420px)] -translate-x-1/2 md:bottom-6">
+      {/* новое сообщение заново въезжает, даже если старое ещё на экране.
+          Скругление 22px: одна строка - капсула, несколько - аккуратная плашка, а не круг */}
+      <div key={msg.n} className={cx('rise rounded-[22px] bg-ink px-5 py-3 text-sm leading-snug text-white shadow-[0_8px_24px_rgba(21,23,28,0.18)]', leaving && 'leaving')}>
         {msg.text}
       </div>
     </div>,
