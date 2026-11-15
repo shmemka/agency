@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import type { Task, TaskSection } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Card, Loading, Menu, PageHeader, Segmented, Skel, Toggle, cx, useEntrance, useIsPhone } from '../components/ui'
+import { Avatar, Card, Loading, Menu, PageHeader, Segmented, Skel, Toggle, cx, useEntrance } from '../components/ui'
 import { TaskList } from '../components/bits'
 import { TaskDrawer } from '../components/TaskDrawer'
 import { confirmDialog } from '../components/dialogs'
@@ -218,9 +218,6 @@ function TaskCard({ t, counts, dragging, onOpen, onToggle, onPatch, onDragStart,
 export function Tasks() {
   const { tasks, sections, reload, loading } = useData()
   const entering = useEntrance(!loading)
-  // на телефоне доска не помещается: колонки — вкладками, видна одна, во всю ширину
-  const phone = useIsPhone()
-  const [mcol, setMcol] = useState<string | null>(null)
   const { profile, isAdmin } = useAuth()
   const { id } = useParams()
   const navigate = useNavigate()
@@ -477,25 +474,10 @@ export function Tasks() {
         </div>
       ) : (
         <>
-        {phone && (
-          <Segmented
-            className="mb-3 w-full"
-            value={(sections.find((x) => x.id === mcol) ?? sections[0]).id}
-            onChange={setMcol}
-            options={sections.map((x) => ({
-              id: x.id,
-              label: (
-                <>
-                  {x.name}
-                  <span className="num opacity-60">{byCol(x.id).length}</span>
-                </>
-              ),
-            }))}
-          />
-        )}
-        <div className="appear -mx-4 overflow-x-auto px-4 pb-4 md:-mx-6 md:px-6">
+        {/* на телефоне доска та же: колонки листаются вбок и встают ровно по краю экрана */}
+        <div className="appear -mx-4 snap-x snap-mandatory scroll-px-4 overflow-x-auto px-4 pb-4 md:-mx-6 md:snap-none md:px-6">
           <div
-            className="flex snap-x snap-mandatory items-start gap-3 md:snap-none"
+            className="flex items-start gap-3"
             onDragOver={colDragOver}
             onDrop={(e) => {
               if (!dragCol) return
@@ -503,7 +485,7 @@ export function Tasks() {
               colDrop()
             }}
           >
-            {(phone ? [sections.find((x) => x.id === mcol) ?? sections[0]] : sections).map((s, si) => {
+            {sections.map((s, si) => {
               const list = byCol(s.id)
               const shown = list.filter((t) => t.id !== drag)
               return (
@@ -517,9 +499,8 @@ export function Tasks() {
                     drop(s.id)
                   }}
                   className={cx(
-                    'relative shrink-0 rounded-card transition-[background-color,opacity] duration-150',
-                    phone ? 'w-full' : 'w-[300px] p-2',
-                    over?.s === s.id ? 'bg-lime/25' : !phone && 'bg-ink/[0.035]',
+                    'relative w-[85vw] max-w-[300px] shrink-0 snap-start rounded-card p-2 transition-[background-color,opacity] duration-150 md:w-[300px]',
+                    over?.s === s.id ? 'bg-lime/25' : 'bg-ink/[0.035]',
                     dragCol === s.id && 'opacity-40',
                   )}
                 >
@@ -528,7 +509,7 @@ export function Tasks() {
                   {dragCol && colOver === sections.length && si === sections.length - 1 && <span aria-hidden className="absolute inset-y-2 -right-2 w-1 rounded-full bg-ink/70" />}
                   {/* заголовок колонки: за него колонку можно перетащить */}
                   <div
-                    className={cx('flex h-10 items-center gap-2 pl-3', phone && 'hidden', canEditCols && renaming !== s.id && 'cursor-grab active:cursor-grabbing')}
+                    className={cx('flex h-10 items-center gap-2 pl-3', canEditCols && renaming !== s.id && 'cursor-grab active:cursor-grabbing')}
                     draggable={canEditCols && renaming !== s.id}
                     onDragStart={(e) => {
                       if (drag) return
@@ -601,7 +582,7 @@ export function Tasks() {
                   </div>
 
                   {/* карточки */}
-                  <div key={phone ? s.id : undefined} className={cx('flex min-h-12 flex-col gap-2', !phone && 'mt-1', phone && 'appear', entering && 'stagger')}>
+                  <div className={cx('mt-1 flex min-h-12 flex-col gap-2', entering && 'stagger')}>
                     {list.map((t) => {
                       const idx = shown.indexOf(t)
                       return (
@@ -664,8 +645,8 @@ export function Tasks() {
               )
             })}
 
-            {/* новая колонка: только учредители и только на компьютере, где видна вся доска */}
-            {canEditCols && !phone && (
+            {/* новая колонка: только учредители */}
+            {canEditCols && (
             <div className="w-[85vw] max-w-[300px] shrink-0 snap-start md:w-[300px]">
               {newCol ? (
                 <div className="mt-1 rounded-2xl bg-surface px-3 py-2 text-[15px] ring-1 ring-ink/15">

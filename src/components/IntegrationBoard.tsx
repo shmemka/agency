@@ -1,10 +1,10 @@
 import { useState } from 'react'
 import { useData } from '../lib/data'
-import { PHASES, STATUSES, STATUS_ORDER, phaseInfo, statusInfo, type Phase } from '../lib/constants'
+import { PHASES, STATUSES, STATUS_ORDER, statusInfo, type Phase } from '../lib/constants'
 import { date, money } from '../lib/format'
 import type { Integration } from '../lib/types'
-import { StatusSelect, cx } from './ui'
-import { BloggerName, useIntegrationPanel } from './bits'
+import { cx } from './ui'
+import { useIntegrationPanel } from './bits'
 
 /** Подпись кампании на карточке: интеграция без кампании - это работа «без клиента» */
 export const NO_CLIENT = 'Без клиента'
@@ -14,6 +14,7 @@ const byDate = (a: Integration, b: Integration) => (a.publish_date ?? '9999').lo
 /**
  * Доска интеграций по этапам: Поиск → Переговоры → Документы → Оплата → Выход.
  * Карточку можно перетащить в другой этап (встанет на первый шаг этапа) или открыть и выбрать точный шаг.
+ * На телефоне этапы листаются вбок, шаг меняется в карточке интеграции.
  * Та же доска - во вкладке кампании и на экране «Выходы», где на карточке видно и кампанию
  */
 export function IntegrationBoard({ rows, showCampaign }: { rows: Integration[]; showCampaign?: boolean }) {
@@ -37,7 +38,8 @@ export function IntegrationBoard({ rows, showCampaign }: { rows: Integration[]; 
 
   return (
     <>
-      <div className="-mx-4 hidden overflow-x-auto px-4 pb-4 md:-mx-6 md:block md:px-6">
+      {/* на телефоне доска та же: этапы листаются вбок и встают ровно по краю экрана */}
+      <div className="-mx-4 snap-x snap-mandatory scroll-px-4 overflow-x-auto px-4 pb-4 md:-mx-6 md:snap-none md:px-6">
         <div className="flex gap-2">
           {cols.map((p) => {
             const items = inPhase(p.id)
@@ -51,7 +53,7 @@ export function IntegrationBoard({ rows, showCampaign }: { rows: Integration[]; 
                 }}
                 onDragLeave={() => setOver((o) => (o === p.id ? null : o))}
                 onDrop={() => drop(p.id)}
-                className={cx('flex min-w-52 flex-1 flex-col rounded-inner p-2 transition-colors duration-200', over === p.id ? 'dropzone is-over' : items.length ? 'bg-ink/[0.04]' : 'dropzone')}
+                className={cx('flex w-[78vw] max-w-[300px] shrink-0 snap-start flex-col rounded-inner p-2 transition-colors duration-200 md:w-auto md:max-w-none md:min-w-52 md:flex-1 md:shrink', over === p.id ? 'dropzone is-over' : items.length ? 'bg-ink/[0.04]' : 'dropzone')}
               >
                 <header className="flex h-8 items-center gap-2 px-2 text-[13px]">
                   <span className={cx('size-2 rounded-full', p.dot)} />
@@ -84,35 +86,6 @@ export function IntegrationBoard({ rows, showCampaign }: { rows: Integration[]; 
         </div>
       </div>
 
-      {/* телефон: те же этапы списком сверху вниз, шаг меняется прямо в строке */}
-      <div className="space-y-5 md:hidden">
-        {cols.map((p) => {
-          const items = inPhase(p.id)
-          if (!items.length) return null
-          return (
-            <section key={p.id} aria-label={p.label}>
-              <h3 className="mb-2 flex items-center gap-2 px-1 text-[13px] text-muted">
-                <span className={cx('size-2 rounded-full', phaseInfo(p.id).dot)} />
-                {p.label}
-                <span className="num">{items.length}</span>
-              </h3>
-              <ul className="space-y-2">
-                {items.map((i) => (
-                  <li key={i.id} className="flex items-center gap-3 rounded-inner bg-surface p-4">
-                    <button className="min-w-0 flex-1 text-left" onClick={() => open(i.id)}>
-                      <BloggerName b={blogger(i.blogger_id)} />
-                      <span className="num mt-1 block truncate text-xs text-muted">
-                        {[showCampaign && where(i), i.publish_date ? `выход ${date(i.publish_date)}` : '', i.price !== null && i.price !== undefined ? money(i.price) : ''].filter(Boolean).join(', ')}
-                      </span>
-                    </button>
-                    <StatusSelect value={i.status} onChange={(s) => moveIntegration(i, s)} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )
-        })}
-      </div>
     </>
   )
 }
