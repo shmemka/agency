@@ -9,7 +9,7 @@ import { isActive } from '../lib/rules'
 import { count, cpm, money, plural } from '../lib/format'
 import type { Blogger } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, BloggerStatusBadge, BloggerStatusSelect, Button, Empty, Input, Menu, PageHeader, Select, Skel, SkelTable, StatusSelect, Table, cx, useEntrance } from '../components/ui'
+import { Avatar, BloggerStatusBadge, BloggerStatusSelect, Button, Empty, Filters, Input, Menu, PageHeader, Select, Skel, SkelTable, StatusSelect, Table, cx, useEntrance } from '../components/ui'
 import { confirmDialog, promptDialog } from '../components/dialogs'
 import { AudienceBar, BloggerName, statsStale } from '../components/bits'
 import { BloggerDrawer, useBloggerStatus } from '../components/BloggerDrawer'
@@ -218,9 +218,10 @@ export function Bloggers() {
         sub={loading ? <Skel className="my-[3px] h-3.5 w-40" /> : isAdmin ? `${bloggers.length} в базе, ${activeBy.size} в работе` : `Ваши блогеры: ${bloggers.length}, в работе ${activeBy.size}`}
         actions={
           <>
-            <Button onClick={() => setImporting(true)}>
+            {/* на телефоне импорт — круглая кнопка с иконкой: главное действие здесь «Добавить» */}
+            <Button onClick={() => setImporting(true)} aria-label="Импорт из Excel" title="Импорт из Excel" className="max-md:w-10 max-md:px-0">
               <FileSpreadsheet className="size-4" strokeWidth={1.5} />
-              Импорт из Excel
+              <span className="max-md:hidden">Импорт из Excel</span>
             </Button>
             <Button variant="primary" onClick={() => setAdding(true)}>
               <Plus className="size-4" strokeWidth={1.5} />
@@ -230,11 +231,19 @@ export function Bloggers() {
         }
       />
 
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-52 flex-1 sm:max-w-xs">
+      <div className="mb-3 flex items-center gap-2 md:flex-wrap">
+        <div className="relative min-w-0 flex-1 md:min-w-52 md:max-w-xs">
           <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-faint" strokeWidth={1.5} />
-          <Input className="rounded-full! bg-surface pl-10" placeholder="Ник, тематика, контакт" value={q} onChange={(e) => set('q', e.target.value)} aria-label="Поиск" />
+          <Input className="rounded-full! bg-surface pl-10" type="search" enterKeyHint="search" placeholder="Ник, тематика, контакт" value={q} onChange={(e) => set('q', e.target.value)} aria-label="Поиск" />
         </div>
+        <Filters
+          active={[platform, owner, status].filter(Boolean).length}
+          onReset={() => {
+            const p = new URLSearchParams(params)
+            ;['platform', 'owner', 'status'].forEach((k) => p.delete(k))
+            setParams(p, { replace: true })
+          }}
+        >
         <Select value={platform} onChange={(e) => set('platform', e.target.value)} aria-label="Площадка" tone="surface" className="w-40">
           <option value="">Все площадки</option>
           {PLATFORMS.map((p) => (
@@ -274,10 +283,11 @@ export function Bloggers() {
           ))}
           <option value="stale">{`Статистика устарела ${inList.filter(statsStale).length}`}</option>
         </Select>
+        </Filters>
       </div>
       {/* вкладки: «Все» и списки, которые создают учредители */}
       <div className="mb-4 flex items-center gap-2">
-        <div role="tablist" aria-label="Списки блогеров" className="inline-flex max-w-full gap-1 overflow-x-auto rounded-full bg-surface p-1">
+        <div role="tablist" aria-label="Списки блогеров" className="no-scrollbar inline-flex max-w-full gap-1 overflow-x-auto overscroll-x-contain rounded-full bg-surface p-1">
           {[{ id: '', name: 'Все', n: base.length }, ...lists.map((l) => ({ id: l.id, name: l.name, n: base.filter((b) => members.get(l.id)?.has(b.id)).length }))].map((t) => (
             <button
               key={t.id || 'all'}
@@ -428,29 +438,20 @@ export function Bloggers() {
           <ul className={cx('appear space-y-2 md:hidden', entering && 'stagger')}>
             {rows.slice(0, limit).map((b) => (
               <li key={b.id}>
-                <div role="button" tabIndex={0} onClick={() => open(b)} className={cx('rounded-inner bg-surface p-4', picked.has(b.id) && 'ring-2 ring-ink/20')}>
-                  <div className="flex items-start justify-between gap-2">
-                    {/* галочка на телефоне: массовые действия (в подборку, передать) работают и здесь */}
-                    <label className="-m-2 flex items-center p-2" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={picked.has(b.id)}
-                        onChange={() => {}}
-                        onMouseDown={(e) => e.shiftKey && e.preventDefault()}
-                        onClick={(e) => toggle(b.id, e.shiftKey)}
-                        aria-label={`Выбрать ${b.nick}`}
-                        title="Shift+клик выделяет всех между двумя галочками"
-                      />
-                    </label>
+                {/* на телефоне карточка без галочек: только то, что нужно, чтобы узнать блогера и открыть его.
+                    Массовые действия (в список, передать) — на компьютере */}
+                <div role="button" tabIndex={0} onClick={() => open(b)} className="rounded-inner bg-surface p-4 transition-transform duration-200 active:scale-[0.99]">
+                  <div className="flex items-center justify-between gap-3">
                     <span className="min-w-0 flex-1">
                       <BloggerName b={b} />
                     </span>
                     <BloggerStatusBadge status={b.status} />
                   </div>
-                  <div className="num mt-3 flex justify-between text-[13px] text-muted">
+                  <div className="num mt-2.5 flex items-center gap-x-3 text-[13px] text-muted">
                     <span>{count(b.followers)} подп.</span>
+                    <span className="text-faint">·</span>
                     <span>охват {count(b.avg_reach)}</span>
-                    <span>{money(b.price)}</span>
+                    <span className="ml-auto text-ink">{money(b.price)}</span>
                   </div>
                   {activeBy.has(b.id) && <div className="mt-3">{work(b)}</div>}
                 </div>

@@ -30,6 +30,28 @@ body,
   height: 100%;
 }
 
+html {
+  /* телефон не увеличивает шрифт сам при повороте экрана */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* iPhone приближает страницу, если у поля шрифт меньше 16px, и не отдаляет обратно.
+   На сенсорных экранах поля — 16px, тогда ничего не «прыгает» при вводе */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  textarea,
+  select,
+  [contenteditable='true'] {
+    font-size: 16px !important;
+  }
+}
+
+/* белый выпадающий список внутри белого окна был бы невидим: там он серый */
+[role='dialog'] [data-tone='surface'] {
+  background-color: var(--color-soft);
+}
+
 body {
   background: var(--color-canvas);
   color: var(--color-ink);
@@ -373,6 +395,13 @@ input[type='search']::-webkit-search-decoration {
   ::after {
     transition-duration: 0.01ms !important;
   }
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 .safe-bottom {

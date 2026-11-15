@@ -219,7 +219,7 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
                 <Trash2 className="size-4" strokeWidth={1.5} />
               </IconButton>
             )}
-            <DrawerClose className="hidden size-8 md:inline-flex" iconClass="size-4" />
+            <DrawerClose className="size-8 max-md:hidden!" iconClass="size-4" />
           </div>
 
           <textarea

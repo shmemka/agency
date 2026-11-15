@@ -1,6 +1,6 @@
 import { Children, createContext, isValidElement, useContext, useEffect, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type ComponentProps, type CSSProperties, type HTMLAttributes, type ReactNode, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, ChevronDown, ChevronLeft, Copy, Loader2, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, Copy, Loader2, SlidersHorizontal, X } from 'lucide-react'
 import { BLOGGER_STATUSES, PHASES, STATUSES, STATUS_ORDER, bloggerStatusInfo, nextStatus, phaseInfo, statusInfo, type BloggerStatus, type Status } from '../lib/constants'
 import { onToast } from '../lib/toast'
 
@@ -10,6 +10,62 @@ export function cx(...a: (string | false | null | undefined)[]) {
 
 export const isPhone = () => window.matchMedia('(max-width: 767px)').matches
 export const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+/** Телефон или узкое окно: меняется вместе с поворотом экрана */
+export function useIsPhone() {
+  const [phone, setPhone] = useState(isPhone)
+  useEffect(() => {
+    const m = window.matchMedia('(max-width: 767px)')
+    const on = () => setPhone(m.matches)
+    m.addEventListener('change', on)
+    return () => m.removeEventListener('change', on)
+  }, [])
+  return phone
+}
+
+/**
+ * Сколько пикселей снизу закрывает клавиатура телефона. Окна-панели снизу поднимаются на эту высоту,
+ * иначе поле, в которое пишут, оказывается под клавиатурой
+ */
+export function useKeyboardInset(active: boolean) {
+  const [inset, setInset] = useState(0)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!active || !vv) return
+    const on = () => setInset(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)))
+    on()
+    vv.addEventListener('resize', on)
+    vv.addEventListener('scroll', on)
+    return () => {
+      vv.removeEventListener('resize', on)
+      vv.removeEventListener('scroll', on)
+      setInset(0)
+    }
+  }, [active])
+  return inset
+}
+
+// сколько окон и панелей сейчас открыто: страница под ними не прокручивается, пока открыто хоть одно
+let locks = 0
+/** Пока окно открыто, страница под ним стоит на месте: на телефоне иначе прокручивается фон */
+export function useScrollLock(active: boolean) {
+  useEffect(() => {
+    if (!active) return
+    const html = document.documentElement
+    if (locks++ === 0) {
+      // ширина полосы прокрутки, чтобы на компьютере страница не дёргалась вбок
+      const gap = window.innerWidth - html.clientWidth
+      html.style.overflow = 'hidden'
+      if (gap > 0) html.style.paddingRight = `${gap}px`
+    }
+    return () => {
+      if (--locks === 0) {
+        html.style.overflow = ''
+        html.style.paddingRight = ''
+      }
+    }
+  }, [active])
+}
 
 /**
  * Держит элемент на экране ещё `ms` после закрытия, чтобы он успел плавно уйти.
@@ -289,6 +345,8 @@ export function Select({
   const btn = useRef<HTMLButtonElement>(null)
   const list = useRef<HTMLDivElement>(null)
   const phone = isPhone()
+  // на телефоне список — панель снизу: фон под ней не прокручивается
+  useScrollLock(open && phone)
   const searchable = options.length > 12
   const shown = q.trim() ? options.filter((o) => o.text.toLowerCase().includes(q.trim().toLowerCase())) : options
 
@@ -416,6 +474,7 @@ export function Select({
   return (
     <div className={cx('relative min-w-0', className)}>
       <button
+        data-tone={tone}
         ref={btn}
         type="button"
         disabled={disabled}
@@ -574,6 +633,8 @@ export function Menu<T extends string>({
   const btn = useRef<HTMLButtonElement>(null)
   const [pos, setPos] = useState({ top: 0, left: 0 })
   const phone = isPhone()
+  // на телефоне список — панель снизу: фон под ней не прокручивается
+  useScrollLock(open && phone)
 
   useEffect(() => {
     if (!open) return
@@ -747,19 +808,43 @@ export function Segmented<T extends string>({ value, options, onChange, classNam
     if (!el) return setPill(null)
     setPill((p) => ({ x: el.offsetLeft, w: el.offsetWidth, animate: !!p }))
   }, [value, options.length])
+  // вариантов больше, чем влезает (телефон): выбранный подкручиваем в поле зрения, края затухают
+  const [edge, setEdge] = useState({ l: false, r: false })
+  const edges = useCallback(() => {
+    const el = box.current
+    if (!el) return
+    setEdge({ l: el.scrollLeft > 2, r: el.scrollLeft + el.clientWidth < el.scrollWidth - 2 })
+  }, [])
+  useEffect(() => {
+    const el = box.current
+    const a = el?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (el && a && el.scrollWidth > el.clientWidth) {
+      const left = a.offsetLeft - (el.clientWidth - a.offsetWidth) / 2
+      el.scrollTo({ left: Math.max(0, left), behavior: reducedMotion() ? 'auto' : 'smooth' })
+    }
+    edges()
+  }, [value, edges])
   useEffect(() => {
     // ширина вариантов меняется вместе со шрифтом и счётчиками внутри
     const el = box.current
     if (!el || typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver(() => {
+      edges()
       const a = el.querySelector<HTMLElement>('[aria-selected="true"]')
       if (a) setPill((p) => (p && p.x === a.offsetLeft && p.w === a.offsetWidth ? p : { x: a.offsetLeft, w: a.offsetWidth, animate: false }))
     })
     ro.observe(el)
     return () => ro.disconnect()
-  }, [])
+  }, [edges])
+  const mask = edge.l || edge.r ? `linear-gradient(to right, ${edge.l ? 'transparent, #000 28px' : '#000'}, ${edge.r ? '#000 calc(100% - 28px), transparent' : '#000'})` : undefined
   return (
-    <div ref={box} className={cx('relative inline-flex max-w-full gap-1 overflow-x-auto rounded-full bg-surface', lg ? 'p-1.5' : 'p-1', className)} role="tablist">
+    <div
+      ref={box}
+      onScroll={edges}
+      className={cx('no-scrollbar relative inline-flex max-w-full gap-1 overflow-x-auto overscroll-x-contain rounded-full bg-surface', lg ? 'p-1.5' : 'p-1', className)}
+      style={{ maskImage: mask, WebkitMaskImage: mask }}
+      role="tablist"
+    >
       {pill && (
         <span
           aria-hidden
@@ -817,6 +902,8 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
   const footerRef = useRef<HTMLDivElement>(null)
   // пока окно уходит, показываем его последнее содержимое: данные формы к этому времени уже сброшены
   const { mounted, leaving } = usePresence(open, 220)
+  useScrollLock(open)
+  const kb = useKeyboardInset(open && isPhone())
   const last = useRef({ title, children, footer })
   if (open) last.current = { title, children, footer }
   const v = open ? { title, children, footer } : last.current
@@ -830,13 +917,15 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
   return createPortal(
     <div
       className={cx('fade fixed inset-0 z-[60] flex items-end justify-center bg-ink/30 md:items-start md:overflow-y-auto md:p-6 md:pt-[8vh]', leaving && 'leaving pointer-events-none')}
+      style={kb ? { paddingBottom: kb } : undefined}
       onMouseDown={leaving ? undefined : onClose}
     >
       <div
         role="dialog"
         aria-modal={leaving ? undefined : 'true'}
         aria-label={v.title}
-        className={cx('sheet safe-bottom flex max-h-[92vh] w-full flex-col rounded-t-[28px] bg-surface md:max-h-none md:rounded-card', wide ? 'md:max-w-3xl' : 'md:max-w-lg')}
+        className={cx('sheet safe-bottom flex max-h-[92dvh] w-full flex-col rounded-t-[28px] bg-surface md:max-h-none md:rounded-card', wide ? 'md:max-w-3xl' : 'md:max-w-lg')}
+        style={kb ? { maxHeight: `calc(92dvh - ${kb}px)` } : undefined}
         onMouseDown={(e) => e.stopPropagation()}
         onKeyDown={(e) => submitOnEnter(e, footerRef.current, 'button[data-variant="primary"], button[data-save]')}
       >
@@ -846,8 +935,9 @@ export function Modal({ open, onClose, title, children, footer, wide }: { open: 
             <X className="size-[18px]" strokeWidth={1.5} />
           </IconButton>
         </div>
-        <div className="overflow-y-auto px-6 pb-6 md:overflow-visible">{v.children}</div>
-        {v.footer && <div ref={footerRef} className="flex flex-wrap justify-end gap-2 border-t border-line px-6 py-4">{v.footer}</div>}
+        <div className="overscroll-contain overflow-y-auto px-6 pb-6 md:overflow-visible">{v.children}</div>
+        {/* на телефоне кнопки окна — во всю ширину, по ним легко попасть большим пальцем */}
+        {v.footer && <div ref={footerRef} className="flex flex-wrap justify-end gap-2 border-t border-line px-6 py-4 max-md:[&>*]:flex-1">{v.footer}</div>}
       </div>
     </div>,
     document.body,
@@ -874,6 +964,7 @@ export function DrawerClose({ className, iconClass = 'size-[18px]' }: { classNam
 /** Боковая панель; на телефоне — экран целиком с кнопкой «Назад» */
 export function Drawer({ onClose, children, label, beforeClose }: { onClose: () => void; children: ReactNode; label: string; beforeClose?: () => Promise<boolean> | boolean }) {
   const [leaving, setLeaving] = useState(false)
+  useScrollLock(true)
   // панель уезжает вправо, и только потом её убирают со страницы
   const dismiss = useCallback(() => {
     if (reducedMotion()) return onClose()
@@ -896,8 +987,9 @@ export function Drawer({ onClose, children, label, beforeClose }: { onClose: () 
     <DrawerCtx.Provider value={{ close, dismiss }}>
       <div className={cx('fixed inset-0 z-50', leaving && 'leaving pointer-events-none')}>
         <div className="fade absolute inset-0 hidden bg-ink/25 md:block" onClick={close} />
-        <aside role="complementary" aria-label={label} onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')} className="slide absolute inset-0 flex flex-col overflow-y-auto bg-canvas md:inset-y-3 md:right-3 md:left-auto md:w-[720px] md:rounded-card md:shadow-[0_8px_24px_rgba(21,23,28,0.1)]">
-          <button onClick={close} className="flex h-12 shrink-0 items-center gap-1 px-3 text-muted md:hidden">
+        <aside role="complementary" aria-label={label} onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')} className="slide absolute inset-0 flex flex-col overflow-y-auto overscroll-contain bg-canvas md:inset-y-3 md:right-3 md:left-auto md:w-[720px] md:rounded-card md:shadow-[0_8px_24px_rgba(21,23,28,0.1)]">
+          {/* «Назад» всегда под рукой: панель на телефоне длинная */}
+          <button onClick={close} className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-1 bg-canvas/90 px-3 text-muted backdrop-blur md:hidden">
             <ChevronLeft className="size-5" strokeWidth={1.5} />
             Назад
           </button>
@@ -909,7 +1001,7 @@ export function Drawer({ onClose, children, label, beforeClose }: { onClose: () 
   )
 }
 
-export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: ReactNode }) {
   return (
     <label className="inline-flex min-h-10 cursor-pointer items-center gap-3 select-none">
       <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
@@ -997,4 +1089,50 @@ export function sendOnEnter(e: React.KeyboardEvent): boolean {
   if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches) return false
   e.preventDefault()
   return true
+}
+
+/**
+ * Фильтры списка. На компьютере стоят в строку как есть.
+ * На телефоне вместо стопки разных по ширине списков — одна кнопка «Фильтры» с числом включённых,
+ * а сами списки открываются панелью снизу во всю ширину.
+ */
+export function Filters({ active, onReset, children }: { active: number; onReset?: () => void; children: ReactNode }) {
+  const phone = useIsPhone()
+  const [open, setOpen] = useState(false)
+  if (!phone) return <>{children}</>
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={cx(
+          'inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm transition-[background-color,color,transform] duration-200 active:scale-[0.97]',
+          active ? 'bg-ink text-white' : 'bg-surface text-ink',
+        )}
+      >
+        <SlidersHorizontal className="size-4" strokeWidth={1.5} />
+        Фильтры
+        {active > 0 && <span className="num -mr-1 flex size-5 items-center justify-center rounded-full bg-white/20 text-xs">{active}</span>}
+      </button>
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Фильтры"
+        footer={
+          <>
+            {active > 0 && onReset && (
+              <Button variant="ghost" onClick={onReset}>
+                Сбросить
+              </Button>
+            )}
+            <Button variant="primary" className="flex-1" onClick={() => setOpen(false)}>
+              Готово
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3 [&>*]:w-full!">{children}</div>
+      </Modal>
+    </>
+  )
 }

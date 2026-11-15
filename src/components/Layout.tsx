@@ -232,6 +232,21 @@ export function Layout() {
   const seg = loc.pathname.split('/').filter(Boolean)
   const pageKey = seg[0] === 'campaigns' && seg[1] ? `campaigns/${seg[1]}` : (seg[0] ?? '')
 
+  // новая страница открывается с начала, а не с того места, где листали прошлую
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pageKey])
+
+  // шапка на телефоне: наверху — название агентства, после прокрутки — название страницы, как в iOS
+  const [scrolled, setScrolled] = useState(false)
+  useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 56)
+    on()
+    window.addEventListener('scroll', on, { passive: true })
+    return () => window.removeEventListener('scroll', on)
+  }, [])
+  const pageLabel = current?.label ?? (loc.pathname.startsWith('/profile') ? 'Мой профиль' : loc.pathname.startsWith('/settings') ? 'Настройки' : agency)
+
   const navBox = useRef<HTMLElement>(null)
   const [pill, setPill] = useState<{ y: number; animate: boolean } | null>(null)
   useLayoutEffect(() => {
@@ -271,9 +286,14 @@ export function Layout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="no-print sticky top-0 z-30 flex h-14 items-center gap-2.5 bg-canvas/90 px-4 backdrop-blur md:hidden">
+        <header className={cx('no-print sticky top-0 z-30 flex h-14 items-center gap-2.5 bg-canvas/85 px-4 backdrop-blur-md transition-shadow duration-300 md:hidden', scrolled && 'shadow-[0_1px_0_var(--color-line)]')}>
           <Mark />
-          <span className="flex-1 text-[15px] font-medium">{current?.label ?? (loc.pathname.startsWith('/profile') ? 'Мой профиль' : loc.pathname.startsWith('/settings') ? 'Настройки' : agency)}</span>
+          <span className="relative h-5 min-w-0 flex-1 text-[15px] leading-5 font-medium">
+            <span className={cx('absolute inset-0 truncate transition-[opacity,transform] duration-300', scrolled ? '-translate-y-1 opacity-0' : 'opacity-100')}>{agency}</span>
+            <span aria-hidden={!scrolled} className={cx('absolute inset-0 truncate transition-[opacity,transform] duration-300', scrolled ? 'opacity-100' : 'translate-y-1 opacity-0')}>
+              {pageLabel}
+            </span>
+          </span>
           <BellButton />
         </header>
         <main className="mx-auto w-full max-w-[1480px] flex-1 px-4 pt-2 pb-28 md:px-6 md:pt-8 md:pb-10">
@@ -299,8 +319,19 @@ export function Layout() {
         </button>
       </nav>
 
-      <Modal open={more} onClose={() => setMore(false)} title={name}>
+      <Modal open={more} onClose={() => setMore(false)} title="Ещё">
         <div className="-mx-3">
+          {nav
+            .filter((n) => !n.phone)
+            .map((n) => (
+              <NavLink key={n.to} to={n.to} onClick={() => setMore(false)} className="flex h-12 items-center gap-3 rounded-2xl px-3 text-[15px] hover:bg-soft">
+                <n.icon className="size-5 text-muted" strokeWidth={1.5} />
+                <span className="flex-1">{n.label}</span>
+                {badge(n.to) > 0 && <span className="num text-[13px] text-faint">{badge(n.to)}</span>}
+              </NavLink>
+            ))}
+          <div className="mx-3 my-2 h-px bg-line" />
+          <p className="px-3 pt-1 pb-1 text-[13px] text-faint">Кабинеты</p>
           {workspaces.map((w) => (
             <button
               key={w.id}
@@ -326,16 +357,6 @@ export function Layout() {
             <Plus className="size-5" strokeWidth={1.5} />
             Создать кабинет
           </button>
-          <div className="mx-3 my-2 h-px bg-line" />
-          {nav
-            .filter((n) => !n.phone)
-            .map((n) => (
-              <NavLink key={n.to} to={n.to} onClick={() => setMore(false)} className="flex h-12 items-center gap-3 rounded-2xl px-3 text-[15px] hover:bg-soft">
-                <n.icon className="size-5 text-muted" strokeWidth={1.5} />
-                <span className="flex-1">{n.label}</span>
-                {badge(n.to) > 0 && <span className="num text-[13px] text-faint">{badge(n.to)}</span>}
-              </NavLink>
-            ))}
           <div className="mx-3 my-2 h-px bg-line" />
           {accountFor(isAdmin).map((n) => (
             <NavLink key={n.to} to={n.to} onClick={() => setMore(false)} className="flex h-12 items-center gap-3 rounded-2xl px-3 text-[15px] hover:bg-soft">

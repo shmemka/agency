@@ -35,12 +35,12 @@ export function Documents() {
   return (
     <>
       <PageHeader title="Документы" sub="Договоры, акты, чеки и скрины со всех карточек. Загружают их в интеграции, карточке блогера или кампании" />
-      <div className="mb-4 flex flex-wrap gap-2">
-        <div className="relative min-w-52 flex-1 sm:max-w-xs">
+      <div className="mb-4 flex gap-2 md:flex-wrap">
+        <div className="relative min-w-0 flex-1 md:min-w-52 md:max-w-xs">
           <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-faint" strokeWidth={1.5} />
           <Input className="rounded-full! bg-surface pl-10" placeholder="Название или ник" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Поиск" />
         </div>
-        <Select value={kind} onChange={(e) => setKind(e.target.value)} tone="surface" className="w-44" aria-label="Тип">
+        <Select value={kind} onChange={(e) => setKind(e.target.value)} tone="surface" className="w-36 shrink-0 md:w-44" aria-label="Тип">
           <option value="">Все типы</option>
           {DOC_KINDS.map((k) => (
             <option key={k.id} value={k.id}>

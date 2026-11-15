@@ -75,6 +75,57 @@ export function Team() {
         </Card>
       )}
 
+      {/* телефон: карточки людей вместо таблицы — роль и доступ под рукой, без прокрутки вбок */}
+      <ul className="space-y-2 md:hidden">
+        {active.map((p) => {
+          const self = p.id === profile?.id
+          return (
+            <li key={p.id} className="rounded-inner bg-surface p-4">
+              <div className="flex items-center gap-3">
+                <Avatar name={p.full_name || p.email || ''} src={p.avatar_url} className="size-10" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate">
+                    {p.full_name}
+                    {self && <span className="ml-2 text-xs text-muted">это вы</span>}
+                  </div>
+                  <div className="truncate text-[13px] text-muted">{p.email}</div>
+                </div>
+              </div>
+              {(isAdmin || self) && (
+                <div className="num mt-3 text-[13px] text-muted">
+                  Блогеров {count(p.id)}, интеграций в работе {integrations.filter((i) => i.owner_id === p.id && isActive(i)).length}
+                </div>
+              )}
+              <div className="mt-3 flex items-center gap-2">
+                {isAdmin && !self ? (
+                  <Select value={p.role} onChange={(e) => update(p, { role: e.target.value as Profile['role'] })} className="flex-1" aria-label="Роль">
+                    <option value="manager">Специалист</option>
+                    <option value="admin">Учредитель</option>
+                  </Select>
+                ) : (
+                  <span className="flex h-10 flex-1 items-center gap-2 rounded-2xl bg-soft pr-3 pl-4 text-sm">
+                    <span className="min-w-0 flex-1 truncate">{p.role === 'admin' ? 'Учредитель' : 'Специалист'}</span>
+                    <Lock className="size-4 shrink-0 text-faint" strokeWidth={1.5} />
+                  </span>
+                )}
+                {isAdmin && !self && (
+                  <Button
+                    variant="danger"
+                    onClick={() => {
+                      setHeir('')
+                      setClosing(p)
+                    }}
+                  >
+                    Закрыть доступ
+                  </Button>
+                )}
+              </div>
+            </li>
+          )
+        })}
+      </ul>
+
+      <div className="hidden md:block">
       <Table
         min={560}
         head={
@@ -138,6 +189,7 @@ export function Team() {
           )
         })}
       </Table>
+      </div>
 
       {isAdmin && closed.length > 0 && (
         <Card className="mt-3">

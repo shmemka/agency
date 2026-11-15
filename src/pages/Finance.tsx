@@ -145,14 +145,15 @@ export function Finance() {
       {tab === 'summary' && (
         <>
           <Segmented<Period> className="mb-3" value={period} onChange={setPeriod} options={[{ id: 'month', label: 'Месяц' }, { id: 'quarter', label: 'Квартал' }, { id: 'year', label: 'Год' }]} />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* на телефоне четыре цифры — сеткой 2×2, чтобы сводка помещалась на экран */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
             {[
               ['Поступления', money(sumIn), `${inP.length} ${plural(inP.length, 'платёж', 'платежа', 'платежей')}`],
               ['Налог к уплате', money(tax), 'по ставке каждого поступления'],
               ['Расходы', money(sumEx), `${exP.length} ${plural(exP.length, 'запись', 'записи', 'записей')}`],
               ['Остаётся', money(sumIn - tax - sumEx), 'после налога и расходов'],
             ].map(([k, v, n]) => (
-              <Card key={k}>
+              <Card key={k} className="max-sm:p-4">
                 <div className="text-[13px] text-muted">{k}</div>
                 {busy ? (
                   <>
@@ -161,7 +162,7 @@ export function Finance() {
                   </>
                 ) : (
                   <div className="appear">
-                    <div className="num mt-1 text-[28px] leading-8">{v}</div>
+                    <div className="num mt-1 text-[20px] leading-7 sm:text-[28px] sm:leading-8">{v}</div>
                     <div className="mt-1 text-xs text-muted">{n}</div>
                   </div>
                 )}

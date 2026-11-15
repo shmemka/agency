@@ -193,11 +193,11 @@ export function Dashboard() {
         </Card>
 
         <Card>
-          <div className="mb-2 flex items-baseline justify-between">
-            <h2 className="text-base">Сдать статистику в ОРД</h2>
+          <div className="mb-2 flex items-baseline justify-between gap-3">
+            <h2 className="min-w-0 text-base">Сдать статистику в ОРД</h2>
             {ord.length > 0 && (
-              <Link to="/integrations?tab=ord" className="inline-flex items-center gap-1 text-[13px] text-muted hover:text-ink">
-                Отметить сданные <ArrowUpRight className="size-3.5" strokeWidth={1.5} />
+              <Link to="/integrations?tab=ord" className="inline-flex shrink-0 items-center gap-1 text-[13px] whitespace-nowrap text-muted hover:text-ink">
+                Отметить <span className="max-sm:hidden">сданные</span> <ArrowUpRight className="size-3.5" strokeWidth={1.5} />
               </Link>
             )}
           </div>

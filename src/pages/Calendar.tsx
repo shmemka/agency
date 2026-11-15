@@ -6,7 +6,7 @@ import { useData } from '../lib/data'
 import { phaseInfo, statusInfo } from '../lib/constants'
 import { isLive, ordDeadline, taskOwner } from '../lib/rules'
 import { todayISO } from '../lib/format'
-import { Button, Card, IconButton, Loading, PageHeader, Select, Skel, cx } from '../components/ui'
+import { Button, Card, Filters, IconButton, Loading, PageHeader, Select, Skel, cx, useIsPhone } from '../components/ui'
 import { useIntegrationPanel } from '../components/bits'
 
 interface Ev {
@@ -39,6 +39,7 @@ export function Calendar() {
     setSp(p, { replace: true })
   }
   const today = todayISO()
+  const phone = useIsPhone()
   const [expanded, setExpanded] = useState<string | null>(null)
 
   const events = useMemo(() => {
@@ -88,24 +89,8 @@ export function Calendar() {
     </button>
   )
 
-  return (
+  const filters = (
     <>
-      <PageHeader
-        title={cursor.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }).replace(/^./, (c) => c.toUpperCase()).replace(' г.', '')}
-        sub="Выходы, сроки задач и сдача статистики в ОРД"
-        actions={
-          <>
-            <IconButton label="Предыдущий месяц" onClick={() => move(-1)} className="bg-surface">
-              <ChevronLeft className="size-[18px]" strokeWidth={1.5} />
-            </IconButton>
-            <Button onClick={() => setCursor(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Сегодня</Button>
-            <IconButton label="Следующий месяц" onClick={() => move(1)} className="bg-surface">
-              <ChevronRight className="size-[18px]" strokeWidth={1.5} />
-            </IconButton>
-          </>
-        }
-      />
-      <div className="mb-4 flex flex-wrap gap-2">
         <Select value={cid} onChange={(e) => set('campaign', e.target.value)} aria-label="Кампания" tone="surface" className="w-56">
           <option value="">Все кампании</option>
           {campaigns.map((c) => (
@@ -126,7 +111,40 @@ export function Calendar() {
               ))}
           </Select>
         )}
-      </div>
+          </>
+  )
+
+  return (
+    <>
+      <PageHeader
+        title={cursor.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' }).replace(/^./, (c) => c.toUpperCase()).replace(' г.', '')}
+        sub="Выходы, сроки задач и сдача статистики в ОРД"
+        actions={
+          <>
+            {phone && (
+              <Filters
+                active={[cid, owner].filter(Boolean).length}
+                onReset={() => {
+                  const p = new URLSearchParams(sp)
+                  ;['campaign', 'owner'].forEach((k) => p.delete(k))
+                  setSp(p, { replace: true })
+                }}
+              >
+                {filters}
+              </Filters>
+            )}
+            <IconButton label="Предыдущий месяц" onClick={() => move(-1)} className="bg-surface">
+              <ChevronLeft className="size-[18px]" strokeWidth={1.5} />
+            </IconButton>
+            <Button onClick={() => setCursor(new Date(new Date().getFullYear(), new Date().getMonth(), 1))}>Сегодня</Button>
+            <IconButton label="Следующий месяц" onClick={() => move(1)} className="bg-surface">
+              <ChevronRight className="size-[18px]" strokeWidth={1.5} />
+            </IconButton>
+          </>
+        }
+      />
+      {/* на телефоне фильтры — кнопкой рядом с месяцами, на компьютере — строкой под заголовком */}
+      {!phone && <div className="mb-4 flex flex-wrap gap-2">{filters}</div>}
 
       <div className="hidden overflow-hidden rounded-card bg-surface md:block">
         <div className="grid grid-cols-7 text-xs text-faint">

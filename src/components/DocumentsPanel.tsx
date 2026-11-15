@@ -76,12 +76,14 @@ export function DocRow({ d, extra, onChanged }: { d: Doc; extra?: ReactNode; onC
 
   return (
     <li className="flex min-h-12 items-center gap-3 border-t border-line py-2 first:border-0">
-      <Chip className="w-24 shrink-0 justify-center">{docKindLabel(d.kind)}</Chip>
+      {/* на телефоне тип — в подписи под названием, чтобы названию хватило места */}
+      <Chip className="w-24 shrink-0 justify-center max-md:hidden">{docKindLabel(d.kind)}</Chip>
       <div className="min-w-0 flex-1">
         <button className="block max-w-full truncate text-left hover:underline" onClick={open}>
           {d.name}
         </button>
         <div className="truncate text-xs text-muted">
+          <span className="md:hidden">{docKindLabel(d.kind)}, </span>
           {extra}
           {extra ? ', ' : ''}
           {[d.external_url ? 'ссылка' : fileSize(d.size), d.uploaded_by ? personName(d.uploaded_by).split(' ')[0] : '', date(d.created_at)].filter(Boolean).join(', ')}
@@ -100,7 +102,7 @@ export function DocRow({ d, extra, onChanged }: { d: Doc; extra?: ReactNode; onC
           <EyeOff className="size-4" strokeWidth={1.5} />
         </IconButton>
       )}
-      <IconButton label={d.external_url ? 'Открыть ссылку' : 'Открыть файл'} className="size-9" onClick={open}>
+      <IconButton label={d.external_url ? 'Открыть ссылку' : 'Открыть файл'} className="size-9 max-md:hidden" onClick={open}>
         {d.external_url ? <ExternalLink className="size-4" strokeWidth={1.5} /> : <Download className="size-4" strokeWidth={1.5} />}
       </IconButton>
       {canDelete && (

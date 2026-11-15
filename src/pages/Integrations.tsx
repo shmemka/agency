@@ -9,7 +9,7 @@ import { checklist, isActive, isLive, ordDeadline } from '../lib/rules'
 import { count, cpm, date, money, todayISO } from '../lib/format'
 import type { Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Button, Chip, Empty, Input, PageHeader, Segmented, Select, SkelTable, StatusBadge, StatusSelect, Table, cx, useEntrance } from '../components/ui'
+import { Button, Chip, Empty, Filters, Input, PageHeader, Segmented, Select, SkelTable, StatusBadge, StatusSelect, Table, cx, useEntrance } from '../components/ui'
 import { BloggerName, useIntegrationPanel } from '../components/bits'
 import { NewIntegrationModal } from '../components/BloggerForm'
 import { confirmDialog } from '../components/dialogs'
@@ -98,11 +98,19 @@ export function Integrations() {
           </Button>
         }
       />
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-52 flex-1 sm:max-w-xs">
+      <div className="mb-3 flex items-center gap-2 md:flex-wrap">
+        <div className="relative min-w-0 flex-1 md:min-w-52 md:max-w-xs">
           <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-faint" strokeWidth={1.5} />
-          <Input className="rounded-full! bg-surface pl-10" placeholder="Ник, промокод, erid" value={q} onChange={(e) => set('q', e.target.value)} aria-label="Поиск" />
+          <Input className="rounded-full! bg-surface pl-10" type="search" enterKeyHint="search" placeholder="Ник, промокод, erid" value={q} onChange={(e) => set('q', e.target.value)} aria-label="Поиск" />
         </div>
+        <Filters
+          active={[cid, phase].filter(Boolean).length}
+          onReset={() => {
+            const p = new URLSearchParams(params)
+            ;['campaign', 'phase'].forEach((k) => p.delete(k))
+            setParams(p, { replace: true })
+          }}
+        >
         <Select value={cid} onChange={(e) => set('campaign', e.target.value)} tone="surface" className="w-56" aria-label="Кампания">
           <option value="">Все кампании</option>
           <option value="none">Без кампании</option>
@@ -120,6 +128,7 @@ export function Integrations() {
             </option>
           ))}
         </Select>
+        </Filters>
       </div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <Segmented

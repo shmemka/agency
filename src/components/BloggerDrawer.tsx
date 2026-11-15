@@ -90,9 +90,9 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
               <BloggerName b={b} big />
             </div>
             {tg && (
-              <a href={`https://t.me/${tg}`} target="_blank" rel="noreferrer" className="inline-flex h-10 items-center gap-2 rounded-full bg-soft px-4 text-sm hover:bg-ink/10">
+              <a href={`https://t.me/${tg}`} target="_blank" rel="noreferrer" aria-label="Написать в Telegram" title="Написать в Telegram" className="inline-flex size-10 shrink-0 items-center justify-center gap-2 rounded-full bg-soft text-sm hover:bg-ink/10 sm:w-auto sm:px-4">
                 <Send className="size-4" strokeWidth={1.5} />
-                Написать
+                <span className="max-sm:hidden">Написать</span>
               </a>
             )}
             {isAdmin && (
