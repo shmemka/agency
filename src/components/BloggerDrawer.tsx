@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react'
-import { ArrowUpRight, Check, MessageCircle, Plus, Trash2 } from 'lucide-react'
+import { Check, MessageCircle, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { legalInfo, platformInfo, type BloggerStatus } from '../lib/constants'
-import { isActive } from '../lib/rules'
+import { isActive, nextStep } from '../lib/rules'
 import { count, cpm, date, money } from '../lib/format'
 import type { Blogger } from '../lib/types'
 import { toast } from '../lib/toast'
-import { BloggerStatusSelect, Button, Card, Chip, Drawer, DrawerClose, IconButton, Segmented, SkelDrawer, StatusBadge, StatusRail, cx } from './ui'
+import { BloggerStatusSelect, Button, Card, Chip, Drawer, DrawerClose, IconButton, Segmented, SkelDrawer, StatusBadge, cx } from './ui'
 import { NO_DEAL } from './IntegrationBoard'
 import { RichText } from './RichText'
 import { AudienceBar, BloggerName, TaskList, statsStale, useIntegrationPanel } from './bits'
@@ -59,7 +59,7 @@ export function useBloggerStatus() {
 }
 
 export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void }) {
-  const { blogger, integrations, campaign, docs, tasks, loading, reload, moveIntegration, patchBlogger } = useData()
+  const { blogger, integrations, campaign, docs, tasks, loading, reload, settings, patchBlogger } = useData()
   const { isAdmin } = useAuth()
   const { open } = useIntegrationPanel()
   const setStatus = useBloggerStatus()
@@ -175,37 +175,35 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
                 </Button>
               </div>
               {active.length === 0 ? (
-                <p className="text-muted">{b.status === 'blacklist' ? 'Блогер в чёрном списке, новые интеграции закрыты' : 'Блогер сейчас не в работе. Добавьте его в сделку с клиентом'}</p>
+                <p className="text-muted">{b.status === 'blacklist' ? 'Блогер в чёрном списке, новые интеграции закрыты' : 'Блогер сейчас не в работе. Добавьте его в сделку с клиентом, и он появится в списке дел'}</p>
               ) : (
-                <div className="space-y-3">
-                  {active.map((i) => (
-                    <div key={i.id} className="rounded-inner bg-soft p-4">
-                      <button onClick={() => open(i.id)} className="mb-3 flex w-full items-center gap-2 text-left">
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate">{campaign(i.campaign_id)?.name ?? NO_DEAL}</span>
-                          <span className="num block text-xs text-muted">
-                            {i.publish_date ? `выход ${date(i.publish_date)}, ` : ''}
-                            {money(i.price)}
+                <ul>
+                  {active.map((i) => {
+                    const step = nextStep(i, docs, settings)
+                    return (
+                      <li key={i.id}>
+                        <button onClick={() => open(i.id)} className="flex min-h-12 w-full items-center gap-3 border-t border-line py-2 text-left transition-colors duration-150 hover:bg-soft">
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate">{campaign(i.campaign_id)?.name ?? NO_DEAL}</span>
+                            {step && <span className={cx('block truncate text-xs', step.tone === 'bad' ? 'text-bad' : step.tone === 'warn' ? 'text-warn' : 'text-muted')}>{step.text}</span>}
                           </span>
-                        </span>
-                        <span className="flex size-9 items-center justify-center rounded-full bg-surface">
-                          <ArrowUpRight className="size-4" strokeWidth={1.5} />
-                        </span>
-                      </button>
-                      <StatusRail value={i.status} onChange={(s) => moveIntegration(i, s)} />
-                    </div>
-                  ))}
-                </div>
+                          <span className="num hidden text-muted sm:inline">{money(i.price)}</span>
+                          <StatusBadge status={i.status} />
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
               )}
               {rest.length > 0 && (
-                <ul className="mt-4">
+                <ul>
                   {rest.map((i) => (
                     <li key={i.id}>
                       <button onClick={() => open(i.id)} className="flex min-h-11 w-full items-center gap-3 border-t border-line py-2 text-left hover:bg-soft">
                         <span className="num w-20 shrink-0 text-muted">{date(i.publish_date)}</span>
                         <span className="min-w-0 flex-1 truncate">{campaign(i.campaign_id)?.name ?? NO_DEAL}</span>
                         <span className="num hidden sm:inline">{money(i.price)}</span>
-                        {i.campaign_id && i.client_decision !== 'approved' ? <Chip>В подборке</Chip> : <StatusBadge status={i.status} />}
+                        <StatusBadge status={i.status} />
                       </button>
                     </li>
                   ))}

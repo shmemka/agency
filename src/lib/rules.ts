@@ -1,12 +1,17 @@
 import { STATUS_ORDER, legalInfo, type Status } from './constants'
-import { addDays, daysBetween, todayISO } from './format'
+import { addDays, date, daysBetween, money, todayISO } from './format'
 import type { Blogger, Campaign, Doc, Integration, Settings, Task } from './types'
 
 export type DocLite = Pick<Doc, 'id' | 'integration_id' | 'blogger_id' | 'campaign_id' | 'kind'>
 
-/** Интеграция в работе: не закрыта, не отказ и (если есть кампания) одобрена клиентом */
-export const isActive = (i: Integration) =>
-  i.status !== 'done' && i.status !== 'declined' && (!i.campaign_id || i.client_decision === 'approved')
+/**
+ * Блогер в сделке считается взятым в работу, если клиент от него не отказался.
+ * Подборок по ссылке больше нет: с клиентом договариваются сами, поэтому старые «не отправлено» и «ждём решения» - тоже работа
+ */
+export const inWork = (i: Pick<Integration, 'client_decision'>) => i.client_decision !== 'rejected'
+
+/** Интеграция в работе: взята, не закрыта и не отказ */
+export const isActive = (i: Integration) => i.status !== 'done' && i.status !== 'declined' && inWork(i)
 
 /** Чья задача: исполнителя, а если его нет — того, кто поставил. Так задача без исполнителя не теряется */
 export const taskOwner = (t: Pick<Task, 'assignee_id' | 'created_by'>) => t.assignee_id ?? t.created_by
@@ -31,6 +36,74 @@ export function checklist(i: Integration, docs: DocLite[]) {
     { label: 'Скрин статистики после выхода', done: has('stats') },
     { label: 'Статистика передана в ОРД', done: Boolean(i.ord_reported_at) || i.marked_by !== 'us' },
   ]
+}
+
+/** Через сколько дней молчания блогера «ждём» превращается в «напомнить» */
+export const REMIND_AFTER = 3
+
+/**
+ * Группы списка дел на экране «Работа»:
+ * now - ход за нами, wait - ждём блогера, soon - оплачено и ждём выхода, tails - вышло, но не всё собрано
+ */
+export type WorkGroup = 'now' | 'wait' | 'soon' | 'tails'
+export interface NextStep {
+  group: WorkGroup
+  /** что сделать или чего ждём - одной короткой фразой */
+  text: string
+  tone?: 'warn' | 'bad'
+  /** порядок внутри группы: меньше - выше */
+  sort: number
+}
+
+/**
+ * Что делать с интеграцией прямо сейчас и чей ход. Каждый шаг воронки сам говорит об этом:
+ * «Согласовано» - наш ход (запросить реквизиты), «Жду подпись» - ход блогера, а после трёх дней тишины - снова наш (напомнить)
+ */
+export function nextStep(i: Integration, docs: DocLite[], settings: Settings | null, today = todayISO()): NextStep | null {
+  if (!isActive(i)) return null
+  const waited = Math.max(0, daysBetween(i.status_changed_at ?? i.updated_at, today))
+  const ours = (text: string, tone?: NextStep['tone']): NextStep => ({ group: 'now', text, tone, sort: -waited })
+  // what - чего ждём; пусто, если это уже сказано в названии шага («Жду подпись»)
+  const theirs = (what = ''): NextStep =>
+    waited >= REMIND_AFTER
+      ? { group: 'now', text: `напомнить: молчит ${waited}\u00a0дн.`, tone: 'warn', sort: -waited }
+      : { group: 'wait', text: [what, waited ? `${waited}\u00a0дн.` : 'с сегодня'].filter(Boolean).join(' '), sort: -waited }
+  switch (i.status) {
+    case 'new':
+      return ours('написать блогеру')
+    case 'contacted':
+      return theirs('ждём ответ')
+    case 'waiting_reply':
+      return theirs()
+    case 'negotiating':
+      return ours('договориться о цене и дате')
+    case 'agreed':
+      return ours('запросить реквизиты')
+    case 'waiting_details':
+      return theirs()
+    case 'waiting_contract':
+      return ours('подготовить и отправить договор')
+    case 'waiting_signature':
+      return theirs()
+    case 'waiting_payment':
+      return ours(i.price ? `оплатить ${money(i.price)}` : 'оплатить')
+    case 'paid': {
+      if (!i.publish_date) return ours('указать дату выхода')
+      const left = daysBetween(today, i.publish_date)
+      if (left < 0) return { group: 'now', text: `проверить выход: был ${date(i.publish_date)}`, tone: 'warn', sort: left }
+      if (left <= 1 && !i.erid) return { group: 'now', text: `получить erid: выход ${left ? 'завтра' : 'сегодня'}`, tone: 'bad', sort: left - 100 }
+      return { group: 'soon', text: left === 0 ? 'выход сегодня' : left === 1 ? 'выход завтра' : `выход ${date(i.publish_date)}`, sort: left }
+    }
+    case 'published': {
+      const c = checklist(i, docs)
+      const miss = [!c[0].done && 'нет договора', !i.erid && 'нет erid', !c[3].done && 'нет чека или акта', !c[4].done && 'нет скрина статистики', !i.fact_reach && 'нет охвата', !c[5].done && 'не сдано в ОРД'].filter(Boolean) as string[]
+      const dl = !i.ord_reported_at ? ordDeadline(i, settings) : null
+      const late = dl ? daysBetween(today, dl) : 999
+      if (!miss.length) return { group: 'tails', text: 'всё собрано - можно закрыть', sort: 1000 }
+      return { group: 'tails', text: miss.join(', '), tone: late < 0 ? 'bad' : late <= 7 ? 'warn' : undefined, sort: late }
+    }
+  }
+  return null
 }
 
 /** Предупреждения перед сменой статуса. Не запрет — можно перевести всё равно */

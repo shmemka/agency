@@ -12,7 +12,7 @@ import { BloggerName, useIntegrationPanel } from '../components/bits'
 import { confirmDialog } from '../components/dialogs'
 import { DateInput } from '../components/DateInput'
 import { bgLocation } from '../lib/settingsNav'
-import { commission as commissionOf } from '../lib/rules'
+import { commission as commissionOf, inWork } from '../lib/rules'
 
 type Tab = 'summary' | 'incomes' | 'payouts' | 'expenses'
 type Period = 'month' | 'quarter' | 'year'
@@ -154,7 +154,7 @@ export function Finance() {
   const payouts = useMemo(
     () =>
       integrations
-        .filter((i) => ['waiting_payment', 'paid', 'published', 'done'].includes(i.status) && (!i.campaign_id || i.client_decision === 'approved'))
+        .filter((i) => ['waiting_payment', 'paid', 'published', 'done'].includes(i.status) && inWork(i))
         .map((i) => ({ i, receipt: docs.some((d) => d.integration_id === i.id && (d.kind === 'receipt' || d.kind === 'act')) }))
         .sort((a, b) => (b.i.publish_date ?? '').localeCompare(a.i.publish_date ?? '')),
     [integrations, docs],
@@ -171,7 +171,7 @@ export function Finance() {
   const commission = campaigns
     .filter((c) => c.status !== 'cancelled')
     .map((c) => {
-      const rows = integrations.filter((i) => i.campaign_id === c.id && i.client_decision === 'approved' && i.status !== 'declined')
+      const rows = integrations.filter((i) => i.campaign_id === c.id && inWork(i) && i.status !== 'declined')
       return { c, plan: commissionOf(rows), fact: incomes.filter((i) => i.campaign_id === c.id).reduce((a, i) => a + i.amount, 0) }
     })
     .filter((x) => x.plan > 0 || x.fact > 0)

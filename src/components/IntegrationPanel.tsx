@@ -4,7 +4,7 @@ import { Check, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
-import { DECISIONS, MARKED_BY, platformInfo } from '../lib/constants'
+import { MARKED_BY, platformInfo } from '../lib/constants'
 import { checklist, isLive, ordDeadline } from '../lib/rules'
 import { count, cpm, date, daysBetween, money, parseNumber, todayISO } from '../lib/format'
 import type { Decision, Integration } from '../lib/types'
@@ -109,7 +109,6 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
                 ) : (
                   'Без сделки'
                 )}
-                {c && i.client_decision !== 'approved' && <span>, клиент: {DECISIONS[i.client_decision].toLowerCase()}</span>}
               </div>
               <div className="text-xl">
                 <BloggerName b={b} link />
@@ -203,31 +202,20 @@ export function IntegrationPanel({ id, onClose }: { id: string; onClose: () => v
                 <Select
                   value={v.campaign_id ?? ''}
                   onChange={(e) =>
-                    // интеграцию без кампании уже ведут: привязка к кампании не должна прятать её в подборку
-                    setD((x) => ({ ...x, campaign_id: e.target.value || null, ...(e.target.value && !i.campaign_id ? { client_decision: 'approved' as Decision } : {}) }))
+                    // блогера в сделке уже ведут: с клиентом о нём договорились
+                    setD((x) => ({ ...x, campaign_id: e.target.value || null, ...(e.target.value ? { client_decision: 'approved' as Decision } : {}) }))
                   }
                 >
                   <option value="" disabled>
                     Выберите сделку
                   </option>
-                  {campaigns.filter((x) => x.status === 'planning' || x.status === 'active' || x.id === i.campaign_id).map((x) => (
+                  {campaigns.filter((x) => (x.status !== 'done' && x.status !== 'cancelled') || x.id === i.campaign_id).map((x) => (
                     <option key={x.id} value={x.id}>
                       {x.name}
                     </option>
                   ))}
                 </Select>
               </Field>
-              {v.campaign_id && (
-                <Field label="Решение клиента">
-                  <Select value={v.client_decision} onChange={(e) => set('client_decision', e.target.value as Decision)}>
-                    {Object.entries(DECISIONS).map(([k, l]) => (
-                      <option key={k} value={k}>
-                        {l}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-              )}
               <Field label="Дата выхода">
                 <DateInput value={v.publish_date} onChange={(x) => set('publish_date', x)} aria-label="Дата выхода" />
               </Field>

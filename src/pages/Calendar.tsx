@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { phaseInfo, statusInfo } from '../lib/constants'
-import { isLive, ordDeadline, taskOwner } from '../lib/rules'
+import { inWork, isLive, ordDeadline, taskOwner } from '../lib/rules'
 import { todayISO } from '../lib/format'
 import { Button, Card, Filters, IconButton, Loading, PageHeader, Select, Skel, cx, useIsPhone } from '../components/ui'
 import { useIntegrationPanel } from '../components/bits'
@@ -45,7 +45,7 @@ export function Calendar() {
   const events = useMemo(() => {
     const out: Ev[] = []
     for (const i of integrations) {
-      if (i.status === 'declined' || (i.campaign_id && i.client_decision !== 'approved')) continue
+      if (i.status === 'declined' || !inWork(i)) continue
       if (cid && i.campaign_id !== cid) continue
       if (owner && i.owner_id !== owner) continue
       const nick = blogger(i.blogger_id)?.nick ?? 'блогер'

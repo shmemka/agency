@@ -9,7 +9,7 @@ import { nickFromUrl, parseNumber, platformFromUrl } from '../lib/format'
 import { removeAvatar, uploadAvatar } from '../lib/avatars'
 import type { Blogger, Campaign, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Button, Field, FieldGroup, Input, Modal, Segmented, Select, Toggle, cx } from './ui'
+import { Avatar, Button, Field, FieldGroup, Input, Modal, Select, Toggle, cx } from './ui'
 import { CampaignModal } from './CampaignForm'
 import { RichEditor } from './RichEditor'
 
@@ -399,15 +399,15 @@ export function BloggerFormModal({ open, onClose, onCreated }: { open: boolean; 
 
 /** Новая интеграция: блогер + (необязательно) кампания. Остальное заполняется в панели */
 /**
- * Блогер в сделку: в открытую сделку или в новую. Работа с блогером всегда идёт с клиентом.
- * Сразу в работу - когда с клиентом уже договорились, в подборку - когда клиент выберет сам
+ * Блогер в сделку: в открытую или в новую. Работа с блогером всегда идёт с клиентом,
+ * о блогере с клиентом уже договорились, поэтому он сразу попадает в список дел на экране «Работа»
  */
 export function AddToDealModal({ open, onClose, bloggerId, onCreated }: { open: boolean; onClose: () => void; bloggerId: string; onCreated: (i: Integration) => void }) {
   const { campaigns, integrations, blogger, reload } = useData()
   const { isAdmin, profile } = useAuth()
   const nav = useNavigate()
   const [cid, setCid] = useState('')
-  const [mode, setMode] = useState<'work' | 'shortlist'>('work')
+  const [price, setPrice] = useState('')
   const [busy, setBusy] = useState(false)
   const [newDeal, setNewDeal] = useState<Partial<Campaign> | null>(null)
   const deals = campaigns.filter((c) => c.status !== 'done' && c.status !== 'cancelled')
@@ -415,8 +415,10 @@ export function AddToDealModal({ open, onClose, bloggerId, onCreated }: { open: 
   useEffect(() => {
     if (!open) return
     setCid('')
-    setMode('work')
-  }, [open])
+    const p = blogger(bloggerId)?.price
+    setPrice(p === null || p === undefined ? '' : String(p))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, bloggerId])
 
   async function create() {
     if (!cid) return toast('Выберите сделку')
@@ -424,15 +426,14 @@ export function AddToDealModal({ open, onClose, bloggerId, onCreated }: { open: 
     setBusy(true)
     const { data, error } = await supabase
       .from('integrations')
-      .insert({ blogger_id: bloggerId, campaign_id: cid, price: blogger(bloggerId)?.price ?? null, status: 'new', client_decision: mode === 'work' ? 'approved' : 'none' })
+      .insert({ blogger_id: bloggerId, campaign_id: cid, price: parseNumber(price), status: 'new', client_decision: 'approved' })
       .select()
       .single()
     setBusy(false)
     if (error) return toast(error.code === '23505' ? 'Этот блогер уже есть в сделке' : error.message)
     await reload('integrations')
     onClose()
-    if (mode === 'work') onCreated(data as Integration)
-    else toast('Блогер добавлен в подборку сделки')
+    onCreated(data as Integration)
   }
 
   return (
@@ -453,7 +454,7 @@ export function AddToDealModal({ open, onClose, bloggerId, onCreated }: { open: 
         }
       >
         <div className="grid gap-4">
-          <Field label="Сделка" hint={deals.length ? undefined : 'Открытых сделок нет - создайте новую'}>
+          <Field label="Сделка" hint={deals.length ? 'Блогер появится в списке дел на экране «Работа»' : 'Открытых сделок нет - создайте новую'}>
             <Select
               value={cid}
               onChange={(e) => {
@@ -472,15 +473,8 @@ export function AddToDealModal({ open, onClose, bloggerId, onCreated }: { open: 
               {isAdmin && <option value="new">+ Новая сделка</option>}
             </Select>
           </Field>
-          <Field as="div" label="Как добавить" hint={mode === 'work' ? 'С клиентом уже договорились: блогер встанет на доску' : 'Клиент увидит блогера в подборке по ссылке и решит сам'}>
-            <Segmented
-              value={mode}
-              onChange={setMode}
-              options={[
-                { id: 'work', label: 'Сразу в работу' },
-                { id: 'shortlist', label: 'В подборку' },
-              ]}
-            />
+          <Field label="Цена блогера, ₽" hint="Цена для клиента посчитается сама: с наценкой сделки">
+            <Input inputMode="numeric" className="num" value={price} onChange={(e) => setPrice(e.target.value)} />
           </Field>
         </div>
       </Modal>
@@ -490,7 +484,7 @@ export function AddToDealModal({ open, onClose, bloggerId, onCreated }: { open: 
         onClose={() => setNewDeal(null)}
         onSaved={(id) => {
           onClose()
-          nav(`/work/${id}?tab=work`)
+          nav(`/work/${id}`)
         }}
       />
     </>

@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { siteUrl, supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
-import { campaignStatusLabel } from '../lib/constants'
 import type { Campaign, Client, ShareLink } from '../lib/types'
 import { toast } from '../lib/toast'
 import { Button, Field, Input, Modal, Select, cx } from './ui'
@@ -32,15 +31,13 @@ export function CampaignModal({ value, onClose, onSaved, bloggerIds }: { value: 
     setD(value.id ? value : { status: 'planning', markup_pct: settings?.default_markup_pct ?? 20, owner_id: profile?.id ?? null, ...value })
     setCrew(new Set(members.filter((m) => m.campaign_id === value.id).map((m) => m.profile_id)))
   }, [value])
-  // «На паузе», «Завершена» и «Отменена» автоматика не меняет, остальное база считает сама по интеграциям
-  const manual = d.status === 'paused' || d.status === 'done' || d.status === 'cancelled'
   const set = <K extends keyof Campaign>(k: K, v: Campaign[K] | null) => setD((x) => ({ ...x, [k]: v }))
 
   async function save() {
     if (!d.client_id) return toast('Выберите клиента')
     const clientName = clients.find((c) => c.id === d.client_id)?.name
     setBusy(true)
-    const payload = { name: d.name?.trim() || autoName(clientName), client_id: d.client_id ?? null, status: d.status, start_date: d.start_date ?? null, end_date: d.end_date ?? null, owner_id: d.owner_id ?? null, brief: d.brief?.trim() || null, markup_pct: d.markup_pct ?? 20 }
+    const payload = { name: d.name?.trim() || autoName(clientName), client_id: d.client_id ?? null, status: d.status ?? 'planning', start_date: d.start_date ?? null, end_date: d.end_date ?? null, owner_id: d.owner_id ?? null, brief: d.brief?.trim() || null, markup_pct: d.markup_pct ?? 20 }
     const res = d.id ? await supabase.from('campaigns').update(payload).eq('id', d.id).select().single() : await supabase.from('campaigns').insert(payload).select().single()
     if (res.error) {
       setBusy(false)
@@ -111,17 +108,6 @@ export function CampaignModal({ value, onClose, onSaved, bloggerIds }: { value: 
         <Field label="Название" hint="Можно не заполнять: подставится клиент и месяц" className="sm:col-span-2">
           <Input value={d.name ?? ''} onChange={(e) => set('name', e.target.value)} placeholder={autoName(clients.find((c) => c.id === d.client_id)?.name ?? 'Клиент')} />
         </Field>
-        {/* статус новой сделки ставится сам; вручную - только пауза, завершение и отмена */}
-        {d.id && (
-        <Field label="Статус" hint={manual ? undefined : 'Идёт после первого «Берём» клиента, завершается, когда все интеграции закрыты'}>
-            <Select value={manual ? d.status! : 'auto'} onChange={(e) => set('status', (e.target.value === 'auto' ? 'planning' : e.target.value) as Campaign['status'])}>
-              <option value="auto">{d.id && !manual && value?.status ? `Автоматически: ${campaignStatusLabel(value.status).toLowerCase()}` : 'Автоматически'}</option>
-              <option value="paused">На паузе</option>
-              <option value="done">Завершена</option>
-              <option value="cancelled">Отменена</option>
-            </Select>
-          </Field>
-        )}
         <Field label="Начало">
           <DateInput value={d.start_date} onChange={(v) => set('start_date', v)} aria-label="Начало" />
         </Field>

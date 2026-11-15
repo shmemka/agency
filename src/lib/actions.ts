@@ -1,13 +1,10 @@
 import { supabase } from './supabase'
-import type { Blogger, Decision, Integration } from './types'
+import type { Blogger, Integration } from './types'
 
-/**
- * Добавляет блогеров в сделку: в подборку для клиента (decision 'none') или сразу в работу ('approved').
- * Чёрный список и уже добавленных пропускает
- */
-export async function addToCampaign(campaignId: string, bloggers: Blogger[], integrations: Integration[], decision: Decision = 'none') {
+/** Добавляет блогеров в сделку сразу в работу. Чёрный список и уже добавленных пропускает */
+export async function addToCampaign(campaignId: string, bloggers: Blogger[], integrations: Integration[]) {
   const have = new Set(integrations.filter((i) => i.campaign_id === campaignId).map((i) => i.blogger_id))
-  const rows = bloggers.filter((b) => b.status !== 'blacklist' && !have.has(b.id)).map((b) => ({ blogger_id: b.id, campaign_id: campaignId, price: b.price, status: 'new', client_decision: decision }))
+  const rows = bloggers.filter((b) => b.status !== 'blacklist' && !have.has(b.id)).map((b) => ({ blogger_id: b.id, campaign_id: campaignId, price: b.price, status: 'new', client_decision: 'approved' }))
   if (!rows.length) return { added: 0, error: null as string | null }
   const { error } = await supabase.from('integrations').insert(rows)
   return { added: error ? 0 : rows.length, error: error?.message ?? null }

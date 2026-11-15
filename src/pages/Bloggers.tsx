@@ -205,7 +205,7 @@ export function Bloggers() {
   // кандидаты подборок тоже считаются: блогер уже предложен клиенту
   const busyBy = useMemo(() => {
     const m = new Map<string, typeof integrations>()
-    for (const i of integrations) if (isActive(i) || (i.campaign_id && i.status !== 'declined' && i.status !== 'done' && i.client_decision !== 'rejected')) m.set(i.blogger_id, [...(m.get(i.blogger_id) ?? []), i])
+    for (const i of integrations) if (isActive(i)) m.set(i.blogger_id, [...(m.get(i.blogger_id) ?? []), i])
     return m
   }, [integrations])
   const work = (b: Blogger) => {

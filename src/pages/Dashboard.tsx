@@ -3,7 +3,7 @@ import { ArrowUpRight } from 'lucide-react'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { PHASES, statusInfo } from '../lib/constants'
-import { commission as commissionOf, isActive, isLive, ordDeadline, taskOwner } from '../lib/rules'
+import { commission as commissionOf, inWork, isActive, isLive, ordDeadline, taskOwner } from '../lib/rules'
 import { count, date, money, plural, todayISO } from '../lib/format'
 import { Card, PageHeader, Skel, SkelList, StatusBadge, cx } from '../components/ui'
 import { BloggerName, TaskList, useIntegrationPanel } from '../components/bits'
@@ -28,7 +28,7 @@ export function Dashboard() {
   const livePhase = flow.findIndex((p) => p.id === 'live')
 
   const myTasks = tasks.filter((t) => taskOwner(t) === profile?.id && !t.done_at && !!t.due_date && t.due_date <= today).sort((a, b) => (a.due_date ?? '9').localeCompare(b.due_date ?? '9'))
-  const thisMonth = integrations.filter((i) => i.publish_date?.startsWith(month) && i.status !== 'declined' && (!i.campaign_id || i.client_decision === 'approved'))
+  const thisMonth = integrations.filter((i) => i.publish_date?.startsWith(month) && i.status !== 'declined' && inWork(i))
   const out = thisMonth.filter(isLive)
   const upcoming = active.filter((i) => i.publish_date && i.publish_date >= today && !isLive(i)).sort((a, b) => a.publish_date!.localeCompare(b.publish_date!)).slice(0, 6)
   const ord = integrations
@@ -37,7 +37,7 @@ export function Dashboard() {
     .filter((x) => x.dl)
     .sort((a, b) => a.dl!.localeCompare(b.dl!))
   const running = campaigns.filter((c) => c.status === 'active' || c.status === 'planning')
-  const commission = commissionOf(integrations.filter((i) => i.campaign_id && running.some((c) => c.id === i.campaign_id) && i.client_decision === 'approved' && i.status !== 'declined'))
+  const commission = commissionOf(integrations.filter((i) => i.campaign_id && running.some((c) => c.id === i.campaign_id) && inWork(i) && i.status !== 'declined'))
 
   return (
     <>
@@ -48,7 +48,7 @@ export function Dashboard() {
           <div className="flex items-baseline justify-between gap-2">
             <h2 className="text-base">В работе сейчас</h2>
             <Link to="/work" className="text-[13px] text-muted hover:text-ink">
-              Открыть доску
+              Список дел
             </Link>
           </div>
           {loading ? (
@@ -63,7 +63,7 @@ export function Dashboard() {
             {flow.map((p, idx) => {
               const n = byPhase(p.id).length
               return (
-                <Link key={p.id} to={`/work?phase=${p.id}`} className="group min-w-12 sm:min-w-24" style={{ flex: `${Math.max(n / total, 0.08)} 1 0` }}>
+                <Link key={p.id} to="/work?view=board" className="group min-w-12 sm:min-w-24" style={{ flex: `${Math.max(n / total, 0.08)} 1 0` }}>
                   {loading ? (
                     <Skel className="h-10 w-full" />
                   ) : (
@@ -196,7 +196,7 @@ export function Dashboard() {
           <div className="mb-2 flex items-baseline justify-between gap-3">
             <h2 className="min-w-0 text-base">Сдать статистику в ОРД</h2>
             {ord.length > 0 && (
-              <Link to="/work?tab=ord" className="inline-flex shrink-0 items-center gap-1 text-[13px] whitespace-nowrap text-muted hover:text-ink">
+              <Link to="/work" className="inline-flex shrink-0 items-center gap-1 text-[13px] whitespace-nowrap text-muted hover:text-ink">
                 Отметить <span className="max-sm:hidden">сданные</span> <ArrowUpRight className="size-3.5" strokeWidth={1.5} />
               </Link>
             )}

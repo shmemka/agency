@@ -974,6 +974,7 @@ export function DrawerClose({ className, iconClass = 'size-[18px]' }: { classNam
 /** Боковая панель; на телефоне — экран целиком с кнопкой «Назад» */
 export function Drawer({ onClose, children, label, beforeClose }: { onClose: () => void; children: ReactNode; label: string; beforeClose?: () => Promise<boolean> | boolean }) {
   const [leaving, setLeaving] = useState(false)
+  const box = useRef<HTMLElement>(null)
   useScrollLock(true)
   // панель уезжает вправо, и только потом её убирают со страницы
   const dismiss = useCallback(() => {
@@ -988,7 +989,10 @@ export function Drawer({ onClose, children, label, beforeClose }: { onClose: () 
   }, [beforeClose, dismiss])
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !document.querySelector('[role=dialog][aria-modal=true]')) close()
+      if (e.key !== 'Escape' || document.querySelector('[role=dialog][aria-modal=true]')) return
+      // панель поверх панели (интеграция поверх сделки): Esc закрывает только верхнюю
+      const all = document.querySelectorAll('aside[role=complementary]')
+      if (all[all.length - 1] === box.current) close()
     }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
@@ -997,7 +1001,7 @@ export function Drawer({ onClose, children, label, beforeClose }: { onClose: () 
     <DrawerCtx.Provider value={{ close, dismiss }}>
       <div className={cx('fixed inset-0 z-50', leaving && 'leaving pointer-events-none')}>
         <div className="fade absolute inset-0 hidden bg-ink/25 md:block" onClick={close} />
-        <aside role="complementary" aria-label={label} onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')} className="slide absolute inset-0 flex flex-col overflow-y-auto overscroll-contain bg-canvas md:inset-y-3 md:right-3 md:left-auto md:w-[720px] md:rounded-card md:shadow-[0_8px_24px_rgba(21,23,28,0.1)]">
+        <aside ref={box} role="complementary" aria-label={label} onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')} className="slide absolute inset-0 flex flex-col overflow-y-auto overscroll-contain bg-canvas md:inset-y-3 md:right-3 md:left-auto md:w-[720px] md:rounded-card md:shadow-[0_8px_24px_rgba(21,23,28,0.1)]">
           {/* «Назад» всегда под рукой: панель на телефоне длинная */}
           <button onClick={close} className="sticky top-0 z-20 flex h-12 shrink-0 items-center gap-1 bg-canvas/90 px-3 text-muted backdrop-blur md:hidden">
             <ChevronLeft className="size-5" strokeWidth={1.5} />
