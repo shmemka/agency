@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Bell, Building2, Check, CircleArrowUp, Coins, LayoutGrid, ListTodo, LogOut, Palette, Pipette, Upload, Users, type LucideIcon } from 'lucide-react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Bell, Building2, Check, ChevronLeft, ChevronRight, CircleArrowUp, Coins, HardDrive, LayoutGrid, ListTodo, LogOut, Palette, Pipette, Upload, Users, type LucideIcon } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { fetchAll, siteUrl, supabase } from '../lib/supabase'
 import { AVATAR_BUCKET, avatarPath } from '../lib/avatars'
@@ -8,39 +8,99 @@ import { useData } from '../lib/data'
 import { parseNumber, plural } from '../lib/format'
 import type { Settings as SettingsRow } from '../lib/types'
 import { toast } from '../lib/toast'
-import { confirmDialog } from '../components/dialogs'
-import { Avatar, Button, Card, Field, Input, Loading, Modal, PageHeader, Segmented, Skel, cx, submitOnEnter } from '../components/ui'
+import { confirmDialog, confirmDiscard } from '../components/dialogs'
+import { Avatar, Button, Card, Field, Input, Loading, Modal, PageHeader, Skel, cx, submitOnEnter } from '../components/ui'
 import { PLAN, UpgradeButton, WorkspaceTile } from '../components/Workspace'
 import { BrandLogo, Mark } from '../components/Layout'
 import { BRAND_PRESETS, DEFAULT_BRAND, LOGO_BUCKET, applyBrand, logoPath, normalizeHex, onBrand, prepareLogo, removeLogo, uploadLogo, uploadWorkspaceAvatar, type PreparedLogo } from '../lib/brand'
 import { STORAGE_PARTS, bytes, workspaceStorage, type StorageUse } from '../lib/storage'
 
-type SectionId = 'general' | 'brand' | 'money' | 'danger'
+type SectionId = 'general' | 'brand' | 'plan' | 'money' | 'danger'
 
-/** Разделы настроек: у каждого свой адрес, /settings/brand и т. п. Учредитель видит все, специалист - общее и выход */
+/** Разделы настроек: у каждого свой адрес, /settings/brand и т. п. Учредитель видит все, специалист - без оформления и денег */
 const SECTIONS: { id: SectionId; label: string; icon: LucideIcon; admin?: boolean }[] = [
-  { id: 'general', label: 'Общее', icon: Building2 },
+  { id: 'general', label: 'Кабинет', icon: Building2 },
   { id: 'brand', label: 'Оформление', icon: Palette, admin: true },
+  { id: 'plan', label: 'Тариф и место', icon: HardDrive },
   { id: 'money', label: 'Деньги и ОРД', icon: Coins, admin: true },
   { id: 'danger', label: 'Выход и удаление', icon: LogOut },
 ]
 
+// undefined - считаем, null - миграции 022 ещё нет или нет связи
+type Use = StorageUse | null | undefined
+const usedPart = (u: Use) => (u && u.limit ? u.total / u.limit : 0)
+
+/** Раздел сообщает, что в нём есть несохранённое: тогда переход в другой раздел сначала спросит */
+const Unsaved = createContext<(dirty: boolean) => void>(() => {})
+function useUnsaved(dirty: boolean) {
+  const set = useContext(Unsaved)
+  useEffect(() => {
+    set(dirty)
+    return () => set(false)
+  }, [dirty, set])
+}
+
+const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 })
+
 /**
  * Настройки текущего кабинета. Открываются из меню профиля.
- * Слева разделы (на телефоне - переключатель сверху), справа - один выбранный раздел
+ * Компьютер: слева разделы, справа выбранный. Телефон: сначала список разделов с тем, что в них сейчас, из раздела - назад к списку
  */
 export function Settings() {
-  const { workspace, isAdmin } = useAuth()
+  const { workspace, isAdmin, team } = useAuth()
   const { settings } = useData()
   const { section } = useParams()
   const navigate = useNavigate()
-  const list = SECTIONS.filter((x) => !x.admin || isAdmin)
-  const cur = list.find((x) => x.id === section) ?? list[0]
+  const [use, setUse] = useState<Use>(undefined)
+  useEffect(() => {
+    workspaceStorage().then(setUse)
+  }, [workspace?.id, workspace?.avatar_url, workspace?.logo_url])
+  const dirty = useRef(false)
+  const setDirty = useRef((d: boolean) => void (dirty.current = d)).current
+  // вкладку с несохранённым не закрыть случайно
+  useEffect(() => {
+    const on = (e: BeforeUnloadEvent) => dirty.current && e.preventDefault()
+    window.addEventListener('beforeunload', on)
+    return () => window.removeEventListener('beforeunload', on)
+  }, [])
+
   if (!workspace) return null
-  const go = (id: SectionId) => navigate(id === 'general' ? '/settings' : `/settings/${id}`, { replace: true })
+  const list = SECTIONS.filter((x) => !x.admin || isAdmin)
+  const picked = list.find((x) => x.id === section)
+  const cur = picked ?? list[0]
+  const full = usedPart(use) >= 0.8
+
+  async function go(id: SectionId | null, push?: boolean) {
+    if (id === cur.id && picked) return
+    if (dirty.current && !(await confirmDiscard())) return
+    navigate(id ? `/settings/${id}` : '/settings', { replace: !push })
+  }
+
+  // что сейчас в разделе - одной строкой, чтобы на телефоне не заходить в каждый
+  const people = team.filter((t) => t.is_active).length
+  const color = workspace.brand_color ? (BRAND_PRESETS.find((p) => p.hex === workspace.brand_color)?.label.toLowerCase() ?? workspace.brand_color) : null
+  const summary: Record<SectionId, string> = {
+    general: `${workspace.name}, ${people} ${plural(people, 'участник', 'участника', 'участников')}`,
+    brand: [workspace.logo_url ? 'Свой логотип' : 'Без логотипа', color ? `цвет ${color}` : 'цвет «Сверки»'].join(', '),
+    plan: use ? `${PLAN}, занято ${bytes(use.total)} из ${bytes(use.limit)}` : PLAN,
+    money: settings ? `Наценка ${nf.format(settings.default_markup_pct)} %, налоги ${nf.format(settings.tax_org_pct)} % и ${nf.format(settings.tax_person_pct)} %` : 'Наценка, сроки и налоги',
+    danger: isAdmin ? 'Покинуть или удалить кабинет' : 'Покинуть кабинет',
+  }
+
   return (
-    <>
-      <PageHeader title="Настройки кабинета" sub={isAdmin ? undefined : 'Менять настройки могут учредители'} />
+    <Unsaved.Provider value={setDirty}>
+      <div className={cx(picked && 'hidden lg:block')}>
+        <PageHeader title="Настройки кабинета" sub={isAdmin ? undefined : 'Менять настройки могут учредители'} />
+      </div>
+      {picked && (
+        <div className="mb-5 lg:hidden">
+          <button type="button" onClick={() => go(null)} className="-ml-1.5 flex h-9 items-center gap-1 pr-3 text-muted transition-colors duration-150 active:text-ink">
+            <ChevronLeft className="size-5" strokeWidth={1.5} />
+            Настройки кабинета
+          </button>
+          <h1 className="mt-1 text-[28px] leading-8 tracking-tight">{cur.label}</h1>
+        </div>
+      )}
       <div className="lg:grid lg:grid-cols-[200px_minmax(0,42rem)] lg:items-start lg:gap-8">
         <nav aria-label="Разделы настроек" className="sticky top-8 hidden space-y-0.5 lg:block">
           {list.map((x) => (
@@ -52,14 +112,34 @@ export function Settings() {
               className={cx('flex h-9 w-full items-center gap-2.5 rounded-full px-3 text-left transition-colors duration-150', x.id === cur.id ? 'bg-surface text-ink' : 'text-muted hover:bg-ink/5 hover:text-ink')}
             >
               <x.icon className="size-4" strokeWidth={1.5} />
-              {x.label}
+              <span className="flex-1 truncate">{x.label}</span>
+              {x.id === 'plan' && full && <span className="size-1.5 rounded-full bg-warn" aria-label="Место заканчивается" />}
             </button>
           ))}
         </nav>
-        <Segmented className="mb-4 max-w-full lg:hidden" value={cur.id} options={list.map((x) => ({ id: x.id, label: x.label }))} onChange={go} />
-        <div key={cur.id} className="fade grid min-w-0 grid-cols-1 gap-3">
-          {cur.id === 'general' && <Passport />}
+
+        {/* телефон: список разделов */}
+        {!picked && (
+          <nav aria-label="Разделы настроек" className="fade overflow-hidden rounded-card bg-surface lg:hidden">
+            {list.map((x, i) => (
+              <button key={x.id} type="button" onClick={() => go(x.id, true)} className={cx('flex w-full items-center gap-3 px-5 py-4 text-left transition-colors duration-150 active:bg-ink/4', i > 0 && 'border-t border-line')}>
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-soft">
+                  <x.icon className="size-[18px]" strokeWidth={1.5} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px]">{x.label}</span>
+                  <span className={cx('num mt-0.5 block truncate text-[13px]', x.id === 'plan' && full ? 'text-warn' : 'text-muted')}>{summary[x.id]}</span>
+                </span>
+                <ChevronRight className="size-5 shrink-0 text-faint" strokeWidth={1.5} />
+              </button>
+            ))}
+          </nav>
+        )}
+
+        <div key={cur.id} className={cx('fade min-w-0 grid-cols-1 gap-3', picked ? 'grid' : 'hidden lg:grid')}>
+          {cur.id === 'general' && <General />}
           {cur.id === 'brand' && <BrandSection />}
+          {cur.id === 'plan' && <PlanSection use={use} />}
           {cur.id === 'money' &&
             (settings ? (
               <MoneyCard s={settings} />
@@ -79,7 +159,7 @@ export function Settings() {
           {cur.id === 'danger' && <DangerCard />}
         </div>
       </div>
-    </>
+    </Unsaved.Provider>
   )
 }
 
@@ -101,18 +181,34 @@ function SaveBar({ dirty, saving, onSave, onReset }: { dirty: boolean; saving: b
   )
 }
 
-/** Паспорт кабинета: аватарка, название, команда, тариф и место в хранилище. Название видно команде и клиентам на подборках и отчётах */
-function Passport() {
+/** Строка настройки: что это - слева, действие - справа (на телефоне под текстом) */
+function Row({ title, text, children, lead }: { title: string; text?: ReactNode; children?: ReactNode; lead?: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <div className="flex min-w-0 items-center gap-4">
+        {lead}
+        <div className="min-w-0">
+          <h3 className="text-[15px]">{title}</h3>
+          {text && <p className="mt-1 text-[13px] text-muted">{text}</p>}
+        </div>
+      </div>
+      {children && <div className="flex shrink-0 gap-2">{children}</div>}
+    </div>
+  )
+}
+
+const linkButton = 'inline-flex h-10 items-center rounded-full bg-soft px-4 text-sm font-medium transition-colors duration-200 hover:bg-ink/8'
+const divider = <div className="my-5 h-px bg-line" />
+
+/** Кабинет: аватарка, название и команда. Название видно команде и клиентам на подборках и отчётах */
+function General() {
   const { workspace, isAdmin, team, reloadProfile } = useAuth()
   const [name, setName] = useState(workspace?.name ?? '')
   const [saving, setSaving] = useState(false)
   const [avatarBusy, setAvatarBusy] = useState(false)
   const avatarInput = useRef<HTMLInputElement>(null)
-  // undefined - считаем, null - миграции 022 ещё нет: тогда место не показываем
-  const [use, setUse] = useState<StorageUse | null | undefined>(undefined)
-  useEffect(() => {
-    workspaceStorage().then(setUse)
-  }, [workspace?.id])
+  const dirty = !!workspace && name.trim() !== workspace.name
+  useUnsaved(dirty)
   if (!workspace) return null
   const migrate = (m: string) => (/avatar_url|schema cache/i.test(m) ? 'Нужно запустить миграцию 022_storage_avatar.sql в Supabase' : m)
 
@@ -126,7 +222,6 @@ function Passport() {
       if (error) throw new Error(migrate(error.message))
       await removeLogo(workspace!.avatar_url)
       await reloadProfile()
-      workspaceStorage().then(setUse)
       toast(file ? 'Аватарка сохранена' : 'Аватарка убрана')
     } catch (e) {
       if (url) await removeLogo(url)
@@ -136,7 +231,6 @@ function Passport() {
   }
   const people = team.filter((t) => t.is_active)
   const shown = name.trim() || workspace.name
-  const dirty = name.trim() !== workspace.name
 
   async function save() {
     if (!name.trim()) return toast('Укажите название агентства')
@@ -148,109 +242,146 @@ function Passport() {
     toast('Название сохранено')
   }
 
+  const tile = <WorkspaceTile id={workspace.id} name={shown} src={workspace.avatar_url} className="size-14 rounded-[18px] text-lg" />
+  const teamRow = (
+    <Row
+      title="Команда"
+      text={
+        <span className="flex items-center gap-2">
+          <span className="flex">
+            {people.slice(0, 4).map((p) => (
+              <Avatar key={p.id} name={p.full_name || p.email || ''} src={p.avatar_url} className="-ml-1.5 size-6 text-[10px] ring-2 ring-surface first:ml-0" />
+            ))}
+          </span>
+          <span className="num">
+            {people.length} {plural(people.length, 'участник', 'участника', 'участников')}
+          </span>
+        </span>
+      }
+    >
+      <Link to="/team" className={linkButton}>
+        Открыть команду
+      </Link>
+    </Row>
+  )
+
+  if (!isAdmin)
+    return (
+      <Card>
+        <div className="flex items-center gap-4">
+          {tile}
+          <h2 className="min-w-0 truncate text-xl leading-7">{workspace.name}</h2>
+        </div>
+        {divider}
+        {teamRow}
+      </Card>
+    )
+
   return (
     <Card>
-      <div className="flex items-center gap-4">
-        <WorkspaceTile id={workspace.id} name={shown} src={workspace.avatar_url} className="size-14 rounded-[18px] text-lg" />
-        <div className="min-w-0">
-          <h2 className="truncate text-xl leading-7">{shown}</h2>
-          <Link to="/team" className="group mt-1 inline-flex items-center gap-2 text-[13px] text-muted transition-colors hover:text-ink">
-            <span className="flex">
-              {people.slice(0, 4).map((p) => (
-                <Avatar key={p.id} name={p.full_name || p.email || ''} src={p.avatar_url} className="-ml-1.5 size-6 text-[10px] ring-2 ring-surface first:ml-0" />
-              ))}
-            </span>
-            {people.length} {plural(people.length, 'участник', 'участника', 'участников')}
-          </Link>
-        </div>
+      <Row
+        title="Аватарка"
+        text="Квадратная картинка рядом с названием в меню и в списке кабинетов"
+        lead={
+          <button type="button" aria-label={workspace.avatar_url ? 'Заменить аватарку' : 'Загрузить аватарку'} disabled={avatarBusy} onClick={() => avatarInput.current?.click()} className="shrink-0 rounded-[18px] transition-opacity duration-150 hover:opacity-80 disabled:opacity-50">
+            {tile}
+          </button>
+        }
+      >
+        <Button loading={avatarBusy} onClick={() => avatarInput.current?.click()}>
+          {!avatarBusy && <Upload className="size-4" strokeWidth={1.5} />}
+          {workspace.avatar_url ? 'Заменить' : 'Загрузить'}
+        </Button>
+        {workspace.avatar_url && (
+          <Button variant="ghost" disabled={avatarBusy} onClick={() => setAvatar(null)}>
+            Убрать
+          </Button>
+        )}
+        <input
+          ref={avatarInput}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            e.target.value = ''
+            if (f) setAvatar(f)
+          }}
+        />
+      </Row>
+      {divider}
+      <div onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')}>
+        <Field label="Название агентства" hint={hint('Видно команде, а клиентам - на подборках и отчётах')}>
+          <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
+        </Field>
+        <SaveBar dirty={dirty} saving={saving} onSave={save} onReset={() => setName(workspace.name)} />
       </div>
-
-      {/* тариф и его лимит рядом: «Улучшить» стоит там, где видно, сколько места осталось */}
-      <div className="mt-5 rounded-inner bg-soft p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-xs text-muted">Тариф</div>
-            <div className="text-sm">{PLAN}</div>
-          </div>
-          {isAdmin && <UpgradeButton size="md" />}
-        </div>
-        {use !== null && <StorageMeter use={use} />}
-      </div>
-
-      {isAdmin && (
-        <div className="mt-5" onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')}>
-          <Field as="div" label="Аватарка кабинета" hint={hint('Квадратная картинка: видна рядом с названием в меню и в списке кабинетов')} className="mb-4">
-            <div className="flex gap-2">
-              <Button loading={avatarBusy} onClick={() => avatarInput.current?.click()}>
-                {!avatarBusy && <Upload className="size-4" strokeWidth={1.5} />}
-                {workspace.avatar_url ? 'Заменить' : 'Загрузить'}
-              </Button>
-              {workspace.avatar_url && (
-                <Button variant="ghost" disabled={avatarBusy} onClick={() => setAvatar(null)}>
-                  Убрать
-                </Button>
-              )}
-            </div>
-            <input
-              ref={avatarInput}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                e.target.value = ''
-                if (f) setAvatar(f)
-              }}
-            />
-          </Field>
-          <Field label="Название агентства" hint={hint('Видно команде, а клиентам - на подборках и отчётах')}>
-            <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
-          </Field>
-          <SaveBar dirty={dirty} saving={saving} onSave={save} onReset={() => setName(workspace.name)} />
-        </div>
-      )}
+      {divider}
+      {teamRow}
     </Card>
   )
 }
 
-/** Место в хранилище: сколько занято из лимита тарифа и из чего складывается */
-function StorageMeter({ use }: { use: StorageUse | undefined }) {
-  if (!use)
-    return (
-      <div className="mt-4 border-t border-line pt-4">
-        <Skel className="h-3.5 w-40" />
-        <Skel className="mt-2.5 h-1.5 w-full" />
-      </div>
-    )
-  const part = use.limit ? use.total / use.limit : 0
-  const tone = part >= 0.95 ? 'bg-bad' : part >= 0.8 ? 'bg-warn' : 'bg-ink/70'
-  const parts = STORAGE_PARTS.filter((p) => use[p.id] > 0)
+// куда идти, чтобы освободить место
+const PART_LINK: Record<string, string> = { documents: '/documents', tasks: '/tasks', bloggers: '/bloggers', brand: '/settings/brand' }
+const PART_TONE = [1, 0.6, 0.38, 0.2]
+
+/** Тариф и место в хранилище: сколько занято из лимита и чем. Каждая строка ведёт туда, где эти файлы лежат */
+function PlanSection({ use }: { use: Use }) {
+  const { isAdmin } = useAuth()
+  const part = usedPart(use)
+  const tone = part >= 1 ? 'bg-bad' : part >= 0.8 ? 'bg-warn' : 'bg-ink'
+  const parts = use ? STORAGE_PARTS.filter((p) => isAdmin || p.id !== 'brand').map((p, i) => ({ ...p, size: use[p.id], opacity: PART_TONE[i] })) : []
   return (
-    <div className="mt-4 border-t border-line pt-4">
-      <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span>Хранилище</span>
-        <span className="num text-muted">
-          {bytes(use.total)} из {bytes(use.limit)}
-        </span>
-      </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink/6" role="meter" aria-valuemin={0} aria-valuemax={use.limit} aria-valuenow={use.total} aria-label="Занято в хранилище">
-        <div className={cx('h-full rounded-full transition-[width] duration-700 ease-[var(--ease-out)]', tone)} style={{ width: `${Math.min(100, Math.max(part * 100, use.total ? 1 : 0))}%` }} />
-      </div>
-      {parts.length > 0 && (
-        <div className="num mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
-          {parts.map((p) => (
-            <span key={p.id}>
-              {p.label} {bytes(use[p.id])}
-            </span>
-          ))}
-        </div>
+    <Card>
+      <Row title={PLAN} text="Все разделы, команда без ограничений и 1 ГБ для файлов">
+        {isAdmin && <UpgradeButton size="md" />}
+      </Row>
+      {use !== null && (
+        <>
+          {divider}
+          {use ? (
+            <section>
+              <div className="flex items-baseline justify-between gap-3">
+                <h3 className="text-[15px]">Хранилище</h3>
+                <span className="num text-[13px] text-muted">свободно {bytes(Math.max(0, use.limit - use.total))}</span>
+              </div>
+              <div className="num mt-3 text-[28px] leading-8">
+                {bytes(use.total)} <span className="text-base text-muted">из {bytes(use.limit)}</span>
+              </div>
+              <div className="mt-3 flex h-2 gap-px overflow-hidden rounded-full bg-ink/6" role="meter" aria-valuemin={0} aria-valuemax={use.limit} aria-valuenow={use.total} aria-label="Занято в хранилище">
+                {parts.map((p) => p.size > 0 && <span key={p.id} className={cx('h-full', tone)} style={{ width: `${(p.size / use.limit) * 100}%`, opacity: p.opacity }} />)}
+              </div>
+              {part >= 0.8 && (
+                <p className={cx('mt-3 text-[13px]', part >= 1 ? 'text-bad' : 'text-warn')}>
+                  {part >= 1 ? 'Место закончилось: новые документы и файлы задач не загрузятся' : 'Место заканчивается: удалите ненужные файлы или улучшите тариф'}
+                </p>
+              )}
+              <ul className="mt-4 divide-y divide-line">
+                {parts.map((p) => (
+                  <li key={p.id}>
+                    <Link to={PART_LINK[p.id]} className="group flex h-11 items-center gap-3 text-sm">
+                      <span className={cx('size-2 shrink-0 rounded-full', tone)} style={{ opacity: p.opacity }} />
+                      <span className="flex-1 truncate">{p.label}</span>
+                      <span className="num text-muted">{bytes(p.size)}</span>
+                      <ChevronRight className="size-4 shrink-0 text-faint transition-colors duration-150 group-hover:text-ink" strokeWidth={1.5} />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : (
+            <Loading>
+              <Skel className="h-4 w-28" />
+              <Skel className="mt-4 h-7 w-44" />
+              <Skel className="mt-3 h-2 w-full" />
+              <Skel className="mt-6 h-4 w-full" />
+              <Skel className="mt-6 h-4 w-full" />
+            </Loading>
+          )}
+        </>
       )}
-      {part >= 0.8 && (
-        <p className={cx('mt-2 text-[13px]', part >= 1 ? 'text-bad' : 'text-warn')}>
-          {part >= 1 ? 'Место закончилось: новые документы и файлы задач не загрузятся' : 'Место заканчивается. Удалите ненужные файлы или улучшите тариф'}
-        </p>
-      )}
-    </div>
+    </Card>
   )
 }
 
@@ -280,6 +411,7 @@ function BrandSection() {
   // предпросмотр нового файла живёт в памяти браузера - освобождаем, когда он больше не нужен
   useEffect(() => () => void (draft.kind === 'new' && URL.revokeObjectURL(draft.logo.url)), [draft])
 
+  useUnsaved(color !== saved || draft.kind !== 'keep')
   if (!workspace) return null
   const logo = draft.kind === 'new' ? draft.logo.url : draft.kind === 'none' ? null : savedLogo
   const dirty = color !== saved || draft.kind !== 'keep'
@@ -330,7 +462,7 @@ function BrandSection() {
       ? `${draft.name}${draft.logo.trimmed ? ' - пустые поля обрезаны' : ''}`
       : draft.kind === 'none'
         ? 'В меню вернутся значок и название агентства'
-        : 'SVG или PNG на прозрачном фоне. Файл можно перетащить на предпросмотр выше'
+        : 'SVG или PNG на прозрачном фоне'
   const swatch = 'relative flex size-9 shrink-0 items-center justify-center rounded-full shadow-[inset_0_0_0_1px_rgb(21_23_28/0.08)] transition-transform duration-150 active:scale-90'
   const picked = 'ring-2 ring-ink ring-offset-2 ring-offset-surface'
 
@@ -350,8 +482,8 @@ function BrandSection() {
           pick(e.dataTransfer.files?.[0])
         }}
       >
-        <div className="flex gap-4" aria-hidden>
-          <div className="w-52 shrink-0">
+        <div className="flex flex-col gap-4 sm:flex-row" aria-hidden>
+          <div className="sm:w-52 sm:shrink-0">
             <div className="flex items-center gap-1.5 px-2">
               {/* пунктир - место логотипа в меню */}
               <div className="flex h-8 w-36 min-w-0 items-center rounded-[6px] outline-1 outline-offset-2 outline-ink/20 outline-dashed">
@@ -368,7 +500,7 @@ function BrandSection() {
                 <Bell className="size-[18px]" strokeWidth={1.5} />
               </span>
             </div>
-            <div className="mt-5 space-y-0.5">
+            <div className="mt-5 hidden space-y-0.5 sm:block">
               {[
                 [LayoutGrid, 'Обзор'],
                 [Users, 'Блогеры'],
@@ -384,7 +516,7 @@ function BrandSection() {
               })}
             </div>
           </div>
-          <div className="hidden min-w-0 flex-1 rounded-[20px] bg-surface p-4 sm:block">
+          <div className="min-w-0 flex-1 rounded-[20px] bg-surface p-4">
             <div className="text-xs text-muted">Кампания</div>
             <div className="truncate text-[15px]">Весенний запуск</div>
             <div className="mt-4 flex h-1.5 overflow-hidden rounded-full bg-ink/6">
@@ -413,7 +545,10 @@ function BrandSection() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
           <div className="min-w-0">
             <h3 className="text-sm font-medium">Логотип</h3>
-            <p className="mt-1 text-[13px] break-words text-muted">{note}</p>
+            <p className="mt-1 text-[13px] break-words text-muted">
+              {note}
+              {draft.kind === 'keep' && <span className="hidden lg:inline">. Файл можно перетащить на предпросмотр выше</span>}
+            </p>
             {draft.kind === 'new' && draft.logo.warnings.length > 0 && (
               <ul className="mt-1.5 space-y-1 text-[13px] text-warn">
                 {draft.logo.warnings.map((w) => (
@@ -504,8 +639,6 @@ function BrandSection() {
   )
 }
 
-const nf = new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 })
-
 /** Число с единицей прямо в поле: «30 %», «2 400 000 ₽». Пока поле в фокусе, формат не мешает печатать */
 function NumberInput({ value, unit, onChange }: { value: number; unit: string; onChange: (v: number) => void }) {
   const [text, setText] = useState<string | null>(null)
@@ -539,6 +672,7 @@ function MoneyCard({ s }: { s: SettingsRow }) {
   const [saving, setSaving] = useState(false)
   const keys: MoneyKey[] = ['default_markup_pct', 'ord_deadline_days', 'tax_org_pct', 'tax_person_pct', 'income_limit']
   const dirty = keys.some((k) => d[k] !== s[k])
+  useUnsaved(dirty)
   const num = (k: MoneyKey, label: string, unit: string, h?: string) => (
     <Field label={label} hint={h && hint(h)}>
       <NumberInput value={d[k]} unit={unit} onChange={(v) => setD({ ...d, [k]: v })} />
@@ -567,10 +701,10 @@ function MoneyCard({ s }: { s: SettingsRow }) {
             {num('ord_deadline_days', 'Срок сдачи статистики в ОРД', 'дн.', 'Считается от конца месяца первого показа')}
           </div>
         </Group>
-        <Group title="Налоги" sub="Для раздела «Финансы». При переходе на ИП с УСН поставьте обе ставки 6 % и увеличьте лимит">
+        <Group title="Налоги" sub="По ним «Финансы» считают налог и остаток лимита. На ИП с УСН поставьте обе ставки 6 % и свой лимит">
           <div className="grid gap-4 sm:grid-cols-3">
-            {num('tax_org_pct', 'С оплат организаций и ИП', '%')}
-            {num('tax_person_pct', 'С оплат физлиц', '%')}
+            {num('tax_org_pct', 'С оплат организаций и ИП', '%', 'У самозанятого 6 %')}
+            {num('tax_person_pct', 'С оплат физлиц', '%', 'У самозанятого 4 %')}
             {num('income_limit', 'Лимит дохода в год', '₽', 'У самозанятого 2 400 000 ₽')}
           </div>
         </Group>
@@ -591,19 +725,6 @@ function Group({ title, sub, children }: { title: string; sub?: string; children
   )
 }
 
-/** Строка необратимого действия: что произойдёт - слева, кнопка - справа (на телефоне под текстом) */
-function DangerRow({ title, text, children }: { title: string; text: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
-      <div className="min-w-0">
-        <h3 className="text-[15px]">{title}</h3>
-        <p className="mt-1 text-[13px] text-muted">{text}</p>
-      </div>
-      <div className="shrink-0">{children}</div>
-    </div>
-  )
-}
-
 /**
  * Необратимое - отдельной карточкой в самом низу: покинуть кабинет (любой участник)
  * и удалить его со всеми данными (учредитель)
@@ -616,7 +737,7 @@ function DangerCard() {
         <LeaveRow />
         {isAdmin && (
           <>
-            <div className="my-5 h-px bg-line" />
+            {divider}
             <DeleteRow />
           </>
         )}
@@ -635,14 +756,14 @@ function LeaveRow() {
   const lastAdmin = isAdmin && !team.some((m) => m.id !== profile.id && m.role === 'admin' && m.is_active)
   if (lastAdmin)
     return (
-      <DangerRow title="Покинуть кабинет" text="Вы единственный учредитель. Чтобы уйти, сначала назначьте учредителем кого-то из команды">
-        <Link to="/team" className="inline-flex h-10 items-center rounded-full bg-soft px-4 text-sm font-medium transition-colors hover:bg-ink/8">
+      <Row title="Покинуть кабинет" text="Вы единственный учредитель. Чтобы уйти, сначала назначьте учредителем кого-то из команды">
+        <Link to="/team" className={linkButton}>
           Открыть команду
         </Link>
-      </DangerRow>
+      </Row>
     )
   return (
-    <DangerRow
+    <Row
       title="Покинуть кабинет"
       text={other ? `Данные останутся в кабинете, а у вас откроется «${other.name}»` : 'Данные останутся в кабинете, а вы сможете создать свой или войти в другой по ссылке'}
     >
@@ -667,7 +788,7 @@ function LeaveRow() {
       >
         Покинуть
       </Button>
-    </DangerRow>
+    </Row>
   )
 }
 
@@ -737,11 +858,11 @@ function DeleteRow() {
 
   return (
     <>
-      <DangerRow title="Удалить кабинет" text="Все данные и файлы удалятся навсегда, команда потеряет доступ">
+      <Row title="Удалить кабинет" text="Все данные и файлы удалятся навсегда, команда потеряет доступ">
         <Button variant="danger" className="bg-bad/8" onClick={() => setOpen(true)}>
           Удалить
         </Button>
-      </DangerRow>
+      </Row>
       <Modal
         open={open}
         onClose={() => {
