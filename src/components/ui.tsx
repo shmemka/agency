@@ -31,7 +31,7 @@ export function usePresence(open: boolean, ms = 160) {
  * true, пока список ещё не показан, и первые ms после показа (ready = данные загрузились).
  * Строки, появившиеся вместе со списком, въезжают по очереди; добавленные потом — сразу, без задержки
  */
-export function useEntrance(ready = true, ms = 700) {
+export function useEntrance(ready = true, ms = 1300) {
   const [on, setOn] = useState(true)
   useEffect(() => {
     if (!ready) return
@@ -59,8 +59,8 @@ export function useCopy() {
 export function CopyIcon({ copied }: { copied: boolean }) {
   return (
     <span className="relative inline-flex size-3.5">
-      <Copy className={cx('absolute inset-0 size-3.5 transition-[opacity,transform] duration-200', copied ? 'scale-50 opacity-0' : 'opacity-100')} strokeWidth={1.5} />
-      <Check className={cx('absolute inset-0 size-3.5 transition-[opacity,transform] duration-200', copied ? 'opacity-100' : 'scale-50 opacity-0')} strokeWidth={2} />
+      <Copy className={cx('absolute inset-0 size-3.5 transition-[opacity,transform] duration-300', copied ? 'scale-50 opacity-0' : 'opacity-100')} strokeWidth={1.5} />
+      <Check className={cx('absolute inset-0 size-3.5 transition-[opacity,transform] duration-300', copied ? 'opacity-100' : 'scale-50 opacity-0')} strokeWidth={2} />
     </span>
   )
 }
@@ -180,7 +180,7 @@ export function Button({
       {...rest}
       disabled={rest.disabled || loading}
       className={cx(
-        'inline-flex shrink-0 items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,color,transform] duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40',
+        'inline-flex shrink-0 items-center justify-center gap-2 rounded-full font-medium whitespace-nowrap transition-[background-color,color,transform] duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40',
         size === 'sm' ? 'h-8 px-3 text-[13px]' : 'h-10 px-4 text-sm',
         variant === 'primary' && 'bg-ink text-white hover:bg-ink/85',
         // белая кнопка без обводки; внутри белых карточек и окон она серая (см. index.css)
@@ -204,14 +204,14 @@ export function IconButton({ label, className, children, ...rest }: ButtonHTMLAt
       aria-label={label}
       title={label}
       {...rest}
-      className={cx('inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted transition-[background-color,color,transform] duration-150 hover:bg-ink/5 hover:text-ink active:scale-[0.92]', className)}
+      className={cx('inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted transition-[background-color,color,transform] duration-200 hover:bg-ink/5 hover:text-ink active:scale-[0.92]', className)}
     >
       {children}
     </button>
   )
 }
 
-const fieldBase = 'w-full rounded-2xl bg-soft px-4 text-sm text-ink placeholder:text-faint ring-1 ring-transparent transition-shadow duration-150 focus:bg-surface focus:outline-none focus:ring-ink/25'
+const fieldBase = 'w-full rounded-2xl bg-soft px-4 text-sm text-ink placeholder:text-faint ring-1 ring-transparent transition-shadow duration-200 focus:bg-surface focus:outline-none focus:ring-ink/25'
 
 export function Input(props: ComponentProps<'input'>) {
   return <input {...props} className={cx(fieldBase, 'h-10', props.className)} />
@@ -425,7 +425,7 @@ export function Select({
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={onKey}
         className={cx(
-          'flex h-10 w-full items-center gap-2 pr-3 pl-4 text-left text-sm transition-[background-color,box-shadow] duration-150 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
+          'flex h-10 w-full items-center gap-2 pr-3 pl-4 text-left text-sm transition-[background-color,box-shadow] duration-200 focus:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50',
           // фильтры на фоне страницы и в тёмной панели — капсулы; поля внутри карточек — со скруглением 16
           tone === 'field' ? 'rounded-2xl' : 'rounded-full',
           tone === 'field' && 'bg-soft text-ink hover:bg-ink/[0.06] focus-visible:ring-ink/25',
@@ -435,7 +435,7 @@ export function Select({
         )}
       >
         <span className={cx('min-w-0 flex-1 truncate', !current?.text && !placeholder && 'text-faint', current?.value === '' && tone !== 'dark' && 'text-muted')}>{current?.label ?? placeholder ?? '—'}</span>
-        <ChevronDown className={cx('size-4 shrink-0 transition-transform duration-150', tone === 'dark' ? 'text-white/70' : 'text-faint', open && 'rotate-180')} strokeWidth={1.5} />
+        <ChevronDown className={cx('size-4 shrink-0 transition-transform duration-200', tone === 'dark' ? 'text-white/70' : 'text-faint', open && 'rotate-180')} strokeWidth={1.5} />
       </button>
       {open &&
         createPortal(
@@ -711,7 +711,7 @@ export function StatusRail({ value, onChange }: { value: Status; onChange: (s: S
                       onClick={() => onChange(s.id)}
                       aria-pressed={isCur}
                       className={cx(
-                        'h-8 truncate rounded-full px-3 text-left text-[13px] transition-colors duration-150',
+                        'h-8 truncate rounded-full px-3 text-left text-[13px] transition-colors duration-200',
                         isCur ? 'bg-ink text-white' : passed ? 'bg-lime/45 text-ink hover:bg-lime/70' : 'hatch text-muted hover:text-ink',
                       )}
                     >
@@ -727,7 +727,7 @@ export function StatusRail({ value, onChange }: { value: Status; onChange: (s: S
           type="button"
           onClick={() => onChange('declined')}
           aria-pressed={stopped}
-          className={cx('mt-2 h-8 rounded-full px-3 text-[13px] transition-colors duration-150', stopped ? 'bg-ink text-white' : 'text-muted hover:bg-ink/5 hover:text-ink')}
+          className={cx('mt-2 h-8 rounded-full px-3 text-[13px] transition-colors duration-200', stopped ? 'bg-ink text-white' : 'text-muted hover:bg-ink/5 hover:text-ink')}
         >
           Отказ
         </button>
@@ -763,7 +763,7 @@ export function Segmented<T extends string>({ value, options, onChange, classNam
       {pill && (
         <span
           aria-hidden
-          className={cx('absolute left-0 rounded-full bg-ink', lg ? 'top-1.5 h-11' : 'top-1 h-8', pill.animate && 'transition-[transform,width] duration-250 ease-[var(--ease-out)]')}
+          className={cx('absolute left-0 rounded-full bg-ink', lg ? 'top-1.5 h-11' : 'top-1 h-8', pill.animate && 'transition-[transform,width] duration-450 ease-[var(--ease-out)]')}
           style={{ transform: `translateX(${pill.x}px)`, width: pill.w }}
         />
       )}
@@ -791,7 +791,7 @@ export function Progress({ value, max, over, className }: { value: number; max: 
   const p = max > 0 ? Math.min(100, (value / max) * 100) : 0
   return (
     <div className={cx('hatch h-4 overflow-hidden rounded-full', className)} role="progressbar" aria-valuenow={Math.round(p)} aria-valuemin={0} aria-valuemax={100}>
-      <div className={cx('grow h-full rounded-full transition-[width] duration-500 ease-[var(--ease-out)]', over ? 'bg-bad' : 'bar-lime')} style={{ width: `${p}%` }} />
+      <div className={cx('grow h-full rounded-full transition-[width] duration-700 ease-[var(--ease-out)]', over ? 'bg-bad' : 'bar-lime')} style={{ width: `${p}%` }} />
     </div>
   )
 }
@@ -816,7 +816,7 @@ export function submitOnEnter(e: React.KeyboardEvent, scope: HTMLElement | null,
 export function Modal({ open, onClose, title, children, footer, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode; wide?: boolean }) {
   const footerRef = useRef<HTMLDivElement>(null)
   // пока окно уходит, показываем его последнее содержимое: данные формы к этому времени уже сброшены
-  const { mounted, leaving } = usePresence(open, 150)
+  const { mounted, leaving } = usePresence(open, 220)
   const last = useRef({ title, children, footer })
   if (open) last.current = { title, children, footer }
   const v = open ? { title, children, footer } : last.current
@@ -878,7 +878,7 @@ export function Drawer({ onClose, children, label, beforeClose }: { onClose: () 
   const dismiss = useCallback(() => {
     if (reducedMotion()) return onClose()
     setLeaving(true)
-    setTimeout(onClose, 170)
+    setTimeout(onClose, 260)
   }, [onClose])
   // beforeClose спрашивает, можно ли закрыть: например, когда есть несохранённые правки
   const close = useCallback(async () => {
@@ -913,7 +913,7 @@ export function Toggle({ checked, onChange, label }: { checked: boolean; onChang
   return (
     <label className="inline-flex min-h-10 cursor-pointer items-center gap-3 select-none">
       <input type="checkbox" className="peer sr-only" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span className="relative h-6 w-10 shrink-0 rounded-full bg-ink/15 transition-colors duration-150 peer-checked:bg-ink peer-focus-visible:ring-2 peer-focus-visible:ring-ink/40 after:absolute after:top-1 after:left-1 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-150 peer-checked:after:translate-x-4" />
+      <span className="relative h-6 w-10 shrink-0 rounded-full bg-ink/15 transition-colors duration-200 peer-checked:bg-ink peer-focus-visible:ring-2 peer-focus-visible:ring-ink/40 after:absolute after:top-1 after:left-1 after:size-4 after:rounded-full after:bg-white after:transition-transform after:duration-200 peer-checked:after:translate-x-4" />
       {label}
     </label>
   )
@@ -952,7 +952,7 @@ export function ToastHost() {
     const t = setTimeout(() => setOpen(false), 3200)
     return () => clearTimeout(t)
   }, [open, msg?.n])
-  const { mounted, leaving } = usePresence(open, 160)
+  const { mounted, leaving } = usePresence(open, 220)
   if (!mounted || !msg) return null
   return createPortal(
     <div role="status" className="fixed bottom-24 left-1/2 z-[80] max-w-[90vw] -translate-x-1/2 md:bottom-6">

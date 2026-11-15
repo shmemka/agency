@@ -249,7 +249,7 @@ export function Layout() {
         </div>
         <nav ref={navBox} className="relative flex-1 space-y-0.5" aria-label="Разделы">
           {/* белая подложка переезжает к выбранному разделу */}
-          {pill && <span aria-hidden className={cx('absolute inset-x-0 top-0 h-9 rounded-full bg-surface', pill.animate && 'transition-transform duration-300 ease-[var(--ease-out)]')} style={{ transform: `translateY(${pill.y}px)` }} />}
+          {pill && <span aria-hidden className={cx('absolute inset-x-0 top-0 h-9 rounded-full bg-surface', pill.animate && 'transition-transform duration-450 ease-[var(--ease-out)]')} style={{ transform: `translateY(${pill.y}px)` }} />}
           {nav.map((n) => (
             <NavLink
               key={n.to}

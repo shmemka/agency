@@ -20,7 +20,8 @@
 
   --radius-card: 28px;
   --radius-inner: 20px;
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  /* мягкий разгон и долгое плавное торможение: движение без рывка в начале */
+  --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 html,
@@ -187,7 +188,7 @@ input[type='search']::-webkit-search-decoration {
 
 /* ---------- движение ----------
  * Правило: анимация показывает, что изменилось, и не задерживает работу.
- * Появление 160–320 мс, исчезновение быстрее появления. При «уменьшить движение» всё выключается.
+ * Появление 300–500 мс, исчезновение чуть быстрее. При «уменьшить движение» всё выключается.
  */
 @keyframes rise {
   from {
@@ -203,7 +204,7 @@ input[type='search']::-webkit-search-decoration {
 }
 @keyframes slide {
   from {
-    transform: translateX(16px);
+    transform: translateX(24px);
     opacity: 0;
   }
 }
@@ -257,35 +258,35 @@ input[type='search']::-webkit-search-decoration {
   }
 }
 .rise {
-  animation: rise 0.3s var(--ease-out);
+  animation: rise 0.5s var(--ease-out);
 }
 .slide {
-  animation: slide 0.3s var(--ease-out);
+  animation: slide 0.5s var(--ease-out);
 }
 .sheet {
-  animation: sheet 0.3s var(--ease-out);
+  animation: sheet 0.5s var(--ease-out);
 }
 .fade {
-  animation: fade 0.18s var(--ease-out);
+  animation: fade 0.32s var(--ease-out);
 }
 /* выпадающие списки и меню: чуть съезжают от кнопки */
 .pop {
-  animation: pop 0.16s var(--ease-out);
+  animation: pop 0.26s var(--ease-out);
   transform-origin: top;
 }
 /* уход: окно, панель, подсказка */
 .leaving.fade,
 .leaving .fade {
-  animation: fade-out 0.14s ease-in forwards;
+  animation: fade-out 0.22s ease-out forwards;
 }
 .leaving .sheet {
-  animation: sheet-out 0.14s ease-in forwards;
+  animation: sheet-out 0.22s ease-out forwards;
 }
 .leaving .slide {
-  animation: slide-out 0.16s ease-in forwards;
+  animation: slide-out 0.26s ease-out forwards;
 }
 .leaving.rise {
-  animation: fade-out 0.16s ease-in forwards;
+  animation: fade-out 0.22s ease-out forwards;
 }
 /* иллюстрация первого экрана: проявляется и чуть опускается на место */
 @keyframes art-in {
@@ -295,37 +296,37 @@ input[type='search']::-webkit-search-decoration {
   }
 }
 .onboard-art {
-  animation: art-in 0.7s var(--ease-out);
+  animation: art-in 0.9s var(--ease-out);
 }
-/* смена страницы */
+/* смена страницы: только проявление, без сдвига — так спокойнее */
 .page-in {
-  animation: rise-s 0.26s var(--ease-out);
+  animation: fade 0.4s var(--ease-out);
 }
 /* данные пришли вместо скелетона */
 .appear {
-  animation: fade 0.24s var(--ease-out);
+  animation: fade 0.45s var(--ease-out);
 }
 /* счётчик изменился */
 .bump {
-  animation: bump 0.32s var(--ease-out);
+  animation: bump 0.5s var(--ease-out);
 }
 /* полосы прогресса растут слева */
 .grow {
-  animation: grow 0.6s var(--ease-out);
+  animation: grow 0.9s var(--ease-out);
   transform-origin: left;
 }
 /* первые строки списка появляются по очереди, дальше — сразу */
 .stagger > * {
-  animation: rise-s 0.3s var(--ease-out) backwards;
+  animation: rise-s 0.5s var(--ease-out) backwards;
 }
-.stagger > :nth-child(2) { animation-delay: 25ms; }
-.stagger > :nth-child(3) { animation-delay: 50ms; }
-.stagger > :nth-child(4) { animation-delay: 75ms; }
-.stagger > :nth-child(5) { animation-delay: 100ms; }
-.stagger > :nth-child(6) { animation-delay: 125ms; }
-.stagger > :nth-child(7) { animation-delay: 150ms; }
-.stagger > :nth-child(8) { animation-delay: 175ms; }
-.stagger > :nth-child(n + 9) { animation-delay: 200ms; }
+.stagger > :nth-child(2) { animation-delay: 40ms; }
+.stagger > :nth-child(3) { animation-delay: 80ms; }
+.stagger > :nth-child(4) { animation-delay: 120ms; }
+.stagger > :nth-child(5) { animation-delay: 160ms; }
+.stagger > :nth-child(6) { animation-delay: 200ms; }
+.stagger > :nth-child(7) { animation-delay: 240ms; }
+.stagger > :nth-child(8) { animation-delay: 280ms; }
+.stagger > :nth-child(n + 9) { animation-delay: 320ms; }
 
 /* скелетон: серая плашка с бегущим бликом. Сам появляется с задержкой,
    чтобы при быстрой загрузке не мелькать */
@@ -343,7 +344,7 @@ input[type='search']::-webkit-search-decoration {
   animation: shimmer 1.4s ease-in-out infinite;
 }
 .skel-wrap {
-  animation: fade 0.3s ease-out 0.15s both;
+  animation: fade 0.4s ease-out 0.3s both;
 }
 
 @media (prefers-reduced-motion: reduce) {

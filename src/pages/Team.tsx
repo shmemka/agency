@@ -1,4 +1,4 @@
-import { Lock, RefreshCw } from 'lucide-react'
+import { Link2, Lock, RefreshCw, Send, Share, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
@@ -9,7 +9,7 @@ import type { Profile } from '../lib/types'
 import { toast } from '../lib/toast'
 import { inviteUrl } from '../lib/invite'
 import { confirmDialog, promptDialog } from '../components/dialogs'
-import { Avatar, Button, Card, CopyIcon, Field, Modal, PageHeader, Select, Table, useCopy } from '../components/ui'
+import { Avatar, Button, Card, CopyIcon, Field, Modal, PageHeader, Select, Table, cx, useCopy } from '../components/ui'
 
 export function Team() {
   const { team, profile, isAdmin, reloadTeam, workspace } = useAuth()
@@ -51,9 +51,7 @@ export function Team() {
 
   return (
     <>
-      <PageHeader title="Команда" sub={isAdmin ? 'Учредители видят всё. Специалисты видят своих блогеров и свои кампании' : 'Вы видите своих блогеров и кампании, в которые вас добавили'} />
-
-      {isAdmin && <InviteCard />}
+      <PageHeader title="Команда" sub={isAdmin ? 'Учредители видят всё. Специалисты видят своих блогеров и свои кампании' : 'Вы видите своих блогеров и кампании, в которые вас добавили'} actions={isAdmin && <InviteButton />} />
 
       {isAdmin && pending.length > 0 && (
         <Card className="mb-3">
@@ -200,8 +198,10 @@ export function Team() {
   )
 }
 
-/** Ссылка-приглашение в кабинет: по ней человек регистрируется и сразу попадает в команду */
-function InviteCard() {
+/** Кнопка «Пригласить» в шапке: по ней окно со ссылкой, которую можно скопировать или сразу отправить */
+function InviteButton() {
+  const { workspace } = useAuth()
+  const [open, setOpen] = useState(false)
   const [token, setToken] = useState<string | null | undefined>(undefined)
   const { copied, copy } = useCopy()
   const [busy, setBusy] = useState(false)
@@ -231,34 +231,67 @@ function InviteCard() {
 
   if (token === null) return null
   const url = token ? inviteUrl(token) : ''
+  const text = `Присоединяйтесь к команде «${workspace?.name ?? ''}» в Сверке`
+  const canShare = typeof navigator !== 'undefined' && 'share' in navigator
+
   return (
-    <Card className="mb-3">
-      <h2 className="text-base">Пригласить в команду</h2>
-      <p className="mt-1 mb-4 text-muted">Отправьте ссылку коллеге. Он зарегистрируется и сразу попадёт в кабинет специалистом. Роль можно поменять ниже</p>
-      <div className="flex items-center gap-2 rounded-2xl bg-soft py-1 pr-1 pl-4">
-        <span className="min-w-0 flex-1 truncate py-2 text-[13px]">{url || 'Загружаем…'}</span>
-      </div>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="primary"
-          disabled={!url}
-          onClick={async () => {
-            try {
-              await copy(url)
-            } catch {
-              await promptDialog({ title: 'Скопируйте ссылку', body: 'Браузер не дал скопировать автоматически. Ссылка уже выделена', value: url, readOnly: true })
-            }
-          }}
-        >
-          <CopyIcon copied={copied} />
-          {copied ? 'Скопировано' : 'Скопировать ссылку'}
-        </Button>
-        <Button size="sm" loading={busy} disabled={!url} onClick={reset}>
-          {!busy && <RefreshCw className="size-3.5" strokeWidth={1.5} />}
-          Сделать новую
-        </Button>
-      </div>
-    </Card>
+    <>
+      <Button variant="primary" onClick={() => setOpen(true)} disabled={!url}>
+        <UserPlus className="size-4" strokeWidth={1.5} />
+        Пригласить
+      </Button>
+      <Modal open={open} onClose={() => setOpen(false)} title="Пригласить в команду">
+        <p className="text-muted">Коллега откроет ссылку, зарегистрируется и сразу окажется в команде специалистом. Роль можно поменять в списке</p>
+
+        {/* ссылка и копирование в одной строке */}
+        <div className="mt-5 flex items-center gap-3 rounded-full bg-soft py-1.5 pr-1.5 pl-5">
+          <Link2 className="size-4 shrink-0 text-faint" strokeWidth={1.5} />
+          <span className="min-w-0 flex-1 truncate text-[13px] text-muted" title={url}>
+            {url.replace(/^https?:\/\//, '')}
+          </span>
+          <Button
+            variant="primary"
+            className="min-w-36"
+            onClick={async () => {
+              try {
+                await copy(url)
+              } catch {
+                await promptDialog({ title: 'Скопируйте ссылку', body: 'Браузер не дал скопировать автоматически. Ссылка уже выделена', value: url, readOnly: true })
+              }
+            }}
+          >
+            <CopyIcon copied={copied} />
+            {copied ? 'Скопировано' : 'Скопировать'}
+          </Button>
+        </div>
+
+        {/* или сразу отправить: в Telegram или через меню «Поделиться» телефона */}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a
+            href={`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-soft px-4 text-sm font-medium transition-[background-color,transform] duration-200 hover:bg-ink/8 active:scale-[0.98]"
+          >
+            <Send className="size-4" strokeWidth={1.5} />
+            Отправить в Telegram
+          </a>
+          {canShare && (
+            <Button onClick={() => navigator.share({ title: 'Приглашение в Сверку', text, url }).catch(() => {})}>
+              <Share className="size-4" strokeWidth={1.5} />
+              Поделиться
+            </Button>
+          )}
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-line pt-4 text-[13px]">
+          <span className="text-faint">Ссылка попала не к тому человеку?</span>
+          <button onClick={reset} disabled={busy} className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-muted transition-colors duration-200 hover:bg-ink/5 hover:text-ink disabled:opacity-40">
+            <RefreshCw className={cx('size-3.5', busy && 'animate-spin')} strokeWidth={1.5} />
+            Сделать новую ссылку
+          </button>
+        </div>
+      </Modal>
+    </>
   )
 }
