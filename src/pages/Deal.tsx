@@ -175,7 +175,6 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
   const [minReach, setMinReach] = useState('')
   const [picked, setPicked] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
-  const [mine, setMine] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -191,7 +190,6 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
     return bloggers
       .filter((b) => {
         if (have.has(b.id) || b.status === 'blacklist') return false
-        if (mine && !b.signed) return false
         if (platform && b.platform !== platform) return false
         if (n && ![b.nick, b.name, b.topic, b.content_type].join(' ').toLowerCase().includes(n)) return false
         if (female === 'f' && !((b.audience_female_pct ?? 0) >= 60)) return false
@@ -202,7 +200,7 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
         return true
       })
       .sort((a, z) => (z.avg_reach ?? 0) - (a.avg_reach ?? 0))
-  }, [bloggers, integrations, campaignId, q, platform, female, age, maxPrice, minReach, mine])
+  }, [bloggers, integrations, campaignId, q, platform, female, age, maxPrice, minReach])
 
   async function add() {
     setBusy(true)
@@ -261,10 +259,7 @@ function Picker({ open, onClose, campaignId }: { open: boolean; onClose: () => v
         <Input inputMode="numeric" placeholder="Охват от" value={minReach} onChange={(e) => setMinReach(e.target.value)} aria-label="Охват от" />
       </div>
       <div className="mt-3 flex items-center justify-between gap-3 text-[13px] text-muted">
-        <span className="flex items-center gap-4">
-          Подходит: {list.length}
-          <Toggle checked={mine} onChange={setMine} label="Только наши" />
-        </span>
+        <span>Подходит: {list.length}</span>
         <button className="hover:text-ink" onClick={() => setPicked(new Set(picked.size === list.length ? [] : list.map((b) => b.id)))}>
           {picked.size === list.length && list.length ? 'Снять выбор' : `Выбрать всех: ${list.length}`}
         </button>

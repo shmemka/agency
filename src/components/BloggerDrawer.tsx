@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Check, MessageCircle, Plus, Trash2 } from 'lucide-react'
+import { MessageCircle, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -19,30 +19,6 @@ import { tgUsername } from '../lib/contact'
 import { confirmDialog, confirmDiscard, promptDialog } from './dialogs'
 
 type Tab = 'work' | 'data' | 'docs'
-
-/** «Наш» - блогер подписан в агентство. Переключается одним нажатием, сохраняется сразу */
-function SignedChip({ b }: { b: Blogger }) {
-  const { patchBlogger } = useData()
-  const [busy, setBusy] = useState(false)
-  return (
-    <button
-      type="button"
-      aria-pressed={!!b.signed}
-      disabled={busy}
-      title={b.signed ? 'Блогер подписан в агентство. Нажмите, чтобы снять отметку' : 'Отметить, что блогер подписан в агентство'}
-      onClick={async () => {
-        setBusy(true)
-        const err = await patchBlogger(b.id, { signed: !b.signed })
-        setBusy(false)
-        if (err) toast(/signed|schema cache/i.test(err) ? 'Нужно запустить миграцию 023_signed_bloggers.sql в Supabase' : err)
-      }}
-      className={cx('inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[13px] transition-colors duration-150', b.signed ? 'bg-ink text-white' : 'bg-soft text-muted hover:text-ink')}
-    >
-      {b.signed ? <Check className="size-3.5" strokeWidth={2} /> : <Plus className="size-3.5" strokeWidth={1.5} />}
-      {b.signed ? 'Наш блогер' : 'Наш'}
-    </button>
-  )
-}
 
 export function useBloggerStatus() {
   const { patchBlogger } = useData()
@@ -131,7 +107,6 @@ export function BloggerDrawer({ id, onClose }: { id: string; onClose: () => void
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <BloggerStatusSelect value={b.status} onChange={(s) => setStatus(b, s)} />
-            <SignedChip b={b} />
             <Chip>{legalInfo(b.legal_status).label}</Chip>
             {(b.followers ?? 0) >= 10_000 && <Chip tone={b.rkn_registered ? undefined : 'warn'}>{b.rkn_registered ? 'В перечне РКН' : 'РКН не отмечен'}</Chip>}
             {statsStale(b) && <Chip tone="warn">Статистика старше 60 дней</Chip>}

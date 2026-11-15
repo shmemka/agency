@@ -75,12 +75,6 @@ export function BloggerCard({
         <span className={cx(chip, 'font-medium')} title={p.label}>
           {p.short}
         </span>
-        {b.signed && (
-          <span className={chip} title="Подписан в агентство">
-            <Check className="size-3" strokeWidth={2} />
-            <span className="@max-[200px]:hidden">Наш</span>
-          </span>
-        )}
         {b.status !== 'in_base' && (
           <span className={cx(chip, '@max-[239px]:hidden')}>
             {!black && <span className={cx('size-1.5 rounded-full', st.dot)} />}

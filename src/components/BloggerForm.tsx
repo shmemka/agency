@@ -9,7 +9,7 @@ import { nickFromUrl, parseNumber, platformFromUrl } from '../lib/format'
 import { removeAvatar, uploadAvatar } from '../lib/avatars'
 import type { Blogger, Campaign, Integration } from '../lib/types'
 import { toast } from '../lib/toast'
-import { Avatar, Button, Field, FieldGroup, Input, Modal, Select, Toggle, cx } from './ui'
+import { Avatar, Button, Field, FieldGroup, Input, Modal, Select, cx } from './ui'
 import { CampaignModal } from './CampaignForm'
 import { RichEditor } from './RichEditor'
 
@@ -122,10 +122,6 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
               </span>
             )}
           </Field>
-          {/* «наш» блогер - подписан в агентство; остальные просто найдены */}
-          <div className="-mt-2 sm:col-span-2">
-            <Toggle checked={!!d.signed} onChange={(v) => set('signed', v)} label="Подписан в агентство" />
-          </div>
           </>
         ) : (
           <Field label="Ссылка на профиль" className="sm:col-span-2">
@@ -293,7 +289,7 @@ export function BloggerFields({ d, set, collapsible }: { d: BloggerDraft; set: <
   )
 }
 
-const EDITABLE = ['nick', 'name', 'platform', 'url', 'topic', 'audience', 'content_type', 'city', 'age', 'avatar_url', 'followers', 'avg_reach', 'clip_views', 'audience_female_pct', 'audience_age', 'price', 'contact', 'email', 'phone', 'legal_status', 'rkn_registered', 'owner_id', 'notes', 'signed'] as const
+const EDITABLE = ['nick', 'name', 'platform', 'url', 'topic', 'audience', 'content_type', 'city', 'age', 'avatar_url', 'followers', 'avg_reach', 'clip_views', 'audience_female_pct', 'audience_age', 'price', 'contact', 'email', 'phone', 'legal_status', 'rkn_registered', 'owner_id', 'notes'] as const
 
 export function cleanBlogger(d: BloggerDraft): BloggerDraft {
   const out: Record<string, unknown> = {}
@@ -348,7 +344,7 @@ export function BloggerFormModal({ open, onClose, onCreated }: { open: boolean; 
     }
     const { data, error } = await supabase.from('bloggers').insert(cleanBlogger(d)).select().single()
     setBusy(false)
-    if (error) return toast(error.code === '23505' ? 'Такой блогер уже есть в базе' : /signed/.test(error.message) ? 'Нужно запустить миграцию 023_signed_bloggers.sql в Supabase' : error.message)
+    if (error) return toast(error.code === '23505' ? 'Такой блогер уже есть в базе' : error.message)
     await reload('bloggers')
     toast('Блогер добавлен')
     onClose()

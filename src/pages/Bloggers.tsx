@@ -38,8 +38,6 @@ const SORTS: { id: SortKey; dir: 1 | -1; label: string }[] = [
   { id: 'nick', dir: 1, label: 'По нику' },
 ]
 
-/** вкладка «Наши» в адресе: ?list=ours */
-const OURS = 'ours'
 
 type SortKey = 'nick' | 'followers' | 'avg_reach' | 'price' | 'cpm' | 'updated_at'
 
@@ -106,9 +104,7 @@ export function Bloggers() {
     return m
   }, [listItems])
   const current = lists.find((l) => l.id === list)
-  // «Наши» - подписанные в агентство; встроенная вкладка рядом с «Все»
-  const ours = list === OURS
-  const inList = useMemo(() => (current ? base.filter((b) => members.get(current.id)?.has(b.id)) : ours ? base.filter((b) => b.signed) : base), [base, current, members, ours])
+  const inList = useMemo(() => (current ? base.filter((b) => members.get(current.id)?.has(b.id)) : base), [base, current, members])
   const byStatus = (b: Blogger, st: string) => (st === 'active' ? activeBy.has(b.id) : st === 'stale' ? statsStale(b) : b.status === st)
 
   const rows = useMemo(() => {
@@ -129,8 +125,8 @@ export function Bloggers() {
 
   // список удалили (или ссылка старая) — убираем его из адреса, чтобы не путал
   useEffect(() => {
-    if (!loading && list && !current && !ours) set('list', null)
-  }, [loading, list, current, ours])
+    if (!loading && list && !current) set('list', null)
+  }, [loading, list, current])
 
   const open = (b: Blogger) => nav({ pathname: `/bloggers/${b.id}`, search: params.toString() })
   // Shift+клик по галочке выделяет всех между прошлой отмеченной и этой
@@ -370,7 +366,7 @@ export function Bloggers() {
       {/* вкладки: «Все» и списки, которые создают учредители */}
       <div className="mb-4 flex items-center gap-2">
         <div role="tablist" aria-label="Списки блогеров" className="no-scrollbar inline-flex max-w-full gap-1 overflow-x-auto overscroll-x-contain rounded-full bg-surface p-1">
-          {[{ id: '', name: 'Все', n: base.length }, { id: OURS, name: 'Наши', n: base.filter((b) => b.signed).length }, ...lists.map((l) => ({ id: l.id, name: l.name, n: base.filter((b) => members.get(l.id)?.has(b.id)).length }))].map((t) => (
+          {[{ id: '', name: 'Все', n: base.length }, ...lists.map((l) => ({ id: l.id, name: l.name, n: base.filter((b) => members.get(l.id)?.has(b.id)).length }))].map((t) => (
             <button
               key={t.id || 'all'}
               role="tab"
@@ -454,8 +450,6 @@ export function Bloggers() {
         </Empty>
       ) : current && !members.get(current.id)?.size ? (
         <Empty title={`В списке «${current.name}» пока никого`}>Откройте вкладку «Все», отметьте блогеров галочками и выберите «В список…» внизу экрана</Empty>
-      ) : ours && !bloggers.some((b) => b.signed) ? (
-        <Empty title="Своих блогеров пока не отметили">Откройте карточку блогера и нажмите «Наш» рядом со статусом, если он подписан в агентство</Empty>
       ) : rows.length === 0 ? (
         <Empty title="Никого не нашли">Измените поиск или фильтры</Empty>
       ) : (
