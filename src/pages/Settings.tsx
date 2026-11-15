@@ -1,12 +1,13 @@
 import { useState, type ReactNode } from 'react'
-import { siteUrl, supabase } from '../lib/supabase'
+import { fetchAll, siteUrl, supabase } from '../lib/supabase'
+import { AVATAR_BUCKET, avatarPath } from '../lib/avatars'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { parseNumber, plural } from '../lib/format'
 import type { Settings as SettingsRow } from '../lib/types'
 import { toast } from '../lib/toast'
 import { confirmDialog } from '../components/dialogs'
-import { Button, Card, Field, Input, Loading, PageHeader, Skel, submitOnEnter } from '../components/ui'
+import { Button, Card, Field, Input, Loading, Modal, PageHeader, Skel, submitOnEnter } from '../components/ui'
 import { PLAN, UpgradeButton, WorkspaceTile } from '../components/Workspace'
 
 /**
@@ -46,7 +47,7 @@ export function Settings() {
             </div>
           </Section>
         )}
-        <LeaveCard />
+        <DangerCard />
       </div>
     </>
   )
@@ -153,8 +154,28 @@ function MoneyCard({ s }: { s: SettingsRow }) {
   )
 }
 
+/**
+ * Необратимое - отдельной карточкой в самом низу: покинуть кабинет (любой участник)
+ * и удалить его со всеми данными (учредитель)
+ */
+function DangerCard() {
+  const { isAdmin } = useAuth()
+  return (
+    <Card>
+      <h2 className="text-base">Покинуть или удалить</h2>
+      <LeaveRow />
+      {isAdmin && (
+        <>
+          <div className="my-5 h-px bg-line" />
+          <DeleteRow />
+        </>
+      )}
+    </Card>
+  )
+}
+
 /** Выйти из кабинета самому: например, из агентства, с которым закончили работать */
-function LeaveCard() {
+function LeaveRow() {
   const { workspace, workspaces, team, profile, isAdmin } = useAuth()
   const [busy, setBusy] = useState(false)
   if (!workspace || !profile) return null
@@ -162,12 +183,13 @@ function LeaveCard() {
   // кабинет не должен остаться без учредителя
   const lastAdmin = isAdmin && !team.some((m) => m.id !== profile.id && m.role === 'admin' && m.is_active)
   return (
-    <Section title="Покинуть кабинет">
+    <div className="mt-4">
+      <h3 className="text-[15px]">Покинуть кабинет</h3>
       {lastAdmin ? (
-        <p className="text-muted">Вы единственный учредитель, поэтому покинуть кабинет нельзя. Чтобы уйти, сначала назначьте учредителем кого-то из команды</p>
+        <p className="mt-1 text-[13px] text-muted">Вы единственный учредитель, поэтому покинуть кабинет нельзя. Назначьте учредителем кого-то из команды или удалите кабинет</p>
       ) : (
         <>
-          <p className="mb-4 text-muted">
+          <p className="mt-1 mb-3 text-[13px] text-muted">
             {other ? `После выхода откроется «${other.name}».` : 'Это ваш единственный кабинет: после выхода можно будет создать свой или войти в команду по ссылке.'} Блогеры, задачи и документы останутся в кабинете
           </p>
           <Button
@@ -193,6 +215,119 @@ function LeaveCard() {
           </Button>
         </>
       )}
-    </Section>
+    </div>
+  )
+}
+
+const count = (n: number, one: string, few: string, many: string) => `${n} ${plural(n, one, few, many)}`
+
+/** Удалить кабинет со всеми данными и файлами. Подтверждение - название кабинета, набранное вручную */
+function DeleteRow() {
+  const { workspace, workspaces, team } = useAuth()
+  const d = useData()
+  const [open, setOpen] = useState(false)
+  const [typed, setTyped] = useState('')
+  const [step, setStep] = useState<string | null>(null)
+  if (!workspace) return null
+  const match = typed.trim() === workspace.name
+  const other = workspaces.find((w) => w.id !== workspace.id && w.is_active)
+  const people = team.filter((t) => t.is_active).length
+
+  // что пропадёт - числами, чтобы было понятно, о каком объёме речь
+  const lost = [
+    count(d.bloggers.length, 'блогер', 'блогера', 'блогеров'),
+    count(d.campaigns.length, 'кампания', 'кампании', 'кампаний'),
+    count(d.integrations.length, 'интеграция', 'интеграции', 'интеграций'),
+    count(d.tasks.length, 'задача', 'задачи', 'задач'),
+    count(d.docs.length, 'документ', 'документа', 'документов'),
+  ].join(', ')
+
+  async function run() {
+    if (!workspace || !match) return
+    try {
+      // 1. файлы: хранилище разрешает удалить файл, только пока в базе есть запись о нём
+      setStep('Собираем файлы…')
+      const paths = async (table: string, col: string) =>
+        (
+          await fetchAll<Record<string, string | null>>(
+            (f, t) => supabase.from(table).select(col).not(col, 'is', null).range(f, t) as unknown as PromiseLike<{ data: Record<string, string | null>[] | null; error: { message: string } | null }>,
+          )
+        )
+          .map((r) => r[col])
+          .filter((x): x is string => Boolean(x))
+      const groups: [string, string[]][] = [
+        ['documents', await paths('documents', 'storage_path')],
+        ['task-files', await paths('task_files', 'storage_path')],
+        [AVATAR_BUCKET, (await paths('bloggers', 'avatar_url')).map(avatarPath).filter((p): p is string => Boolean(p?.startsWith('bloggers/')))],
+      ]
+      const total = groups.reduce((a, [, p]) => a + p.length, 0)
+      let done = 0
+      for (const [bucket, list] of groups) {
+        for (let i = 0; i < list.length; i += 100) {
+          const { error } = await supabase.storage.from(bucket).remove(list.slice(i, i + 100))
+          if (error) throw new Error(`Не получилось удалить файлы, данные кабинета не тронуты. Попробуйте ещё раз. ${error.message}`)
+          done += Math.min(100, list.length - i)
+          setStep(`Удаляем файлы: ${done} из ${total}`)
+        }
+      }
+      // 2. данные: кабинет и всё, что в нём, одной транзакцией в базе
+      setStep('Удаляем данные…')
+      const { error } = await supabase.rpc('delete_workspace', { p_ws: workspace.id, p_name: typed.trim() })
+      if (error) throw new Error(/delete_workspace/.test(error.message) ? 'Сначала запустите миграцию 018_delete_workspace.sql в Supabase' : error.message)
+      // откроется другой кабинет, а если их нет - экран «создать кабинет или войти по ссылке»
+      window.location.replace(siteUrl())
+    } catch (e) {
+      setStep(null)
+      toast((e as Error).message)
+    }
+  }
+
+  return (
+    <div>
+      <h3 className="text-[15px]">Удалить кабинет</h3>
+      <p className="mt-1 mb-3 text-[13px] text-muted">Навсегда удалит кабинет, все его данные и файлы. Команда потеряет к нему доступ. Отменить удаление нельзя</p>
+      <Button variant="danger" className="bg-bad/8" onClick={() => setOpen(true)}>
+        Удалить кабинет
+      </Button>
+      <Modal
+        open={open}
+        onClose={() => {
+          if (step) return
+          setOpen(false)
+          setTyped('')
+        }}
+        title={`Удалить «${workspace.name}»?`}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              disabled={!!step}
+              onClick={() => {
+                setOpen(false)
+                setTyped('')
+              }}
+            >
+              Отмена
+            </Button>
+            <Button variant="primary" data-save className="bg-bad! hover:bg-bad/90!" disabled={!match} loading={!!step} onClick={run}>
+              Удалить навсегда
+            </Button>
+          </>
+        }
+      >
+        <ul className="space-y-1.5 rounded-inner bg-bad/6 p-4 text-[13px]">
+          <li>Удалятся {lost}</li>
+          <li>Вместе с ними - финансы, списки, комментарии, история и все загруженные файлы</li>
+          <li>
+            {count(people, 'участник', 'участника', 'участников')} {people === 1 ? 'потеряет' : 'потеряют'} доступ. Сами аккаунты останутся
+          </li>
+          <li>{other ? `После удаления откроется «${other.name}»` : 'Других кабинетов у вас нет: после удаления можно будет создать новый'}</li>
+        </ul>
+        <Field label={`Чтобы подтвердить, введите название кабинета: ${workspace.name}`} className="mt-4">
+          <Input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={workspace.name} autoComplete="off" disabled={!!step} />
+        </Field>
+        {step && <p className="mt-3 text-[13px] text-muted">{step}</p>}
+      </Modal>
+    </div>
   )
 }

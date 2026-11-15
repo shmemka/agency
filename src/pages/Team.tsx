@@ -1,6 +1,5 @@
 import { Link2, Lock, RefreshCw, UserPlus } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -266,15 +265,6 @@ function InviteButton() {
       .maybeSingle()
       .then(({ data }) => setToken(data?.token ?? null))
   }, [])
-
-  // «Пригласить» в меню профиля ведёт сюда с ?invite=1: окно открывается, когда ссылка готова
-  const [params, setParams] = useSearchParams()
-  useEffect(() => {
-    if (!token || !params.has('invite')) return
-    setOpen(true)
-    params.delete('invite')
-    setParams(params, { replace: true })
-  }, [token, params, setParams])
 
   async function reset() {
     const ok = await confirmDialog({

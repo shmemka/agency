@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Sparkles } from 'lucide-react'
+import { Check, CircleArrowUp, Sparkles } from 'lucide-react'
 import { Button, Modal, cx } from './ui'
 
 /*
@@ -46,7 +46,8 @@ export function PlanHost() {
 }
 
 /** «Улучшить план»: открывает окно с тарифами */
-export function UpgradeButton({ className, size = 'sm' }: { className?: string; size?: 'sm' | 'md' }) {
+/** size: sm - маленькая, md - обычная, fill - во всю ширину рядом с кнопкой «Настройки» в меню профиля */
+export function UpgradeButton({ className, size = 'sm' }: { className?: string; size?: 'sm' | 'md' | 'fill' }) {
   return (
     <>
       <button
@@ -54,11 +55,11 @@ export function UpgradeButton({ className, size = 'sm' }: { className?: string; 
         onClick={openPlan}
         className={cx(
           'inline-flex shrink-0 items-center gap-1.5 rounded-full bg-lime font-medium text-ink transition-[filter,transform] duration-200 hover:brightness-95 active:scale-[0.97]',
-          size === 'sm' ? 'h-7 px-2.5 text-xs' : 'h-10 px-4 text-sm',
+          size === 'sm' ? 'h-7 px-2.5 text-xs' : size === 'fill' ? 'h-8 w-full justify-center text-[13px]' : 'h-10 px-4 text-sm',
           className,
         )}
       >
-        <Sparkles className={size === 'sm' ? 'size-3.5' : 'size-4'} strokeWidth={1.5} />
+        <CircleArrowUp className={size === 'md' ? 'size-4' : 'size-3.5'} strokeWidth={1.5} />
         Улучшить
       </button>
     </>

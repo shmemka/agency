@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, CalendarDays, ChevronDown, Clapperboard, Ellipsis, Plus, FileText, LayoutGrid, ListTodo, LogOut, Megaphone, Settings, UserPlus, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
+import { Bell, CalendarDays, ChevronDown, Clapperboard, Ellipsis, Plus, FileText, LayoutGrid, ListTodo, LogOut, Megaphone, Settings, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -12,7 +12,7 @@ import { attention, taskOwner, type Attention } from '../lib/rules'
 import { dateTime, plural } from '../lib/format'
 import { Avatar, IconButton, ITEM, ITEM_DESKTOP, Loading, Modal, POPOVER, Skel, cx } from './ui'
 import { useIntegrationPanel } from './bits'
-import { PLAN, UpgradeButton, WorkspaceTile } from './Workspace'
+import { UpgradeButton, WorkspaceTile } from './Workspace'
 import { IntegrationPanel } from './IntegrationPanel'
 
 const NAV = [
@@ -275,7 +275,7 @@ export function Layout() {
                 <WorkspaceTile id={workspace.id} name={workspace.name} className="size-10 rounded-xl text-sm" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[15px] font-medium">{workspace.name}</div>
-                  <div className="text-[13px] text-muted">{isAdmin ? 'Учредитель' : 'Специалист'}</div>
+                  <div className="text-[13px] text-muted">{membersLabel(team.filter((t) => t.is_active).length)}</div>
                 </div>
                 {isAdmin && <UpgradeButton />}
               </div>
@@ -285,7 +285,7 @@ export function Layout() {
               </NavLink>
             </div>
           )}
-          {workspaces.some((w) => w.id !== workspace?.id) && <p className="px-3 pt-3 pb-1 text-[13px] text-faint">Переключить кабинет</p>}
+          <div className="h-2" />
           {workspaces
             .filter((w) => w.id !== workspace?.id)
             .map((w) => (
@@ -399,9 +399,7 @@ function UserCard({ name, email, avatar, role, onSignOut }: { name: string; emai
                   <WorkspaceTile id={workspace.id} name={workspace.name} className="size-10 rounded-xl text-sm" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[15px] leading-5 font-medium">{workspace.name}</div>
-                    <div className="truncate text-xs text-muted">
-                      {role} · {membersLabel(members)}
-                    </div>
+                    <div className="truncate text-xs text-muted">{membersLabel(members)}</div>
                   </div>
                 </div>
                 <div className={cx('mt-3 grid gap-1.5', isAdmin ? 'grid-cols-2' : 'grid-cols-1')}>
@@ -409,24 +407,13 @@ function UserCard({ name, email, avatar, role, onSignOut }: { name: string; emai
                     <Settings className="size-3.5 text-muted" strokeWidth={1.5} />
                     Настройки
                   </NavLink>
-                  {isAdmin && (
-                    <NavLink to="/team?invite=1" role="menuitem" className={action}>
-                      <UserPlus className="size-3.5 text-muted" strokeWidth={1.5} />
-                      Пригласить
-                    </NavLink>
-                  )}
+                  {isAdmin && <UpgradeButton size="fill" />}
                 </div>
-                {isAdmin && (
-                  <div className="mt-1.5 flex items-center gap-2 rounded-full bg-surface py-1 pr-1 pl-3">
-                    <span className="min-w-0 flex-1 truncate text-[13px] text-muted">{PLAN} план</span>
-                    <UpgradeButton />
-                  </div>
-                )}
               </div>
             )}
 
-            {/* 2. другие кабинеты */}
-            <p className={label}>{others.length ? 'Переключить кабинет' : 'Другие кабинеты'}</p>
+            {/* 2. другие кабинеты: сразу под карточкой текущего, без подзаголовка */}
+            <div className="h-1.5" />
             {others.map((w) => (
               <button
                 key={w.id}
