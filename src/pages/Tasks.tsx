@@ -133,9 +133,10 @@ function DuePicker({ value, onChange, done, className }: { value: string | null;
               <circle cx="16" cy="16" r={r} fill="none" stroke="currentColor" strokeOpacity={0.15} strokeWidth="1.5" />
               {part > 0 && <circle cx="16" cy="16" r={r} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeDasharray={`${len * part} ${len}`} />}
             </svg>
-            <span className="num relative flex flex-col items-center leading-none">
-              <span className="text-[11px] font-medium">{sel.getDate()}</span>
-              <span className="mt-px text-[8px]">{MONTH[sel.getMonth()]}</span>
+            {/* цифры обычные, не моноширинные: в «19» единица не занимает место широкой цифры. Месяц прижат к числу */}
+            <span className="relative flex flex-col items-center leading-none">
+              <span className="text-[11px] font-medium tracking-[-0.03em]">{sel.getDate()}</span>
+              <span className="-mt-px text-[8px]">{MONTH[sel.getMonth()]}</span>
             </span>
           </span>
         )
