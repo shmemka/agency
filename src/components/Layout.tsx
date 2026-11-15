@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, CalendarDays, Check, ChevronsUpDown, Clapperboard, Ellipsis, Plus, FileText, LayoutGrid, ListTodo, LogOut, Megaphone, Settings, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
+import { Bell, CalendarDays, Check, ChevronDown, Clapperboard, Ellipsis, Plus, FileText, LayoutGrid, ListTodo, LogOut, Megaphone, Settings, UserRound, Users, UsersRound, Wallet } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
@@ -54,75 +54,6 @@ async function newWorkspace(create: (name: string) => Promise<string | null>) {
   if (!name?.trim()) return
   const err = await create(name.trim())
   if (err) toast(err)
-}
-
-/** Название кабинета в сайдбаре: по клику — мои кабинеты и «Создать кабинет», как в Notion */
-function WorkspaceMenu({ name }: { name: string }) {
-  const { workspaces, workspace, switchWorkspace, createWorkspace } = useAuth()
-  const [open, setOpen] = useState(false)
-  const box = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    const out = (e: MouseEvent) => !box.current?.contains(e.target as Node) && setOpen(false)
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
-    window.addEventListener('mousedown', out)
-    window.addEventListener('keydown', key)
-    return () => {
-      window.removeEventListener('mousedown', out)
-      window.removeEventListener('keydown', key)
-    }
-  }, [open])
-
-  return (
-    <div ref={box} className="relative min-w-0 flex-1">
-      <button
-        type="button"
-        aria-haspopup="menu"
-        aria-expanded={open}
-        onClick={() => setOpen(!open)}
-        className={cx('group flex w-full min-w-0 items-center gap-1 rounded-xl py-1 pr-1 pl-1 text-left hover:bg-ink/5', open && 'bg-ink/5')}
-        title="Кабинеты"
-      >
-        <span className="min-w-0 flex-1 truncate text-[15px] leading-5 font-medium">{name}</span>
-        {/* стрелка — только при наведении: в узком сайдбаре место нужно названию */}
-        <ChevronsUpDown className={cx('size-3.5 shrink-0 text-faint group-hover:block group-focus-visible:block', open ? 'block' : 'hidden')} strokeWidth={1.5} />
-      </button>
-      {open && (
-        <div role="menu" aria-label="Кабинеты" className={cx('fade absolute top-full left-0 z-40 mt-1.5 w-64', POPOVER)}>
-          {workspaces.map((w) => (
-            <button
-              key={w.id}
-              role="menuitem"
-              className={cx(ITEM, ITEM_DESKTOP, 'gap-2.5 hover:bg-soft', !w.is_active && 'text-muted')}
-              onClick={async () => {
-                setOpen(false)
-                if (w.id === workspace?.id) return
-                const err = await switchWorkspace(w.id)
-                if (err) toast(err)
-              }}
-            >
-              <span className="min-w-0 flex-1 truncate">{w.name}</span>
-              {!w.is_active && <span className="shrink-0 text-xs text-faint">{w.deactivated_at ? 'закрыт' : 'ждёт доступа'}</span>}
-              {w.id === workspace?.id && <Check className="size-4 shrink-0" strokeWidth={1.5} />}
-            </button>
-          ))}
-          <div className="mx-2.5 my-1 h-px bg-line" />
-          <button
-            role="menuitem"
-            className={cx(ITEM, ITEM_DESKTOP, 'gap-2.5 text-muted hover:bg-soft hover:text-ink')}
-            onClick={() => {
-              setOpen(false)
-              newWorkspace(createWorkspace)
-            }}
-          >
-            <Plus className="size-4 shrink-0" strokeWidth={1.5} />
-            Создать кабинет
-          </button>
-        </div>
-      )}
-    </div>
-  )
 }
 
 function BellButton() {
@@ -261,7 +192,10 @@ export function Layout() {
       <aside className="no-print sticky top-0 z-30 hidden h-screen w-60 shrink-0 flex-col p-4 md:flex">
         <div className="flex items-center gap-1.5 px-2 pt-1 pb-6">
           <Mark />
-          <WorkspaceMenu name={agency} />
+          {/* кабинеты переключаются в меню профиля внизу сайдбара */}
+          <span className="min-w-0 flex-1 truncate pl-1 text-[15px] leading-5 font-medium" title={agency}>
+            {agency}
+          </span>
           <BellButton />
         </div>
         <nav ref={navBox} className="relative flex-1 space-y-0.5" aria-label="Разделы">
@@ -385,13 +319,16 @@ const ACCOUNT = [
 ]
 const accountFor = (isAdmin: boolean) => ACCOUNT.filter((a) => !a.admin || isAdmin)
 
-/** Карточка пользователя внизу сайдбара: при наведении или по клику открывает меню аккаунта */
+/**
+ * Профиль внизу сайдбара: при наведении или по клику открывает меню —
+ * кабинеты (переключить или создать, как в Notion), профиль, настройки и выход
+ */
 function UserCard({ name, avatar, role, onSignOut }: { name: string; avatar?: string | null; role: string; onSignOut: () => void }) {
   const [open, setOpen] = useState(false)
   const timer = useRef<number | undefined>(undefined)
   const box = useRef<HTMLDivElement>(null)
   const loc = useLocation()
-  const { isAdmin } = useAuth()
+  const { isAdmin, workspaces, workspace, switchWorkspace, createWorkspace } = useAuth()
   const here = ACCOUNT.some((a) => loc.pathname.startsWith(a.to))
 
   const show = () => {
@@ -416,6 +353,8 @@ function UserCard({ name, avatar, role, onSignOut }: { name: string; avatar?: st
     }
   }, [open])
 
+  const item = cx(ITEM, ITEM_DESKTOP, 'gap-2.5 transition-colors duration-150 hover:bg-soft')
+
   return (
     <div
       ref={box}
@@ -427,34 +366,65 @@ function UserCard({ name, avatar, role, onSignOut }: { name: string; avatar?: st
       {open && (
         // pb-1.5 — невидимый мостик: курсор доходит до меню, не покидая блок
         <div className="absolute inset-x-0 bottom-full pb-1.5">
-          <div role="menu" aria-label="Аккаунт" className={cx('fade', POPOVER)}>
+          <div role="menu" aria-label="Аккаунт и кабинеты" className={cx('fade max-h-[70vh] overflow-y-auto', POPOVER)}>
+            <p className="px-2.5 pt-1.5 pb-1 text-xs text-faint">Кабинеты</p>
+            {workspaces.map((w) => (
+              <button
+                key={w.id}
+                role="menuitem"
+                className={cx(item, !w.is_active && 'text-muted')}
+                onClick={async () => {
+                  setOpen(false)
+                  if (w.id === workspace?.id) return
+                  const err = await switchWorkspace(w.id)
+                  if (err) toast(err)
+                }}
+              >
+                <span className="min-w-0 flex-1 truncate">{w.name}</span>
+                {!w.is_active && <span className="shrink-0 text-xs text-faint">{w.deactivated_at ? 'закрыт' : 'ждёт доступа'}</span>}
+                {w.id === workspace?.id && <Check className="size-4 shrink-0" strokeWidth={1.5} />}
+              </button>
+            ))}
+            <button
+              role="menuitem"
+              className={cx(item, 'text-muted hover:text-ink')}
+              onClick={() => {
+                setOpen(false)
+                newWorkspace(createWorkspace)
+              }}
+            >
+              <Plus className="size-4 shrink-0" strokeWidth={1.5} />
+              Создать кабинет
+            </button>
+            <div className="mx-2.5 my-1 h-px bg-line" />
             {accountFor(isAdmin).map((a) => (
-              <NavLink key={a.to} to={a.to} role="menuitem" className={({ isActive }) => cx(ITEM, ITEM_DESKTOP, 'gap-2.5 transition-colors duration-150 hover:bg-soft', isActive && 'bg-soft')}>
+              <NavLink key={a.to} to={a.to} role="menuitem" className={({ isActive }) => cx(item, isActive && 'bg-soft')}>
                 <a.icon className="size-4 shrink-0 text-muted" strokeWidth={1.5} />
                 {a.label}
               </NavLink>
             ))}
+            <button role="menuitem" className={cx(item, 'text-muted hover:text-ink')} onClick={onSignOut}>
+              <LogOut className="size-4 shrink-0" strokeWidth={1.5} />
+              Выйти
+            </button>
           </div>
         </div>
       )}
-      <div className={cx('flex items-center gap-2.5 rounded-inner bg-surface p-2 transition-shadow duration-150', (open || here) && 'ring-1 ring-ink/10')}>
-        <button
-          type="button"
-          aria-haspopup="menu"
-          aria-expanded={open}
-          onClick={() => (open ? setOpen(false) : show())}
-          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-2xl text-left focus-visible:outline-offset-4"
-        >
-          <Avatar name={name} src={avatar} />
-          <span className="min-w-0 flex-1 leading-4">
-            <span className="block truncate text-[13px]">{name}</span>
-            <span className="block text-xs text-faint">{role}</span>
-          </span>
-        </button>
-        <IconButton label="Выйти" onClick={onSignOut} className="size-8">
-          <LogOut className="size-4" strokeWidth={1.5} />
-        </IconButton>
-      </div>
+      {/* капсула: аватарка на равных отступах сверху, снизу и слева (p-1.5), справа стрелка меню */}
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => (open ? setOpen(false) : show())}
+        className={cx('flex w-full items-center gap-2.5 rounded-full bg-surface p-1.5 pr-3 text-left transition-shadow duration-150', (open || here) && 'ring-1 ring-ink/10')}
+      >
+        <Avatar name={name} src={avatar} />
+        <span className="min-w-0 flex-1 leading-4">
+          <span className="block truncate text-[13px]">{name}</span>
+          <span className="block text-xs text-faint">{role}</span>
+        </span>
+        <ChevronDown className={cx('size-4 shrink-0 text-faint transition-transform duration-200', open && 'rotate-180')} strokeWidth={1.5} />
+      </button>
     </div>
   )
 }
