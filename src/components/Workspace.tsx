@@ -19,7 +19,9 @@ export const initials = (name: string) =>
     .map((w) => w[0]?.toUpperCase())
     .join('') || '?'
 
-export function WorkspaceTile({ id, name, className, muted }: { id: string; name: string; className?: string; muted?: boolean }) {
+export function WorkspaceTile({ id, name, className, muted, src }: { id: string; name: string; className?: string; muted?: boolean; src?: string | null }) {
+  // своя аватарка кабинета вместо букв; у закрытого кабинета - приглушённая
+  if (src) return <img src={src} alt="" aria-hidden className={cx('size-8 shrink-0 rounded-[10px] object-cover', muted && 'opacity-50 grayscale', className)} />
   return (
     <span aria-hidden className={cx('flex size-8 shrink-0 items-center justify-center rounded-[10px] text-xs font-medium', muted ? 'bg-ink/6 text-faint' : TILE[hash(id) % TILE.length], className)}>
       {initials(name)}

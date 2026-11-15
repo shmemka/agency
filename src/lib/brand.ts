@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { squareImage } from './avatars'
 
 /*
  * Оформление кабинета: логотип в меню и брендовый цвет вместо зелёного.
@@ -239,4 +240,17 @@ export async function uploadLogo(workspaceId: string, logo: PreparedLogo): Promi
 export async function removeLogo(url: string | null | undefined) {
   const path = logoPath(url)
   if (path) await supabase.storage.from(LOGO_BUCKET).remove([path])
+}
+
+/** Аватарка кабинета: квадрат до 512 px в webp, в папке кабинета рядом с логотипом */
+export async function uploadWorkspaceAvatar(workspaceId: string, file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('Нужна картинка: JPG, PNG или WebP')
+  const blob = await squareImage(file)
+  const path = `${workspaceId}/avatar-${Date.now()}.webp`
+  const { error } = await supabase.storage.from(LOGO_BUCKET).upload(path, blob, { contentType: 'image/webp', cacheControl: '31536000' })
+  if (error) {
+    if (/bucket not found|row-level security|unauthorized|403/i.test(error.message)) throw new Error('Аватарка не сохранилась: нужно запустить миграцию 019_workspace_brand.sql')
+    throw error
+  }
+  return supabase.storage.from(LOGO_BUCKET).getPublicUrl(path).data.publicUrl
 }

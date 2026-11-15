@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ArrowUp, Check, Paperclip, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { checkQuota } from '../lib/storage'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { dateTime } from '../lib/format'
@@ -136,6 +137,8 @@ export function TaskDrawer({ task, onClose }: { task: Task; onClose: () => void 
       return false
     })
     if (!arr.length) return
+    const full = await checkQuota(arr.reduce((a, f) => a + f.size, 0))
+    if (full) return toast(full)
     // строки с прогрессом появляются сразу, файлы грузятся по очереди
     const ids = uploads.add(arr)
     for (const [n, f] of arr.entries()) {

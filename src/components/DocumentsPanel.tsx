@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link2, Upload } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { checkQuota } from '../lib/storage'
 import { useAuth } from '../auth/AuthProvider'
 import { useData } from '../lib/data'
 import { DOC_KINDS, docKindLabel } from '../lib/constants'
@@ -128,6 +129,8 @@ export function DocumentsPanel({ bloggerId, integrationId, campaignId, choices }
     const list = Array.from(files)
     if (input.current) input.current.value = ''
     if (!list.length) return
+    const full = await checkQuota(list.reduce((a, f) => a + f.size, 0))
+    if (full) return toast(full)
     // строки с прогрессом появляются сразу, файлы грузятся по очереди
     const ids = uploads.add(list)
     let ok = 0

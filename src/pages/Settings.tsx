@@ -12,7 +12,8 @@ import { confirmDialog } from '../components/dialogs'
 import { Avatar, Button, Card, Field, Input, Loading, Modal, PageHeader, Segmented, Skel, cx, submitOnEnter } from '../components/ui'
 import { PLAN, UpgradeButton, WorkspaceTile } from '../components/Workspace'
 import { BrandLogo, Mark } from '../components/Layout'
-import { BRAND_PRESETS, DEFAULT_BRAND, LOGO_BUCKET, applyBrand, logoPath, normalizeHex, onBrand, prepareLogo, removeLogo, uploadLogo, type PreparedLogo } from '../lib/brand'
+import { BRAND_PRESETS, DEFAULT_BRAND, LOGO_BUCKET, applyBrand, logoPath, normalizeHex, onBrand, prepareLogo, removeLogo, uploadLogo, uploadWorkspaceAvatar, type PreparedLogo } from '../lib/brand'
+import { STORAGE_PARTS, bytes, workspaceStorage, type StorageUse } from '../lib/storage'
 
 type SectionId = 'general' | 'brand' | 'money' | 'danger'
 
@@ -100,12 +101,39 @@ function SaveBar({ dirty, saving, onSave, onReset }: { dirty: boolean; saving: b
   )
 }
 
-/** Паспорт кабинета: плитка, название, команда и тариф. Название видно команде и клиентам на подборках и отчётах */
+/** Паспорт кабинета: аватарка, название, команда, тариф и место в хранилище. Название видно команде и клиентам на подборках и отчётах */
 function Passport() {
   const { workspace, isAdmin, team, reloadProfile } = useAuth()
   const [name, setName] = useState(workspace?.name ?? '')
   const [saving, setSaving] = useState(false)
+  const [avatarBusy, setAvatarBusy] = useState(false)
+  const avatarInput = useRef<HTMLInputElement>(null)
+  // undefined - считаем, null - миграции 022 ещё нет: тогда место не показываем
+  const [use, setUse] = useState<StorageUse | null | undefined>(undefined)
+  useEffect(() => {
+    workspaceStorage().then(setUse)
+  }, [workspace?.id])
   if (!workspace) return null
+  const migrate = (m: string) => (/avatar_url|schema cache/i.test(m) ? 'Нужно запустить миграцию 022_storage_avatar.sql в Supabase' : m)
+
+  // аватарка сохраняется сразу, как фото в профиле
+  async function setAvatar(file: File | null) {
+    setAvatarBusy(true)
+    let url: string | null = null
+    try {
+      if (file) url = await uploadWorkspaceAvatar(workspace!.id, file)
+      const { error } = await supabase.from('workspaces').update({ avatar_url: url }).eq('id', workspace!.id)
+      if (error) throw new Error(migrate(error.message))
+      await removeLogo(workspace!.avatar_url)
+      await reloadProfile()
+      workspaceStorage().then(setUse)
+      toast(file ? 'Аватарка сохранена' : 'Аватарка убрана')
+    } catch (e) {
+      if (url) await removeLogo(url)
+      toast((e as Error).message)
+    }
+    setAvatarBusy(false)
+  }
   const people = team.filter((t) => t.is_active)
   const shown = name.trim() || workspace.name
   const dirty = name.trim() !== workspace.name
@@ -123,7 +151,7 @@ function Passport() {
   return (
     <Card>
       <div className="flex items-center gap-4">
-        <WorkspaceTile id={workspace.id} name={shown} className="size-14 rounded-[18px] text-lg" />
+        <WorkspaceTile id={workspace.id} name={shown} src={workspace.avatar_url} className="size-14 rounded-[18px] text-lg" />
         <div className="min-w-0">
           <h2 className="truncate text-xl leading-7">{shown}</h2>
           <Link to="/team" className="group mt-1 inline-flex items-center gap-2 text-[13px] text-muted transition-colors hover:text-ink">
@@ -137,16 +165,44 @@ function Passport() {
         </div>
       </div>
 
-      <div className="mt-5 flex min-h-14 items-center justify-between gap-3 rounded-inner bg-soft py-2 pr-2 pl-4">
-        <div>
-          <div className="text-xs text-muted">Тариф</div>
-          <div className="text-sm">{PLAN}</div>
+      {/* тариф и его лимит рядом: «Улучшить» стоит там, где видно, сколько места осталось */}
+      <div className="mt-5 rounded-inner bg-soft p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-xs text-muted">Тариф</div>
+            <div className="text-sm">{PLAN}</div>
+          </div>
+          {isAdmin && <UpgradeButton size="md" />}
         </div>
-        {isAdmin && <UpgradeButton size="md" />}
+        {use !== null && <StorageMeter use={use} />}
       </div>
 
       {isAdmin && (
         <div className="mt-5" onKeyDown={(e) => submitOnEnter(e, e.currentTarget, 'button[data-save]')}>
+          <Field as="div" label="Аватарка кабинета" hint={hint('Квадратная картинка: видна рядом с названием в меню и в списке кабинетов')} className="mb-4">
+            <div className="flex gap-2">
+              <Button loading={avatarBusy} onClick={() => avatarInput.current?.click()}>
+                {!avatarBusy && <Upload className="size-4" strokeWidth={1.5} />}
+                {workspace.avatar_url ? 'Заменить' : 'Загрузить'}
+              </Button>
+              {workspace.avatar_url && (
+                <Button variant="ghost" disabled={avatarBusy} onClick={() => setAvatar(null)}>
+                  Убрать
+                </Button>
+              )}
+            </div>
+            <input
+              ref={avatarInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                e.target.value = ''
+                if (f) setAvatar(f)
+              }}
+            />
+          </Field>
           <Field label="Название агентства" hint={hint('Видно команде, а клиентам - на подборках и отчётах')}>
             <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
           </Field>
@@ -154,6 +210,47 @@ function Passport() {
         </div>
       )}
     </Card>
+  )
+}
+
+/** Место в хранилище: сколько занято из лимита тарифа и из чего складывается */
+function StorageMeter({ use }: { use: StorageUse | undefined }) {
+  if (!use)
+    return (
+      <div className="mt-4 border-t border-line pt-4">
+        <Skel className="h-3.5 w-40" />
+        <Skel className="mt-2.5 h-1.5 w-full" />
+      </div>
+    )
+  const part = use.limit ? use.total / use.limit : 0
+  const tone = part >= 0.95 ? 'bg-bad' : part >= 0.8 ? 'bg-warn' : 'bg-ink/70'
+  const parts = STORAGE_PARTS.filter((p) => use[p.id] > 0)
+  return (
+    <div className="mt-4 border-t border-line pt-4">
+      <div className="flex items-baseline justify-between gap-3 text-sm">
+        <span>Хранилище</span>
+        <span className="num text-muted">
+          {bytes(use.total)} из {bytes(use.limit)}
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-ink/6" role="meter" aria-valuemin={0} aria-valuemax={use.limit} aria-valuenow={use.total} aria-label="Занято в хранилище">
+        <div className={cx('h-full rounded-full transition-[width] duration-700 ease-[var(--ease-out)]', tone)} style={{ width: `${Math.min(100, Math.max(part * 100, use.total ? 1 : 0))}%` }} />
+      </div>
+      {parts.length > 0 && (
+        <div className="num mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+          {parts.map((p) => (
+            <span key={p.id}>
+              {p.label} {bytes(use[p.id])}
+            </span>
+          ))}
+        </div>
+      )}
+      {part >= 0.8 && (
+        <p className={cx('mt-2 text-[13px]', part >= 1 ? 'text-bad' : 'text-warn')}>
+          {part >= 1 ? 'Место закончилось: новые документы и файлы задач не загрузятся' : 'Место заканчивается. Удалите ненужные файлы или улучшите тариф'}
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -262,7 +359,7 @@ function BrandSection() {
                   <BrandLogo key={logo} src={logo} name={workspace.name} className="appear" />
                 ) : (
                   <>
-                    <Mark />
+                    <Mark src={workspace.avatar_url} />
                     <span className="truncate pl-2.5 text-[15px] leading-5 font-medium">{workspace.name}</span>
                   </>
                 )}
@@ -614,7 +711,7 @@ function DeleteRow() {
         ['documents', await paths('documents', 'storage_path')],
         ['task-files', await paths('task_files', 'storage_path')],
         [AVATAR_BUCKET, (await paths('bloggers', 'avatar_url')).map(avatarPath).filter((p): p is string => Boolean(p?.startsWith('bloggers/')))],
-        [LOGO_BUCKET, [logoPath(workspace.logo_url)].filter((p): p is string => Boolean(p))],
+        [LOGO_BUCKET, [logoPath(workspace.logo_url), logoPath(workspace.avatar_url)].filter((p): p is string => Boolean(p))],
       ]
       const total = groups.reduce((a, [, p]) => a + p.length, 0)
       let done = 0

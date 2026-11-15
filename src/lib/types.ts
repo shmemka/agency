@@ -25,6 +25,8 @@ export interface Workspace {
   logo_url?: string | null
   /** брендовый цвет вместо зелёного, #rrggbb */
   brand_color?: string | null
+  /** аватарка кабинета вместо плитки с буквами (миграция 022) */
+  avatar_url?: string | null
 }
 
 export type Platform = 'tiktok' | 'youtube' | 'telegram' | 'vk' | 'instagram' | 'other'

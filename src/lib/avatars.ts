@@ -4,7 +4,7 @@ export const AVATAR_BUCKET = 'avatars'
 const SIZE = 512
 
 /** Квадрат по центру, до 512×512, webp: фото весит десятки килобайт, а не мегабайты с телефона */
-async function squareImage(file: File): Promise<Blob> {
+export async function squareImage(file: File): Promise<Blob> {
   const bmp = await createImageBitmap(file)
   const side = Math.min(bmp.width, bmp.height)
   const canvas = document.createElement('canvas')

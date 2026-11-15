@@ -43,7 +43,9 @@ export function BrandLogo({ src, name, className }: { src: string; name: string;
   return <img src={src} alt={name} title={name} className={cx('h-8 w-auto max-w-36 min-w-0 object-contain object-left', className)} />
 }
 
-export function Mark() {
+/** Значок кабинета рядом с названием: аватарка кабинета, а без неё - знак «Сверки» */
+export function Mark({ src }: { src?: string | null }) {
+  if (src) return <img src={src} alt="" aria-hidden className="size-8 shrink-0 rounded-full object-cover" />
   return (
     <span className="relative inline-flex size-8 shrink-0 items-center justify-center rounded-full bg-ink" aria-hidden>
       <span className="bar-lime size-2.5 rounded-full" />
@@ -212,7 +214,7 @@ export function Layout() {
             </span>
           ) : (
             <>
-              <Mark />
+              <Mark src={workspace?.avatar_url} />
               <span className="min-w-0 flex-1 truncate pl-1 text-[15px] leading-5 font-medium" title={agency}>
                 {agency}
               </span>
@@ -245,7 +247,7 @@ export function Layout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className={cx('no-print sticky top-0 z-30 flex h-14 items-center gap-2.5 bg-canvas/85 px-4 backdrop-blur-md transition-shadow duration-300 md:hidden', scrolled && 'shadow-[0_1px_0_var(--color-line)]')}>
-          {!logo && <Mark />}
+          {!logo && <Mark src={workspace?.avatar_url} />}
           <span className={cx('relative min-w-0 flex-1 text-[15px] leading-5 font-medium', logo ? 'h-8' : 'h-5')}>
             <span className={cx('absolute inset-0 truncate transition-[opacity,transform] duration-300', logo && 'flex', scrolled ? '-translate-y-1 opacity-0' : 'opacity-100')}>{logo ? <BrandLogo src={logo} name={agency} /> : agency}</span>
             <span aria-hidden={!scrolled} className={cx('absolute inset-0 truncate transition-[opacity,transform] duration-300', logo && 'leading-8', scrolled ? 'opacity-100' : 'translate-y-1 opacity-0')}>
@@ -293,7 +295,7 @@ export function Layout() {
           {workspace && (
             <div className="mx-1 rounded-inner bg-soft p-3">
               <div className="flex items-center gap-3">
-                <WorkspaceTile id={workspace.id} name={workspace.name} className="size-10 rounded-xl text-sm" />
+                <WorkspaceTile id={workspace.id} name={workspace.name} src={workspace.avatar_url} className="size-10 rounded-xl text-sm" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[15px] font-medium">{workspace.name}</div>
                   <div className="text-[13px] text-muted">{membersLabel(team.filter((t) => t.is_active).length)}</div>
@@ -318,7 +320,7 @@ export function Layout() {
                 }}
                 className="flex h-14 w-full items-center gap-3 rounded-2xl px-3 text-left hover:bg-soft"
               >
-                <WorkspaceTile id={w.id} name={w.name} muted={!w.is_active} />
+                <WorkspaceTile id={w.id} name={w.name} src={w.avatar_url} muted={!w.is_active} />
                 <span className="min-w-0 flex-1">
                   <span className={cx('block truncate text-[15px]', !w.is_active && 'text-muted')}>{w.name}</span>
                   <span className="block text-[13px] text-faint">{!w.is_active ? (w.deactivated_at ? 'доступ закрыт' : 'ждёт подтверждения') : w.role === 'admin' ? 'Учредитель' : 'Специалист'}</span>
@@ -417,7 +419,7 @@ function UserCard({ name, email, avatar, role, onSignOut }: { name: string; emai
             {workspace && (
               <div className="rounded-[14px] bg-soft p-3">
                 <div className="flex items-center gap-3">
-                  <WorkspaceTile id={workspace.id} name={workspace.name} className="size-10 rounded-xl text-sm" />
+                  <WorkspaceTile id={workspace.id} name={workspace.name} src={workspace.avatar_url} className="size-10 rounded-xl text-sm" />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-[15px] leading-5 font-medium">{workspace.name}</div>
                     <div className="truncate text-xs text-muted">{membersLabel(members)}</div>
@@ -446,7 +448,7 @@ function UserCard({ name, email, avatar, role, onSignOut }: { name: string; emai
                   if (err) toast(err)
                 }}
               >
-                <WorkspaceTile id={w.id} name={w.name} muted={!w.is_active} className="size-7 text-[11px]" />
+                <WorkspaceTile id={w.id} name={w.name} src={w.avatar_url} muted={!w.is_active} className="size-7 text-[11px]" />
                 <span className="min-w-0 flex-1 leading-4">
                   <span className={cx('block truncate', !w.is_active && 'text-muted')}>{w.name}</span>
                   <span className="block truncate text-xs text-faint">{!w.is_active ? (w.deactivated_at ? 'доступ закрыт' : 'ждёт подтверждения') : w.role === 'admin' ? 'Учредитель' : 'Специалист'}</span>
